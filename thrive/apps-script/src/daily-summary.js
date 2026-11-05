@@ -1,4 +1,4 @@
-// DailySummary tab (A:AC) — one row per local calendar day, rolled up from
+// DailySummary tab (A:AE) — one row per local calendar day, rolled up from
 // Workouts, DailyHealth, BodyMeasurements (#203) and Drinks (#522).
 //
 // **Derived, never authoritative.** Every row is rebuildable at any time from
@@ -192,32 +192,99 @@ function getDrinksByDate() {
 }
 
 /**
- * The day's four drinks columns (#522, #562, #592): `water_ml` the sum of its
+ * The day's six drinks columns (#522, #562, #592, #827): `water_ml` the sum of its
  * water amounts, `alcohol_drinks` the sum of its alcohol amounts,
  * `coffee_cups` the sum of its coffee amounts, `unwind_mg` the sum of its
- * unwind amounts. Each is blank,
+ * unwind amounts,
+ * and the two water timing columns (see `waterTiming`). Each is blank,
  * never `0`, on a day with no drink of that kind: blank means not recorded,
  * the rule every other column here keeps. An amount that is not a whole
  * number is skipped; the API never writes one.
  */
-function summarizeDrinksDay(dayDrinks) {
+function summarizeDrinksDay(dayDrinks, date, computedAt) {
   var water = 0, waterCount = 0, alcohol = 0, alcoholCount = 0, coffee = 0, coffeeCount = 0;
   var unwind = 0, unwindCount = 0;
   var list = dayDrinks || [];
+  var waters = [];
   for (var i = 0; i < list.length; i++) {
     var amount = String(list[i].amount).trim();
     if (!/^\d+$/.test(amount)) continue;
-    if (list[i].kind === 'water') { water += Number(amount); waterCount += 1; }
-    else if (list[i].kind === 'alcohol') { alcohol += Number(amount); alcoholCount += 1; }
+    if (list[i].kind === 'water') {
+      water += Number(amount); waterCount += 1;
+      var at = clockSeconds(list[i].time);
+      if (at !== null) waters.push({ at: at, ml: Number(amount) });
+    } else if (list[i].kind === 'alcohol') { alcohol += Number(amount); alcoholCount += 1; }
     else if (list[i].kind === 'coffee') { coffee += Number(amount); coffeeCount += 1; }
     else if (list[i].kind === 'unwind') { unwind += Number(amount); unwindCount += 1; }
   }
+  var timing = waterTiming(waters, date, computedAt);
   return {
     water_ml: waterCount ? String(water) : '',
     alcohol_drinks: alcoholCount ? String(alcohol) : '',
     coffee_cups: coffeeCount ? String(coffee) : '',
     unwind_mg: unwindCount ? String(unwind) : '',
+    water_by_noon_ml: timing.by_noon,
+    water_gap_max_s: timing.gap_max,
   };
+}
+
+/** Seconds after local midnight of a drink's `HH:mm:ss` (or `HH:mm`) time, or null when it is not one. */
+function clockSeconds(time) {
+  var m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(time).trim());
+  if (!m) return null;
+  var h = Number(m[1]), min = Number(m[2]), sec = m[3] ? Number(m[3]) : 0;
+  if (h > 23 || min > 59 || sec > 59) return null;
+  return h * 3600 + min * 60 + sec;
+}
+
+/**
+ * The day's water timing (#827), from its timed water entries `{at, ml}`:
+ * `by_noon` the ml logged before 12:00:00, `gap_max` the longest stretch with
+ * no water inside the daytime window, in whole seconds. Both blank, never `0`,
+ * on a day with no water; a measured `0` stays `0`.
+ *
+ * The window's edges count, so the stretches run from the window's start to
+ * the first water in it, between each pair, and from the last one to its end.
+ * Water outside the window is not in it.
+ *
+ * A row computed on its own date has not seen the rest of the day, so the
+ * window ends at `computedAt` (local) when that is before the window's end,
+ * and the gap is blank before the window opens. Any other row sees the whole
+ * window. Both stay a pure function of the sources and the injected
+ * `computedAt` (#131).
+ */
+function waterTiming(waters, date, computedAt) {
+  if (!waters.length) return { by_noon: '', gap_max: '' };
+
+  var byNoon = 0;
+  for (var i = 0; i < waters.length; i++) {
+    if (waters[i].at < WATER_NOON_S) byNoon += waters[i].ml;
+  }
+
+  var end = WATER_WINDOW_END_S;
+  var instant = computedAt ? new Date(computedAt) : null;
+  if (instant && !isNaN(instant.getTime()) &&
+      Utilities.formatDate(instant, TIMEZONE, 'yyyy-MM-dd') === date) {
+    var now = clockSeconds(Utilities.formatDate(instant, TIMEZONE, 'HH:mm:ss'));
+    if (now !== null && now < end) end = now;
+  }
+  if (end < WATER_WINDOW_START_S) return { by_noon: String(byNoon), gap_max: '' };
+
+  var inWindow = [];
+  for (var j = 0; j < waters.length; j++) {
+    if (waters[j].at >= WATER_WINDOW_START_S && waters[j].at <= end) inWindow.push(waters[j].at);
+  }
+  inWindow.sort(function (a, b) { return a - b; });
+
+  var longest = 0;
+  var cursor = WATER_WINDOW_START_S;
+  for (var k = 0; k < inWindow.length; k++) {
+    if (inWindow[k] - cursor > longest) longest = inWindow[k] - cursor;
+    cursor = inWindow[k];
+  }
+  if (end - cursor > longest) longest = end - cursor;
+
+  return { by_noon: String(byNoon), gap_max: String(longest) };
 }
 
 /** Round half up to the nearest whole number — Math.round's tie-break, made explicit. */
@@ -289,7 +356,7 @@ function buildDaySummary(date, workouts, health, computedAt, body, drinks) {
   var drinks_ = drinks && drinks.length ? drinks : null;
   if (!workouts.length && !health_ && !body_ && !drinks_) return null;
   var bodySummary = summarizeBodyDay(body_);
-  var drinksSummary = summarizeDrinksDay(drinks_);
+  var drinksSummary = summarizeDrinksDay(drinks_, date, computedAt);
 
   var outdoorCardio = workouts.filter(isOutdoorCardio);
   // Blank when no outdoor session measured it, never 0 (#190, as #181 did for
@@ -342,6 +409,9 @@ function buildDaySummary(date, workouts, health, computedAt, body, drinks) {
     coffee_cups: drinksSummary.coffee_cups,
     // Appended after AB (#592), for the same reason.
     unwind_mg: drinksSummary.unwind_mg,
+    // Appended after AC (#827), for the same reason.
+    water_by_noon_ml: drinksSummary.water_by_noon_ml,
+    water_gap_max_s: drinksSummary.water_gap_max_s,
   };
 }
 

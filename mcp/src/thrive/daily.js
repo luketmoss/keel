@@ -6,7 +6,7 @@
 // not conclude "no sleep", and a missing label would hide that the field
 // exists at all.
 
-import { todayStr, secondsToMinutes, metersToMiles, metersToFeet, kgToLb, mlToOz } from './domain.js';
+import { todayStr, nowTimeStr, secondsToMinutes, metersToMiles, metersToFeet, kgToLb, mlToOz } from './domain.js';
 
 export const BLANK = '—';
 
@@ -176,6 +176,43 @@ function bpMean(s) {
 /** "354" -> "12 oz (354 ml)"; blank -> "—" (#522). */
 const water = (ml) => (isBlank(ml) ? BLANK : `${mlToOz(ml)} oz (${ml} ml)`);
 
+/** "354" -> "12 oz"; blank -> "—". A measured "0" stays "0 oz" (#827). */
+const ounces = (ml) => (isBlank(ml) ? BLANK : `${mlToOz(ml)} oz`);
+
+/** "13200" -> "3 h 40 min", "2400" -> "40 min"; blank -> "—" (#827). */
+function gapText(seconds) {
+  if (isBlank(seconds)) return BLANK;
+  const n = Number(seconds);
+  if (!Number.isFinite(n)) return String(seconds);
+  const mins = Math.round(n / 60);
+  return mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
+}
+
+/**
+ * The daytime window closes at 20:00 (the API's WATER_WINDOW_END_S). A row
+ * computed before that on its own date measured an unfinished window, and the
+ * gap says so (#827).
+ */
+const WATER_WINDOW_END = '20:00';
+
+function computedSoFar(s) {
+  if (isBlank(s.computed_at)) return false;
+  const at = new Date(s.computed_at);
+  if (Number.isNaN(at.getTime())) return false;
+  return todayStr(at) === s.date && nowTimeStr(at) < WATER_WINDOW_END;
+}
+
+/**
+ * The water entry (#522, #827): the day's total, then how much came by noon
+ * and the longest daytime gap. A day with no water is one "—"; a row from
+ * before #827's migration has the total and "—" for the two it lacks.
+ */
+function waterDay(s) {
+  if (isBlank(s.water_ml)) return BLANK;
+  const gap = `longest daytime gap ${gapText(s.water_gap_max_s)}${!isBlank(s.water_gap_max_s) && computedSoFar(s) ? ' (so far)' : ''}`;
+  return `${water(s.water_ml)}, ${ounces(s.water_by_noon_ml)} by noon, ${gap}`;
+}
+
 /** "2" -> "2 cups"; blank -> "—" (#562). */
 const coffee = (n) => (isBlank(n) ? BLANK : `${n} cup${Number(n) === 1 ? '' : 's'}`);
 
@@ -213,7 +250,7 @@ export function describeSummaryDay(s) {
   parts.push(`· weight ${mass(s.weight_kg)}`);
   parts.push(`· fat ${withUnit(s.fat_ratio_pct, ' %')}`);
   parts.push(`· BP ${bpMean(s)}`);
-  parts.push(`· water ${water(s.water_ml)}`);
+  parts.push(`· water ${waterDay(s)}`);
   // A row from before #562's migration has no coffee_cups: blank, so "—".
   parts.push(`· coffee ${coffee(s.coffee_cups)}`);
   parts.push(`· alcohol ${alcohol(s.alcohol_drinks)}`);
@@ -238,6 +275,10 @@ export function describeSummaryRange(rows, { from, to }) {
   out.push(
     'Weight and fat are the day\'s FIRST scale reading with a weight, not a mean; BP is the MEAN of the ' +
     "day's readings, with the count behind it. Both are rolled up from BodyMeasurements (#203); \"—\" means no such reading that day.",
+  );
+  out.push(
+    'Water by noon counts what was logged before 12:00 and the longest daytime gap is the longest stretch with no water between ' +
+    '09:00 and 20:00 (#827); "(so far)" means the row was computed before 20:00 that day, so the window was not over.',
   );
   out.push(
     'Water, coffee (in cups), alcohol and Unwind (in mg) are the day\'s totals from the Drinks log (#522, #562, #592): "—" means none ' +

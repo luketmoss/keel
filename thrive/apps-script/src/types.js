@@ -271,7 +271,7 @@ var SECTIONS = ['warmup', 'primary', 'SS1', 'SS2', 'SS3', 'burnout', 'cooldown']
 /** The fields a set correction may change. Mirrors SET_UPDATE_FIELDS. */
 var SET_UPDATE_FIELDS = ['weight', 'reps', 'planned_reps', 'effort'];
 
-// --- DailySummary (A:AC) — #131, #181, #203, #522, #562, #592 ---------
+// --- DailySummary (A:AE) — #131, #181, #203, #522, #562, #592, #827 ---
 //
 // One row per local calendar day. Derived, never authoritative: if this tab
 // and Workouts disagree, Workouts is right and this is stale.
@@ -316,9 +316,18 @@ var DAILY_SUMMARY_FIELDS = [
   'alcohol_drinks',        // AA #522: sum of the day's alcohol amounts (standard drinks); blank when none
   'coffee_cups',           // AB #562: sum of the day's coffee amounts (cups); blank when none
   'unwind_mg',             // AC #592: sum of the day's unwind amounts (mg); blank when none
+  'water_by_noon_ml',      // AD #827: water amounts logged before 12:00:00 local; blank when no water that day
+  'water_gap_max_s',       // AE #827: longest water-free stretch in 09:00:00 to 20:00:00 local, seconds; blank when no water
 ];
 
-var DAILY_SUMMARY_COLUMN_COUNT = 29;
+var DAILY_SUMMARY_COLUMN_COUNT = 31;
+
+// The daytime window #827's water gap is measured in, seconds after local
+// midnight. They match the owner's water-gap test; changing the test's window
+// means changing these, and the rebuild redoes history.
+var WATER_WINDOW_START_S = 9 * 3600;
+var WATER_WINDOW_END_S = 20 * 3600;
+var WATER_NOON_S = 12 * 3600;
 
 // --- DailyHealth (A:S) — #165, #231 ---------------------------------
 //

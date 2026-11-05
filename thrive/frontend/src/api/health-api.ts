@@ -93,6 +93,8 @@ export const DAILY_SUMMARY_FIELDS = [
   'alcohol_drinks', // AA #522: the day's alcohol from Drinks, standard drinks; blank when none
   'coffee_cups', // AB #562: the day's coffee from Drinks, cups; blank when none
   'unwind_mg', // AC #592: the day's unwind from Drinks, mg; blank when none
+  'water_by_noon_ml', // AD #827: water logged before 12:00 local, ml; blank when no water
+  'water_gap_max_s', // AE #827: longest water-free stretch from 09:00 to 20:00 local, seconds; blank when no water
 ] as const;
 
 export type DailyHealthField = (typeof DAILY_HEALTH_FIELDS)[number];

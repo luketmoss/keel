@@ -81,22 +81,24 @@ describe('AC1: each field list mirrors types.js', () => {
     expect(BODY_MEASUREMENT_FIELDS).toHaveLength(20);
   });
 
-  it('DAILY_SUMMARY_FIELDS matches, name for name and in order (A:AC)', () => {
+  it('DAILY_SUMMARY_FIELDS matches, name for name and in order (A:AE)', () => {
     expect([...DAILY_SUMMARY_FIELDS]).toEqual(fieldsIn('DAILY_SUMMARY_FIELDS'));
-    // #522, #562, #592: appended after bp_count, in the same position as types.js
-    expect(DAILY_SUMMARY_FIELDS.slice(24, 29)).toEqual([
+    // #522, #562, #592, #827: appended after bp_count, in the same position as types.js
+    expect(DAILY_SUMMARY_FIELDS.slice(24, 31)).toEqual([
       'bp_count',
       'water_ml',
       'alcohol_drinks',
       'coffee_cups',
       'unwind_mg',
+      'water_by_noon_ml',
+      'water_gap_max_s',
     ]);
   });
 
   it('derives each read range from its list length', () => {
     expect(readRange('DailyHealth', DAILY_HEALTH_FIELDS)).toBe('DailyHealth!A2:S');
     expect(readRange('BodyMeasurements', BODY_MEASUREMENT_FIELDS)).toBe('BodyMeasurements!A2:T');
-    expect(readRange('DailySummary', DAILY_SUMMARY_FIELDS)).toBe('DailySummary!A2:AC');
+    expect(readRange('DailySummary', DAILY_SUMMARY_FIELDS)).toBe('DailySummary!A2:AE');
     // Appending a column is a one-line change: the range follows the list.
     expect(readRange('DailyHealth', [...DAILY_HEALTH_FIELDS, 'next'])).toBe('DailyHealth!A2:T');
   });
@@ -160,6 +162,33 @@ describe('AC2: blank stays blank, 0 stays 0, nothing is converted', () => {
     expect(s.distance_withdata).toBe('1');
     expect(s.total_moving_s).toBe('');
     expect(s.moving_withdata).toBe('0');
+  });
+
+  it('reads a DailySummary row with or without the #827 water timing', () => {
+    const withTiming = rowToDailySummary(
+      rowOf(DAILY_SUMMARY_FIELDS, {
+        date: '2026-10-19',
+        water_ml: '1538',
+        water_by_noon_ml: '532',
+        water_gap_max_s: '13200',
+      }),
+      2,
+    );
+    expect(withTiming.water_by_noon_ml).toBe('532');
+    expect(withTiming.water_gap_max_s).toBe('13200');
+
+    // A row written before the migration stops at AC; Sheets drops the empty tail.
+    const before = rowToDailySummary(
+      rowOf(DAILY_SUMMARY_FIELDS, { date: '2026-10-19', water_ml: '1538' }).slice(0, 29),
+      3,
+    );
+    expect(before.water_ml).toBe('1538');
+    expect(before.water_by_noon_ml).toBe('');
+    expect(before.water_gap_max_s).toBe('');
+
+    // A measured 0 stays 0.
+    const zero = rowToDailySummary(rowOf(DAILY_SUMMARY_FIELDS, { date: '2026-10-19', water_by_noon_ml: '0' }), 4);
+    expect(zero.water_by_noon_ml).toBe('0');
   });
 
   it('trims cell text and turns non-strings into their text, nothing more', () => {
@@ -233,7 +262,7 @@ describe('AC3/AC4: fetching each tab', () => {
           ['g1', '2026-09-20'],
           ['', '2026-09-20'],
         ];
-      if (range === 'DailySummary!A2:AC') return [['2026-09-20', '1'], ['']];
+      if (range === 'DailySummary!A2:AE') return [['2026-09-20', '1'], ['']];
       throw new Error(`unexpected range ${range}`);
     });
     const [h, b, s] = await Promise.all([

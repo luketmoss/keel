@@ -19,6 +19,7 @@ const COL = {
   moving_withdata: 18, elapsed_withdata: 19,
   weight_kg: 20, fat_ratio_pct: 21, systolic_mmhg: 22, diastolic_mmhg: 23, bp_count: 24,
   water_ml: 25, alcohol_drinks: 26, coffee_cups: 27, unwind_mg: 28,
+  water_by_noon_ml: 29, water_gap_max_s: 30,
 };
 
 function rebuild(
@@ -1192,5 +1193,165 @@ describe('#592 AC2: the day sums its unwind mg', () => {
     }, '2026-10-19', '2026-10-19');
     const res = callDoGet<any[]>(first.sandbox, { action: 'getDailySummary', from: '2026-10-19', to: '2026-10-19' });
     expect(res.data[0].unwind_mg).toBe('10');
+  });
+});
+
+// --- #827: water timing, rolled up from Drinks ------------------------------
+
+describe('#827: AD:AE are appended, and the migration matches', () => {
+  it('appends water_by_noon_ml and water_gap_max_s after unwind_mg, moving nothing', () => {
+    const { sandbox } = loadApi();
+    const fields = [...sandbox.DAILY_SUMMARY_FIELDS];
+    expect(fields.slice(25, 31)).toEqual([
+      'water_ml', 'alcohol_drinks', 'coffee_cups', 'unwind_mg', 'water_by_noon_ml', 'water_gap_max_s',
+    ]);
+    expect(fields).toHaveLength(31);
+    expect(sandbox.DAILY_SUMMARY_COLUMN_COUNT).toBe(31);
+  });
+});
+
+/** A day's water entries at the given local times, 100 ml each unless a pair says otherwise. */
+const waters = (date: string, ...times: Array<string | [string, string]>) =>
+  times.map((t, i) => {
+    const [time, ml] = typeof t === 'string' ? [t, '100'] : t;
+    return drinkRow(`w${date}-${i}`, 'water', ml, date, time);
+  });
+
+const DAY = '2026-10-19';
+/** The next morning (local), so the row's window is closed. */
+const NEXT_MORNING = '2026-10-20T14:00:00.000Z';
+
+function waterCols(drinks: CellValue[][], computedAt: string = NEXT_MORNING, date = DAY) {
+  const { res, summaryRows } = rebuild({ drinks }, date, date, computedAt);
+  expect(res.success).toBe(true);
+  return { noon: summaryRows[0][COL.water_by_noon_ml], gap: summaryRows[0][COL.water_gap_max_s], row: summaryRows[0] };
+}
+
+describe('#827: water by noon and the longest daytime gap', () => {
+  it('measures 11:45 to 16:30 as 17100 s, with the 08:15 water outside the window', () => {
+    const { noon, gap } = waterCols(waters(DAY, ['08:15:00', '100'], ['10:00:00', '200'], ['11:45:00', '300'], ['16:30:00', '400']));
+    expect(noon).toBe('600');
+    expect(gap).toBe('17100');
+  });
+
+  it('counts the window edges: waters at 13:30 and 19:00 give 19800 s and a measured 0 by noon', () => {
+    const { noon, gap } = waterCols(waters(DAY, '13:30:00', '19:00:00'));
+    expect(noon).toBe('0');
+    expect(gap).toBe('19800');
+  });
+
+  it('gives the whole 11 hours when the only water is outside the window', () => {
+    expect(waterCols(waters(DAY, '07:00:00', '21:00:00')).gap).toBe('39600');
+  });
+
+  it('counts a water at exactly 12:00:00 after noon and one at 11:59:59 before it', () => {
+    expect(waterCols(waters(DAY, '12:00:00')).noon).toBe('0');
+    expect(waterCols(waters(DAY, '11:59:59')).noon).toBe('100');
+  });
+
+  it('measures by time, not by the order the entries sit in the tab', () => {
+    expect(waterCols(waters(DAY, '16:30:00', '10:00:00', '11:45:00')).gap).toBe('17100');
+  });
+
+  it('is blank, never 0, on a day with other drinks but no water, and on a day with no drinks', () => {
+    const other = waterCols([
+      drinkRow('c1', 'coffee', '1', DAY, '09:00:00'),
+      drinkRow('a1', 'alcohol', '1', DAY, '18:00:00'),
+      drinkRow('u1', 'unwind', '5', DAY, '21:00:00'),
+    ]);
+    expect([other.noon, other.gap]).toEqual(['', '']);
+
+    const { summaryRows } = rebuild({
+      workouts: [workoutRow({ id: 'w_1', date: DAY, type: 'weight' })],
+    }, DAY, DAY);
+    expect(summaryRows[0][COL.water_by_noon_ml]).toBe('');
+    expect(summaryRows[0][COL.water_gap_max_s]).toBe('');
+  });
+
+  it('is not affected by coffee, alcohol or unwind entries', () => {
+    const base = () => waters(DAY, '10:00:00', '11:45:00', '16:30:00');
+    const plain = waterCols(base());
+    const mixed = waterCols([
+      ...base(),
+      drinkRow('c1', 'coffee', '1', DAY, '08:00:00'),
+      drinkRow('c2', 'coffee', '1', DAY, '13:00:00'),
+      drinkRow('a1', 'alcohol', '1', DAY, '14:00:00'),
+      drinkRow('u1', 'unwind', '5', DAY, '15:00:00'),
+    ]);
+    expect([mixed.noon, mixed.gap]).toEqual([plain.noon, plain.gap]);
+  });
+
+  it("keeps another day's water out", () => {
+    const { gap } = waterCols([...waters(DAY, '10:00:00'), ...waters('2026-10-18', '12:00:00', '15:00:00')]);
+    expect(gap).toBe('36000');
+  });
+});
+
+describe('#827: a day still in progress', () => {
+  // America/Denver is UTC-6 on 2026-10-19 (MDT).
+  const at = (hhmm: string) => `2026-10-19T${String(Number(hhmm.slice(0, 2)) + 6).padStart(2, '0')}${hhmm.slice(2)}:00.000Z`;
+
+  it("ends the window at computed_at when that is before 20:00 on the row's own date", () => {
+    expect(waterCols(waters(DAY, '09:30:00', '10:00:00'), at('15:00')).gap).toBe('18000');
+    expect(waterCols(waters(DAY, '09:30:00', '10:00:00'), NEXT_MORNING).gap).toBe('36000');
+  });
+
+  it('leaves the gap blank before 09:00 and sums the water so far', () => {
+    const early = waterCols(waters(DAY, ['06:30:00', '250'], ['07:45:00', '250']), at('08:00'));
+    expect(early.gap).toBe('');
+    expect(early.noon).toBe('500');
+  });
+
+  it('sees the whole window when computed after 20:00 on the same date', () => {
+    expect(waterCols(waters(DAY, '09:30:00', '10:00:00'), at('21:00')).gap).toBe('36000');
+  });
+
+  it('ignores a water stamped after computed_at, which that rebuild could not have seen', () => {
+    expect(waterCols(waters(DAY, '10:00:00', '16:00:00'), at('15:00')).gap).toBe('18000');
+  });
+
+  it('rebuilding the same range twice with the same computed_at gives identical rows', () => {
+    const drinks = () => waters(DAY, '09:30:00', '10:00:00', '14:00:00');
+    const first = rebuild({ drinks: drinks() }, DAY, DAY, at('15:00'));
+    const second = rebuild({ drinks: drinks(), dailySummary: JSON.parse(JSON.stringify(first.summaryRows)) }, DAY, DAY, at('15:00'));
+    expect(second.summaryRows).toEqual(first.summaryRows);
+    expect(first.summaryRows[0].slice(COL.water_by_noon_ml)).toEqual(['200', '14400']);
+  });
+});
+
+describe('#827: Z:AC are unchanged and A:AC keep their positions', () => {
+  it('writes the same Z:AC alongside the timing columns, and reads AD:AE back by name', () => {
+    const { res, summaryRows } = rebuild({
+      drinks: [
+        ...waters(DAY, ['10:00:00', '250'], ['15:00:00', '250']),
+        drinkRow('c1', 'coffee', '2', DAY),
+        drinkRow('a1', 'alcohol', '1', DAY),
+        drinkRow('u1', 'unwind', '5', DAY),
+      ],
+    }, DAY, DAY, NEXT_MORNING);
+    expect(res.success).toBe(true);
+    expect(summaryRows[0].slice(COL.water_ml, COL.unwind_mg + 1)).toEqual(['500', '1', '2', '5']);
+    expect(summaryRows[0].slice(COL.water_by_noon_ml)).toEqual(['250', '18000']);
+
+    const api = loadApi({ dailySummary: summaryRows });
+    const read = callDoGet<any>(api.sandbox, {
+      action: 'getDailySummary', payload: JSON.stringify({ from: DAY, to: DAY }),
+    });
+    expect(read.data[0].water_by_noon_ml).toBe('250');
+    expect(read.data[0].water_gap_max_s).toBe('18000');
+  });
+
+  it('reads a 29-column row from before the migration with both fields blank', () => {
+    const row: CellValue[] = Array(29).fill('');
+    row[COL.date] = DAY;
+    row[COL.water_ml] = '500';
+    const api = loadApi({ dailySummary: [row] });
+    const read = callDoGet<any>(api.sandbox, {
+      action: 'getDailySummary', payload: JSON.stringify({ from: DAY, to: DAY }),
+    });
+    expect(read.success).toBe(true);
+    expect(read.data[0].water_ml).toBe('500');
+    expect(read.data[0].water_by_noon_ml).toBe('');
+    expect(read.data[0].water_gap_max_s).toBe('');
   });
 });

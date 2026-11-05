@@ -297,6 +297,14 @@ and blank, never `0`, on a day with no coffee, as for the other two.
 appended after `coffee_cups` by `scripts/migrate-592-daily-summary-unwind.mjs`
 and blank, never `0`, on a day with none, by the same rules.
 
+`water_by_noon_ml` (AD) and `water_gap_max_s` (AE) are the day's water timing (#827), appended
+after `unwind_mg` by `scripts/migrate-827-daily-summary-water-timing.mjs`: the sum of the water
+`amount`s whose local `time` is before 12:00:00, and the longest stretch with no water between
+09:00:00 and 20:00:00 local, in whole seconds, counting the window's edges. Both are blank,
+never `0`, on a day with no water. A row computed on its own date ends the window at
+`computed_at` (local) if that is before 20:00, and has a blank gap before 09:00; any other
+row sees the whole window.
+
 ### DailyHealth (#165, #158, #231)
 
 | Action | Parameters / payload |

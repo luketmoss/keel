@@ -132,7 +132,7 @@ before(async () => {
       // #522: one rebuilt day carrying the drinks columns, as the API sends it.
       case 'getDailySummary':
         data = p.from <= '2026-10-19' && p.to >= '2026-10-19'
-          ? [{ date: '2026-10-19', steps: '8400', computed_at: '2026-10-20T13:00:00.000Z', water_ml: '354', alcohol_drinks: '1', coffee_cups: '2', unwind_mg: '10' }]
+          ? [{ date: '2026-10-19', steps: '8400', computed_at: '2026-10-20T13:00:00.000Z', water_ml: '354', alcohol_drinks: '1', coffee_cups: '2', unwind_mg: '10', water_by_noon_ml: '177', water_gap_max_s: '13200' }]
           : [];
         break;
       case 'getBodyMeasurements':
@@ -626,7 +626,7 @@ test('thrive_drinks refuses a range over 400 days before any request', async () 
 test('thrive_daily_summary shows water and alcohol for a day that has them', async () => {
   const { text, isError } = await call('thrive_daily_summary', { date_from: '2026-10-19', date_to: '2026-10-19' });
   assert.equal(isError, false, text);
-  assert.match(text, /- 2026-10-19: no activities logged .*· water 12 oz \(354 ml\) · coffee 2 cups · alcohol 1 drink · unwind 10 mg$/m);
+  assert.match(text, /- 2026-10-19: no activities logged .*· water 12 oz \(354 ml\), 6 oz by noon, longest daytime gap 3 h 40 min · coffee 2 cups · alcohol 1 drink · unwind 10 mg$/m);
   const { tools } = await client.listTools();
   assert.match(
     tools.find((t) => t.name === 'thrive_daily_summary').description,

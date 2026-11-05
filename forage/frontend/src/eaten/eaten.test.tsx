@@ -211,11 +211,12 @@ describe('the day view', () => {
     expect(screen.getByTestId('day-note').textContent).toBe('Nothing logged today.');
     expect(screen.getByTestId('day-macros').textContent).toBe('Protein —Carbs —Fat —');
     expect(screen.getByTestId('day-card').textContent).not.toMatch(/\b0 kcal/);
-    // Four meal cards, each a region with only its Add row.
+    // Five meal cards, each a region with only its Add row.
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby'))).toEqual([
       'meal-breakfast',
       'meal-lunch',
       'meal-dinner',
+      'meal-after-dinner',
       'meal-snacks',
     ]);
     expect(screen.getByRole('group', { name: 'Totals for Monday 2 November 2026' })).toBeDefined();
@@ -292,6 +293,58 @@ describe('the day view', () => {
     await open();
     expect(kcal()).toBe('—');
     expect(screen.getByTestId('day-note').textContent).toBe("None of today's entries has nutrition yet.");
+  });
+
+  it('After dinner is its own card: logging stores the slot, a move keeps the numbers, and deleting names it (#826)', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    expect(within(card('After dinner')).getByTestId('add-to-meal').textContent).toContain('Add to after dinner');
+    expect(card('After dinner').querySelector('h2')!.id).toBe('meal-after-dinner');
+    expect(document.querySelectorAll('[id*=" "], [data-testid*=" "]')).toHaveLength(0);
+    const sheet = await addTo('After dinner');
+    expect(within(sheet).getByRole('heading').textContent).toBe('Add to after dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    await previewed();
+    let amount = screen.getByTestId('amount-sheet');
+    fireEvent.click(within(amount).getByTestId('log-it'));
+    await settle();
+    fireEvent.click(screen.getByTestId('add-done'));
+    await settle();
+    expect(api.log[0]).toMatchObject({ slot: 'After dinner' });
+    expect(entriesIn('After dinner')[0].textContent).toContain('Greek yogurt');
+    expect(screen.getByTestId('toast').textContent).toBe('Logged Greek yogurt');
+    const stored = { kcal: api.log[0].kcal, protein_g: api.log[0].protein_g, carbs_g: api.log[0].carbs_g };
+
+    // Snacks and back again: only the meal changes.
+    for (const [from, to] of [
+      ['After dinner', 'Snacks'],
+      ['Snacks', 'After dinner'],
+    ]) {
+      fireEvent.click(entriesIn(from)[0]);
+      await settle();
+      amount = screen.getByTestId('amount-sheet');
+      expect(within(amount).getByRole('group', { name: 'Meal' }).textContent).toBe(
+        'BreakfastLunchDinnerAfter dinnerSnacks',
+      );
+      fireEvent.click(within(amount).getByRole('button', { name: to }));
+      fireEvent.click(within(amount).getByTestId('log-it'));
+      await settle();
+      expect(entriesIn(to)).toHaveLength(1);
+    }
+    expect(api.log[0]).toMatchObject({ slot: 'After dinner', ...stored });
+
+    // Select mode and the delete confirmation work in the card.
+    fireEvent.click(within(card('After dinner')).getByTestId('select-meal'));
+    expect(within(card('After dinner')).getByTestId('select-cancel').textContent).toBe('Cancel');
+    fireEvent.click(within(card('After dinner')).getByTestId('select-cancel'));
+    fireEvent.click(entriesIn('After dinner')[0]);
+    await settle();
+    fireEvent.click(screen.getByTestId('delete-entry'));
+    expect(screen.getByTestId('confirm').textContent).toContain('Delete Greek yogurt from After dinner?');
+    expect(screen.getByTestId('confirm').textContent).toContain("Its calories come off today's total.");
   });
 
   it('a failed load says so with Try again, and the meal cards show nothing', async () => {

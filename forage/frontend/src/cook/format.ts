@@ -52,13 +52,13 @@ export function timerLabel(minutes: number): string {
   return minutes === 60 ? '1 hr' : `${minutes} min`;
 }
 
-/** The meal slot by the time of day: before 11:00 Breakfast, before 15:00 Lunch, before 21:00 Dinner, else Snacks. */
+/** The meal slot by the time of day: before 11:00 Breakfast, before 15:00 Lunch, before 21:00 Dinner, else After dinner. */
 export function slotForTime(now = new Date()): Slot {
   const h = now.getHours();
   if (h < 11) return 'Breakfast';
   if (h < 15) return 'Lunch';
   if (h < 21) return 'Dinner';
-  return 'Snacks';
+  return 'After dinner';
 }
 
 /** A cook id made on the device, so a retried save upserts the same row: `ck_` + 8 hex. */

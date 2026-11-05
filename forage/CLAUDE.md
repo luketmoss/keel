@@ -148,7 +148,7 @@ What the columns mean:
   `getRecipe` (`walkthrough`, `walkthrough_check`) and `getRecipes`
   (`walkthrough_ok`) check the stored one against the current lines on read, so
   a recipe edit makes it stale rather than being refused. The app never runs it.
-- **Plan.** `slot` is `Breakfast`, `Lunch`, `Dinner` or `Snacks`. Exactly one
+- **Plan.** `slot` is `Breakfast`, `Lunch`, `Dinner`, `After dinner` or `Snacks`. Exactly one
   of `recipe_id` and `note` is set (a note is a night out or leftovers).
   `trip_id` is the trip the meal is on; "shopped" (its trip closed) is derived,
   never stored.

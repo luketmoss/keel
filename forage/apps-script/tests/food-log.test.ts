@@ -253,3 +253,21 @@ describe('each MCP write is undoable', () => {
     expect(api.rows('FoodLog')).toHaveLength(0);
   });
 });
+
+describe('the After dinner slot (#826)', () => {
+  it('is accepted by logFood and updateLogEntry, refuses others, sorts before Snacks, and leaves the totals alone', () => {
+    const api = loadApi();
+    seed(api);
+    const snack = log(api, { food_id: 'yog', qty: 1, unit: 'cup', slot: 'Snacks' });
+    const after = log(api, { food_id: 'yog', qty: 1, unit: 'cup', slot: 'After dinner' });
+    const dinner = log(api, { food_id: 'yog', qty: 1, unit: 'cup', slot: 'Dinner' });
+    expect(api.ok('getFoodLog', {}).map((e: { id: string }) => e.id)).toEqual([dinner.id, after.id, snack.id]);
+    const before = api.ok('getFoodLogTotals', { from: DAY, to: DAY });
+    const moved = api.ok('updateLogEntry', { payload: { id: snack.id, changes: { slot: 'After dinner' } } });
+    expect(moved).toMatchObject({ slot: 'After dinner', kcal: snack.kcal, protein_g: snack.protein_g });
+    expect(api.ok('getFoodLogTotals', { from: DAY, to: DAY })).toEqual(before);
+    const refused = api.call('logFood', { payload: { date: DAY, slot: 'Dessert', food_id: 'yog', qty: 1, unit: 'cup' } });
+    expect(refused.error).toMatch(/slot must be one of/);
+    expect(api.rows('FoodLog')).toHaveLength(3);
+  });
+});

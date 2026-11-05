@@ -470,7 +470,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
         SLOTS.map((slot) => {
           const mine = state === 'ready' ? entries.filter((e) => e.slot === slot) : [];
           const plans = state === 'ready' ? planned.filter((p) => p.slot === slot) : [];
-          const headId = `meal-${slot.toLowerCase()}`;
+          const headId = `meal-${slot.toLowerCase().replace(/ /g, '-')}`;
           const selectingHere = selecting === slot;
           const canSelect = mine.some((e) => !blockedReason(e));
           const count = selectingHere ? mine.filter((e) => ticked.includes(e.id) && !blockedReason(e)).length : 0;

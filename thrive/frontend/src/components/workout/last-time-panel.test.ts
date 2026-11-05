@@ -42,6 +42,7 @@ describe('LastTimeLine', () => {
     const props = {
       exerciseId: 'ex1',
       exerciseName: 'Bench Press',
+      section: 'primary',
       currentWorkoutId: 'w1',
       onCopyDown: vi.fn(),
       ...overrides,
@@ -70,6 +71,12 @@ describe('LastTimeLine', () => {
     expect(copy.getAttribute('aria-label')).toBe('Copy last time into Bench Press');
     fireEvent.click(copy);
     expect(props.onCopyDown).toHaveBeenCalledWith(sets);
+  });
+
+  it("looks last time up for the exercise's section in this workout (#817)", () => {
+    vi.mocked(lastTimeData.getLastTimeData).mockReturnValue(null);
+    renderLine({ section: 'SS2' });
+    expect(lastTimeData.getLastTimeData).toHaveBeenCalledWith('ex1', 'w1', 'SS2');
   });
 
   it('shows no line, and no "No previous data", when there is no previous performance', () => {

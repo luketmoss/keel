@@ -1211,6 +1211,50 @@ describe('Set up next (#674)', () => {
     expect(field(container, 'Arnold')?.value).toBe('40');
   });
 
+  it('last time is the primary slot only when the exercise was also a warm-up that day (#817)', async () => {
+    withoutWarmup(() => {
+      rowNo = 3;
+      const earlier = (section: string, order: number, n: number, extra: Partial<SetWithRow>): SetWithRow => ({
+        ...mk(section, order, 'OH Press BB', n, extra),
+        workout_id: 'w0',
+        sheetRow: 100 + rowNo++,
+      });
+      sets.value = [
+        ...[1, 2, 3, 4].map((n) => mk('primary', 5, 'OH Press BB', n, { rest_target_s: '90' })),
+        // Oct 21: the warm-up at order 4 logged nothing, the primary at order 5 has four sets.
+        earlier('warmup', 4, 1, { planned_reps: '' }),
+        earlier('primary', 5, 1, { weight: '90', reps: '8', effort: 'Easy' }),
+        earlier('primary', 5, 2, { weight: '90', reps: '8', effort: 'Medium' }),
+        earlier('primary', 5, 3, { weight: '90', reps: '8', effort: 'Hard' }),
+        earlier('primary', 5, 4, { weight: '90', reps: '6', effort: 'Hard' }),
+      ];
+    });
+    workouts.value = [workout('active'), { ...workout(''), id: 'w0', date: '2026-10-21', sheetRow: 3 }];
+    const { container } = render(<LiftMode workoutId={W} />);
+
+    const ohPress = card(container, 'OH Press BB');
+    expect(ohPress.querySelector('.lift-setup-last-label')?.textContent).toBe('Last time · Oct 21');
+    const rows = [...ohPress.querySelectorAll('.lift-setup-last-row')];
+    expect(rows.map((r) => r.querySelector('.lift-setup-last-n')?.textContent)).toEqual(['1', '2', '3', '4']);
+    expect(rows.map((r) => r.querySelector('.lift-setup-last-figures')?.textContent)).toEqual([
+      '90 × 8',
+      '90 × 8',
+      '90 × 8',
+      '90 × 6',
+    ]);
+    expect(text(ohPress)).not.toContain('BW');
+    // The compact form (#580) is one line of the same four.
+    expect(text(ohPress.querySelector('.lift-setup-last-line')!).replace(/\s+/g, ' ')).toBe(
+      'Oct 21: 90×8 E · 90×8 M · 90×8 H · 90×6 H',
+    );
+    // With no weight planned, the field starts at the primary's set 1.
+    expect(field(container, 'OH Press BB')?.value).toBe('90');
+    // And the set hint reads the primary's set 1, not the warm-up's blank row.
+    await startGroup(container);
+    expect(text(container)).toContain('Last time: 90 × 8 · Easy');
+    expect(text(container)).not.toContain('BW × ?');
+  });
+
   it('weights start at planned, else last time set 1, else Bodyweight with Add weight', async () => {
     const { container } = await toSetup();
     expect(field(container, 'Arnold')?.value).toBe('40');

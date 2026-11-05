@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLastTimeDataFrom, formatLastTimeDate } from './last-time-data';
+import { getLastTimeDataFrom, formatLastTimeDate, sectionKind } from './last-time-data';
 import type { SetWithRow, WorkoutWithRow } from '../../api/types';
 import { toLocalDateStr } from '../activities/activities-helpers';
 
@@ -262,6 +262,189 @@ describe('getLastTimeDataFrom', () => {
     expect(result!.workoutDate).toBe('2025-01-14');
     expect(result!.sets).toHaveLength(4);
     expect(result!.sets[3].effort).toBe('Hard');
+  });
+});
+
+describe('sectionKind (#817)', () => {
+  it('has three kinds: warm-up, cool-down, and every working section', () => {
+    expect(sectionKind('warmup')).toBe('warmup');
+    expect(sectionKind('cooldown')).toBe('cooldown');
+    for (const s of ['primary', 'SS1', 'SS2', 'SS3', 'burnout']) expect(sectionKind(s)).toBe('working');
+  });
+});
+
+// #817 — last time is one slot (an exercise's rows at one exercise_order), never a merge.
+// The Oct 21 case: OH Press BB was a warm-up at order 4 (nothing logged) and the primary at order 5.
+describe('getLastTimeDataFrom: one slot (#817)', () => {
+  const OH = { exercise_id: 'ex_oh', exercise_name: 'OH Press BB' };
+  const warmup = (workout_id: string, extra: Partial<SetWithRow> = {}) =>
+    makeSet({
+      ...OH,
+      workout_id,
+      section: 'warmup',
+      exercise_order: 4,
+      set_number: 1,
+      planned_reps: '',
+      weight: '',
+      reps: '',
+      effort: '',
+      ...extra,
+    });
+  const working = (
+    workout_id: string,
+    section: string,
+    order: number,
+    n: number,
+    weight: string,
+    reps: string,
+    effort: SetWithRow['effort'],
+  ) => makeSet({ ...OH, workout_id, section, exercise_order: order, set_number: n, weight, reps, effort });
+  const primary = (workout_id: string) => [
+    working(workout_id, 'primary', 5, 1, '90', '8', 'Easy'),
+    working(workout_id, 'primary', 5, 2, '90', '8', 'Medium'),
+    working(workout_id, 'primary', 5, 3, '90', '8', 'Hard'),
+    working(workout_id, 'primary', 5, 4, '90', '6', 'Hard'),
+  ];
+  const wk = (id: string, date: string) => makeWorkout({ id, date });
+  const figures = (r: ReturnType<typeof getLastTimeDataFrom>) =>
+    r!.sets.map((s) => `${s.set_number}:${s.weight || 'BW'}x${s.reps || '?'}`);
+
+  const OCT21 = [warmup('w_oct21'), ...primary('w_oct21')];
+  const base = [wk('w_oct21', '2026-10-21'), wk('w_now', '2026-11-04')];
+
+  it('gives a primary only the primary slot: four sets, numbered 1-4, no warm-up row', () => {
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', OCT21, base, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-21');
+    expect(figures(result)).toEqual(['1:90x8', '2:90x8', '3:90x8', '4:90x6']);
+  });
+
+  it('gives a warm-up only the warm-up slot, whatever the primary did', () => {
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', OCT21, base, 'warmup');
+    expect(result!.workoutDate).toBe('2026-10-21');
+    expect(result!.sets).toHaveLength(1);
+    expect(result!.sets[0].section).toBe('warmup');
+    expect(figures(result)).toEqual(['1:BWx?']);
+  });
+
+  it('gives a warm-up with reps logged that one set', () => {
+    const logged = [warmup('w_oct21', { reps: '8' }), ...primary('w_oct21')];
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', logged, base, 'warmup');
+    expect(figures(result)).toEqual(['1:BWx8']);
+  });
+
+  it('looks further back for a primary past a workout where the exercise was only a warm-up', () => {
+    const allSets = [...OCT21, warmup('w_oct28')];
+    const allWorkouts = [...base, wk('w_oct28', '2026-10-28')];
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', allSets, allWorkouts, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-21');
+    expect(figures(result)).toEqual(['1:90x8', '2:90x8', '3:90x8', '4:90x6']);
+  });
+
+  it('looks further back for a warm-up past a workout where the exercise was only worked', () => {
+    const allSets = [warmup('w_oct14'), ...primary('w_oct21')];
+    const allWorkouts = [wk('w_oct14', '2026-10-14'), ...base];
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', allSets, allWorkouts, 'warmup');
+    expect(result!.workoutDate).toBe('2026-10-14');
+    expect(result!.sets[0].section).toBe('warmup');
+  });
+
+  it('has no last time for a primary when the exercise was only ever a warm-up', () => {
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', [warmup('w_oct21')], base, 'primary')).toBeNull();
+  });
+
+  it('has no last time for a warm-up when the exercise was only ever worked', () => {
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', primary('w_oct21'), base, 'warmup')).toBeNull();
+  });
+
+  it('matches working sections to each other: SS1 last time, primary now', () => {
+    const ss1 = [working('w_oct21', 'SS1', 3, 1, '40', '12', 'Easy'), working('w_oct21', 'SS1', 3, 2, '40', '10', '')];
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', ss1, base, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-21');
+    expect(figures(result)).toEqual(['1:40x12', '2:40x10']);
+  });
+
+  describe('the exercise in two working sections of the earlier workout', () => {
+    const both = [
+      working('w_oct21', 'burnout', 8, 1, '30', '15', 'Hard'),
+      working('w_oct21', 'burnout', 8, 2, '30', '12', 'Hard'),
+      ...primary('w_oct21'),
+    ];
+
+    it("takes the slot in today's section when it is among them", () => {
+      expect(figures(getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'primary'))).toEqual([
+        '1:90x8',
+        '2:90x8',
+        '3:90x8',
+        '4:90x6',
+      ]);
+      expect(figures(getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'burnout'))).toEqual(['1:30x15', '2:30x12']);
+    });
+
+    it("takes the lowest-order working slot when today's section is not among them", () => {
+      const result = getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'SS1');
+      expect(result!.sets.every((s) => s.section === 'primary')).toBe(true);
+      expect(figures(result)).toEqual(['1:90x8', '2:90x8', '3:90x8', '4:90x6']);
+    });
+
+    it('never shows two slots together, so no set number repeats', () => {
+      const result = getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'SS2');
+      const numbers = result!.sets.map((s) => s.set_number);
+      expect(new Set(numbers).size).toBe(numbers.length);
+      expect(new Set(result!.sets.map((s) => s.exercise_order)).size).toBe(1);
+    });
+  });
+
+  it('picks the match by section kind, not by whether anything was logged', () => {
+    const abandoned = [warmup('w_oct28'), working('w_oct28', 'primary', 5, 1, '', '', '')];
+    const allWorkouts = [...base, wk('w_oct28', '2026-10-28')];
+    const result = getLastTimeDataFrom('ex_oh', 'w_now', [...OCT21, ...abandoned], allWorkouts, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-28');
+    expect(figures(result)).toEqual(['1:BWx?']);
+  });
+
+  it('treats a cool-down as its own kind', () => {
+    const cool = [warmup('w_oct21', { section: 'cooldown', exercise_order: 9 }), ...primary('w_oct21')];
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', cool, base, 'cooldown')!.sets[0].section).toBe('cooldown');
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', cool, base, 'primary')!.sets[0].section).toBe('primary');
+  });
+
+  it('never takes the current workout, with or without a section', () => {
+    const allSets = [...primary('w_now'), warmup('w_now')];
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', allSets, base, 'primary')).toBeNull();
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', allSets, base)).toBeNull();
+  });
+
+  describe('with no section (the Exercises screen)', () => {
+    it('shows the working slot, not the warm-up row', () => {
+      const result = getLastTimeDataFrom('ex_oh', '', OCT21, base);
+      expect(result!.workoutDate).toBe('2026-10-21');
+      expect(figures(result)).toEqual(['1:90x8', '2:90x8', '3:90x8', '4:90x6']);
+    });
+
+    it('prefers an older working slot to a newer warm-up', () => {
+      const allSets = [...primary('w_oct21'), warmup('w_oct28')];
+      const allWorkouts = [...base, wk('w_oct28', '2026-10-28')];
+      const result = getLastTimeDataFrom('ex_oh', '', allSets, allWorkouts);
+      expect(result!.workoutDate).toBe('2026-10-21');
+      expect(result!.sets.every((s) => s.section === 'primary')).toBe(true);
+    });
+
+    it('shows the most recent warm-up slot for an exercise that was only ever a warm-up', () => {
+      const allSets = [warmup('w_oct14'), warmup('w_oct21', { reps: '10' })];
+      const allWorkouts = [wk('w_oct14', '2026-10-14'), ...base];
+      const result = getLastTimeDataFrom('ex_oh', '', allSets, allWorkouts);
+      expect(result!.workoutDate).toBe('2026-10-21');
+      expect(figures(result)).toEqual(['1:BWx10']);
+    });
+
+    it('shows a cool-down slot for an exercise that was only ever a cool-down', () => {
+      const cool = [warmup('w_oct21', { section: 'cooldown', exercise_order: 9, reps: '30' })];
+      expect(figures(getLastTimeDataFrom('ex_oh', '', cool, base))).toEqual(['1:BWx30']);
+    });
+
+    it('still has no data for an exercise never done', () => {
+      expect(getLastTimeDataFrom('ex_none', '', OCT21, base)).toBeNull();
+    });
   });
 });
 

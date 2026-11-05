@@ -149,6 +149,7 @@ export function ExerciseRow({
         <LastTimeLine
           exerciseId={exercise.exercise_id}
           exerciseName={exercise.exercise_name}
+          section={exercise.section}
           currentWorkoutId={currentWorkoutId}
           onCopyDown={(lastTimeSets) => {
             onCopyDown(lastTimeSets);

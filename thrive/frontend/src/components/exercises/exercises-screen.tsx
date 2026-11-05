@@ -390,6 +390,7 @@ export function ExercisesScreen() {
                     const isExpanded = expandedId === ex.id;
                     const when = formatWhen(lastPerformedMap.get(ex.id), todayStr);
                     const tags = splitExerciseTags(ex.tags);
+                    // No section here (#817): the most recent working slot, else the most recent warm-up or cool-down one.
                     const lastTimeData = isExpanded ? getLastTimeDataFrom(ex.id, '', sets.value, workouts.value) : null;
 
                     return (

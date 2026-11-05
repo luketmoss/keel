@@ -9,20 +9,38 @@ export interface LastTimeResult {
   sets: SetWithRow[]; // sorted by set_number
 }
 
-/**
- * Find the most recent workout's sets for a given exercise,
- * excluding the current workout.
- */
-export function getLastTimeData(exerciseId: string, currentWorkoutId: string): LastTimeResult | null {
-  return getLastTimeDataFrom(exerciseId, currentWorkoutId, sets.value, workouts.value);
+/** The three kinds of section (#817): a warm-up and a cool-down are never comparable to a working set. */
+export type SectionKind = 'warmup' | 'cooldown' | 'working';
+
+export function sectionKind(section: string): SectionKind {
+  if (section === 'warmup') return 'warmup';
+  if (section === 'cooldown') return 'cooldown';
+  return 'working';
 }
 
-/** Pure function for testing — accepts data directly instead of reading signals. */
+/**
+ * Find an exercise's last time, excluding the current workout: one slot (the exercise's rows at one
+ * `exercise_order`) of one earlier workout, never a merge of two (#817). `section` is the exercise's
+ * section in the workout on screen; every screen that shows a workout passes it.
+ */
+export function getLastTimeData(exerciseId: string, currentWorkoutId: string, section?: string): LastTimeResult | null {
+  return getLastTimeDataFrom(exerciseId, currentWorkoutId, sets.value, workouts.value, section);
+}
+
+/**
+ * Pure function for testing — accepts data directly instead of reading signals.
+ *
+ * With a `section`: the most recent earlier workout with the exercise in a section of that kind, and
+ * in it the exercise's slot in that section, else its lowest-order slot of that kind. Without one (the
+ * Exercises screen has no section): the most recent working slot, else the most recent warm-up or
+ * cool-down slot.
+ */
 export function getLastTimeDataFrom(
   exerciseId: string,
   currentWorkoutId: string,
   allSets: SetWithRow[],
   allWorkouts: WorkoutWithRow[],
+  section?: string,
 ): LastTimeResult | null {
   // Build a date lookup for workouts
   const workoutDateMap = new Map<string, string>();
@@ -30,33 +48,40 @@ export function getLastTimeDataFrom(
     workoutDateMap.set(w.id, w.date);
   }
 
-  // Filter sets for this exercise, excluding current workout
-  const matchingSets = allSets.filter((s) => s.exercise_id === exerciseId && s.workout_id !== currentWorkoutId);
+  // This exercise's rows in the workouts that count, excluding the current one
+  const mine = allSets.filter(
+    (s) => s.exercise_id === exerciseId && s.workout_id !== currentWorkoutId && workoutDateMap.get(s.workout_id),
+  );
 
-  if (matchingSets.length === 0) return null;
-
-  // Group by workout_id, find the one with the most recent date
-  const byWorkout = new Map<string, SetWithRow[]>();
-  for (const s of matchingSets) {
-    const arr = byWorkout.get(s.workout_id) || [];
-    arr.push(s);
-    byWorkout.set(s.workout_id, arr);
+  // Only rows that can be compared with the section on screen
+  let candidates = mine;
+  if (section !== undefined) {
+    const kind = sectionKind(section);
+    candidates = mine.filter((s) => sectionKind(s.section) === kind);
+  } else {
+    const worked = mine.filter((s) => sectionKind(s.section) === 'working');
+    if (worked.length > 0) candidates = worked;
   }
 
+  // The workout with the most recent date
   let bestWorkoutId = '';
   let bestDate = '';
-
-  for (const workoutId of byWorkout.keys()) {
-    const date = workoutDateMap.get(workoutId) || '';
+  for (const s of candidates) {
+    const date = workoutDateMap.get(s.workout_id) || '';
     if (date > bestDate) {
       bestDate = date;
-      bestWorkoutId = workoutId;
+      bestWorkoutId = s.workout_id;
     }
   }
 
   if (!bestWorkoutId) return null;
 
-  const resultSets = byWorkout.get(bestWorkoutId)!;
+  // One slot of it: the one in `section` if it has one, else the lowest exercise_order
+  const inWorkout = candidates.filter((s) => s.workout_id === bestWorkoutId);
+  const inSection = section === undefined ? [] : inWorkout.filter((s) => s.section === section);
+  const pool = inSection.length > 0 ? inSection : inWorkout;
+  const slotOrder = Math.min(...pool.map((s) => s.exercise_order));
+  const resultSets = pool.filter((s) => s.exercise_order === slotOrder);
   resultSets.sort((a, b) => a.set_number - b.set_number);
 
   return {

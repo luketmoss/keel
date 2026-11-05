@@ -10,8 +10,9 @@ import type { SetWithRow } from '../../api/types';
 export function lastTimeText(
   exerciseId: string,
   currentWorkoutId: string,
+  section: string,
 ): { text: string; sets: SetWithRow[] } | null {
-  const data = getLastTimeData(exerciseId, currentWorkoutId);
+  const data = getLastTimeData(exerciseId, currentWorkoutId, section);
   if (!data) return null;
   const best = bestSetText(data.sets);
   if (!best) return null;
@@ -21,12 +22,14 @@ export function lastTimeText(
 interface Props {
   exerciseId: string;
   exerciseName: string;
+  /** The exercise's section in this workout (#817): last time is its slot in a section of that kind. */
+  section: string;
   currentWorkoutId: string;
   onCopyDown: (lastTimeSets: SetWithRow[]) => void;
 }
 
-export function LastTimeLine({ exerciseId, exerciseName, currentWorkoutId, onCopyDown }: Props) {
-  const last = lastTimeText(exerciseId, currentWorkoutId);
+export function LastTimeLine({ exerciseId, exerciseName, section, currentWorkoutId, onCopyDown }: Props) {
+  const last = lastTimeText(exerciseId, currentWorkoutId, section);
   if (!last) return null;
   return (
     <div class="lb-last-time">

@@ -1,6 +1,7 @@
 // #577, #578 — the run order, the labels, the step arithmetic and the summary's totals.
-import { describe, it, expect } from 'vitest';
-import type { SetWithRow } from '../../../api/types';
+import { describe, it, expect, afterEach } from 'vitest';
+import type { SetWithRow, WorkoutWithRow } from '../../../api/types';
+import { sets, workouts } from '../../../state/store';
 import {
   buildSteps,
   cleanWeight,
@@ -9,6 +10,8 @@ import {
   figuresText,
   groupMeta,
   isEditable,
+  lastSession,
+  lastTimeFor,
   lastTimeLine,
   nextIndex,
   opensGroup,
@@ -16,6 +19,7 @@ import {
   plannedWeight,
   progressOf,
   roundUpTo,
+  setupExercises,
   shortDate,
   signedMSS,
   stepState,
@@ -326,5 +330,104 @@ describe('Set up next (#674)', () => {
     expect(cleanWeight('abc')).toBe('');
     expect(shortDate('2026-10-21', new Date('2026-10-28T12:00:00'))).toBe('Oct 21');
     expect(shortDate('2025-10-21', new Date('2026-10-28T12:00:00'))).toBe('Oct 21, 2025');
+  });
+});
+
+// #817 — last time is one slot. The Oct 21 case: OH Press was a warm-up at order 4 (nothing logged)
+// and the primary at order 5; today it is the primary of Upper Push B.
+describe('last time is one slot (#817)', () => {
+  const OH = { exercise_id: 'ex_oh', exercise_name: 'OH Press BB' };
+  const earlier = (extra: Partial<SetWithRow>): SetWithRow =>
+    mk('primary', 5, 'OH Press BB', 1, { ...OH, workout_id: 'w_oct21', ...extra });
+  const OCT21 = [
+    earlier({ section: 'warmup', exercise_order: 4, planned_reps: '' }),
+    earlier({ set_number: 1, weight: '90', reps: '8', effort: 'Easy' }),
+    earlier({ set_number: 2, weight: '90', reps: '8', effort: 'Medium' }),
+    earlier({ set_number: 3, weight: '90', reps: '8', effort: 'Hard' }),
+    earlier({ set_number: 4, weight: '90', reps: '6', effort: 'Hard' }),
+  ];
+  const workout = (id: string, date: string, status = ''): WorkoutWithRow =>
+    ({ id, date, status, type: 'weight' }) as WorkoutWithRow;
+  const today = (section: string, order: number, weight = '') =>
+    ['1', '2', '3', '4'].map((n) =>
+      mk(section, order, 'OH Press BB', Number(n), { ...OH, workout_id: 'w_now', weight }),
+    );
+
+  afterEach(() => {
+    sets.value = [];
+    workouts.value = [];
+  });
+  const load = (rows: SetWithRow[], ws: WorkoutWithRow[]) => {
+    sets.value = rows;
+    workouts.value = ws;
+  };
+
+  it('the Set up next card lists the primary slot only: four rows numbered 1-4, no BW × ? row', () => {
+    load(
+      [...OCT21, ...today('primary', 5)],
+      [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'planned')],
+    );
+    const [ex] = setupExercises(buildSteps(today('primary', 5)), 'primary', 'w_now');
+    expect(ex.last!.workoutDate).toBe('2026-10-21');
+    expect(ex.last!.sets.map((s) => s.set_number)).toEqual([1, 2, 3, 4]);
+    expect(ex.last!.sets.map((s) => figuresText(s))).toEqual(['90 × 8', '90 × 8', '90 × 8', '90 × 6']);
+  });
+
+  it('the set hint reads the slot: set 1 is 90 × 8 · Easy, set 4 is 90 × 6 · Hard, set 5 does not exist', () => {
+    load(OCT21, [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'active')]);
+    const [s1, , , s4] = today('primary', 5);
+    expect(lastTimeLine(lastTimeFor(s1, 'w_now'), 1)).toBe('Last time: 90 × 8 · Easy');
+    expect(lastTimeLine(lastTimeFor(s4, 'w_now'), 4)).toBe('Last time: 90 × 6 · Hard');
+    expect(lastTimeLine(lastTimeFor({ ...s4, set_number: 5 }, 'w_now'), 5)).toBe('No set 5 last time');
+  });
+
+  it("with no weight planned, the weight field starts at last time's set 1, not the warm-up's blank", () => {
+    load(OCT21, [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'active')]);
+    const [ex] = setupExercises(buildSteps(today('primary', 5)), 'primary', 'w_now');
+    expect(ex.startWeight).toBe('90');
+  });
+
+  it('a planned weight still wins over last time', () => {
+    load(OCT21, [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'active')]);
+    const [ex] = setupExercises(buildSteps(today('primary', 5, '95')), 'primary', 'w_now');
+    expect(ex.startWeight).toBe('95');
+  });
+
+  it('looks past a later workout where the exercise was only a warm-up', () => {
+    const lateWarmup = earlier({ workout_id: 'w_oct28', section: 'warmup', exercise_order: 4 });
+    load(
+      [...OCT21, lateWarmup],
+      [workout('w_oct21', '2026-10-21'), workout('w_oct28', '2026-10-28'), workout('w_now', '2026-11-04', 'active')],
+    );
+    const data = lastSession('ex_oh', 'w_now', 'primary');
+    expect(data!.workoutDate).toBe('2026-10-21');
+    expect(data!.sets).toHaveLength(4);
+  });
+
+  it("matches a working section to another: SS1 last time is today's primary's last time", () => {
+    const ss1 = [earlier({ section: 'SS1', exercise_order: 3, set_number: 1, weight: '40', reps: '12' })];
+    load(ss1, [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'active')]);
+    const data = lastSession('ex_oh', 'w_now', 'primary');
+    expect(data!.sets.map((s) => s.section)).toEqual(['SS1']);
+    expect(lastTimeLine(lastTimeFor(today('primary', 5)[0], 'w_now'), 1)).toBe('Last time: 40 × 12');
+  });
+
+  it('never takes last time from a planned workout (#674)', () => {
+    const planned = earlier({ workout_id: 'w_oct28', weight: '100', reps: '5' });
+    load(
+      [...OCT21, planned],
+      [
+        workout('w_oct21', '2026-10-21'),
+        workout('w_oct28', '2026-10-28', 'planned'),
+        workout('w_now', '2026-11-04', 'active'),
+      ],
+    );
+    expect(lastSession('ex_oh', 'w_now', 'primary')!.workoutDate).toBe('2026-10-21');
+  });
+
+  it('says First time doing this exercise when the exercise was only ever a warm-up', () => {
+    load([OCT21[0]], [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'active')]);
+    expect(lastSession('ex_oh', 'w_now', 'primary')).toBeNull();
+    expect(lastTimeLine(lastTimeFor(today('primary', 5)[0], 'w_now'), 1)).toBe('First time doing this exercise');
   });
 });

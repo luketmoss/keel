@@ -108,9 +108,11 @@ words, and nothing else about it. Nothing is added when both are up to date.
 
 - Keel `stale`: *"Brief skill not updated: it had changes of its own."* or
   *"Brief skill not updated: couldn't reach GitHub."*
-- Wiki not writable: *"Wiki read as it was: it had changes of its own."*,
-  *"Wiki read as it was: it's on another branch."*, *"Wiki read as it was: it
-  has diverged."* or *"Wiki read as it was: couldn't reach GitHub."*
+- Wiki not writable:
+  *"Wiki read as it was: it had changes of its own."*,
+  *"Wiki read as it was: it's on another branch."*,
+  *"Wiki read as it was: it has diverged."* or
+  *"Wiki read as it was: couldn't reach GitHub."*
 
 A run without a `sync` line (a hand run) adds neither.
 

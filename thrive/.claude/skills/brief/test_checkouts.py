@@ -181,6 +181,15 @@ class WikiSync(Base):
         with open(os.path.join(self.wiki, "page.md")) as fh:
             self.assertEqual(fh.read(), "mine\n")
 
+    def test_unrelated_uncommitted_file_still_blocks_the_update(self):
+        self.remote.advance()
+        write(os.path.join(self.wiki, "notes.md"), "mine\n")
+        head = run(self.wiki, "rev-parse", "HEAD")
+        report = self.wiki_report()
+        self.assertEqual((report["writable"], report["reason"]),
+                         (False, "changes"))
+        self.assertEqual(run(self.wiki, "rev-parse", "HEAD"), head)
+
     def test_other_branch_leaves_everything_untouched(self):
         self.remote.advance()
         run(self.wiki, "checkout", "-q", "-b", "side")

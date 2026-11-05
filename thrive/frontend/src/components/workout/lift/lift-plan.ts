@@ -3,12 +3,12 @@
 
 import type { SetWithRow } from '../../../api/types';
 import { SWITCH_SECTIONS, formatMSS } from '../../../api/rest-times';
-import { getLastTimeDataFrom, type LastTimeResult } from '../last-time-data';
+import { getLastTimeDataFrom, sectionKind, type LastTimeResult } from '../last-time-data';
 import { sets, workouts } from '../../../state/store';
 import { sectionTitle } from '../../activities/exercise-detail';
 
 /** Sections that are not working sets: a checklist before, and one after. */
-export const isWorkingSection = (section: string): boolean => section !== 'warmup' && section !== 'cooldown';
+export const isWorkingSection = (section: string): boolean => sectionKind(section) === 'working';
 
 export interface LiftStep {
   /** `section|exercise_order|set_number`: stable while the plan is. */
@@ -143,17 +143,20 @@ export interface LastTime {
 }
 
 /**
- * The exercise's most recent earlier session: `getLastTimeData` over workouts
- * that were done, so a planned one (today's, or one scheduled ahead) with
- * nothing lifted yet is never "last time" (#674).
+ * The exercise's most recent earlier slot in a section of `section`'s kind: `getLastTimeData` over
+ * workouts that were done, so a planned one (today's, or one scheduled ahead) with nothing lifted
+ * yet is never "last time" (#674). One slot, never a merge (#817).
  */
-export function lastSession(exerciseId: string, workoutId: string): LastTimeResult | null {
+export function lastSession(exerciseId: string, workoutId: string, section: string): LastTimeResult | null {
   const done = workouts.value.filter((w) => w.status !== 'planned');
-  return getLastTimeDataFrom(exerciseId, workoutId, sets.value, done);
+  return getLastTimeDataFrom(exerciseId, workoutId, sets.value, done, section);
 }
 
-export function lastTimeFor(row: Pick<SetWithRow, 'exercise_id' | 'set_number'>, workoutId: string): LastTime {
-  const data = lastSession(row.exercise_id, workoutId);
+export function lastTimeFor(
+  row: Pick<SetWithRow, 'exercise_id' | 'section' | 'set_number'>,
+  workoutId: string,
+): LastTime {
+  const data = lastSession(row.exercise_id, workoutId, row.section);
   if (!data) return { set: null, any: false };
   return { set: data.sets.find((s) => s.set_number === row.set_number) ?? null, any: true };
 }
@@ -354,7 +357,7 @@ export function setupExercises(steps: readonly LiftStep[], section: string, work
     ex.rows.sort((a, b) => a.set_number - b.set_number);
     ex.plan = planLine(ex.rows);
     ex.planned = plannedWeight(ex.rows);
-    ex.last = lastSession(ex.exercise_id, workoutId);
+    ex.last = lastSession(ex.exercise_id, workoutId, section);
     const lastFirst = ex.last?.sets.find((s) => s.set_number === 1) ?? ex.last?.sets[0];
     ex.startWeight = cleanWeight(ex.rows[0]?.weight ?? '') || cleanWeight(lastFirst?.weight ?? '');
   }

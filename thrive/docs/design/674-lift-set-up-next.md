@@ -115,6 +115,8 @@ Each card:
 
 ### 4. The previous group's log card
 
+> **Amended by [#819](819-setup-log-first.md):** the log card now comes second, after the since-last-set line and before the group heading, and the compact must-stay-visible rule below applies only before the first group.
+
 #577's `LogCard`, unchanged, for the round that ended the previous group (the
 same items the rest screen would have shown), with its "earlier sets without
 effort" line. It goes after the exercise cards. Absent before the first group.

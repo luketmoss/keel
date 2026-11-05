@@ -12,10 +12,11 @@ import type { ExerciseWithRow, SetWithRow, WorkoutWithRow } from '../../api/type
 import { ask } from '../../state/confirm';
 import { deleteExerciseCopy } from '../shared/confirm-copy';
 
-/** Build a map of exerciseId → most recent workout date string. */
+/** Build a map of exerciseId → most recent workout date string. A planned workout never counts (#823). */
 export function buildLastPerformedMap(allSets: SetWithRow[], allWorkouts: WorkoutWithRow[]): Map<string, string> {
   const workoutDateMap = new Map<string, string>();
   for (const w of allWorkouts) {
+    if (w.status === 'planned') continue;
     workoutDateMap.set(w.id, w.date);
   }
 

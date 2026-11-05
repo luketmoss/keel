@@ -143,13 +143,12 @@ export interface LastTime {
 }
 
 /**
- * The exercise's most recent earlier slot in a section of `section`'s kind: `getLastTimeData` over
- * workouts that were done, so a planned one (today's, or one scheduled ahead) with nothing lifted
- * yet is never "last time" (#674). One slot, never a merge (#817).
+ * The exercise's most recent earlier slot in a section of `section`'s kind. A planned workout (today's,
+ * or one scheduled ahead) with nothing lifted yet is never "last time" (#674); `getLastTimeDataFrom`
+ * skips it for every screen (#823). One slot, never a merge (#817).
  */
 export function lastSession(exerciseId: string, workoutId: string, section: string): LastTimeResult | null {
-  const done = workouts.value.filter((w) => w.status !== 'planned');
-  return getLastTimeDataFrom(exerciseId, workoutId, sets.value, done, section);
+  return getLastTimeDataFrom(exerciseId, workoutId, sets.value, workouts.value, section);
 }
 
 export function lastTimeFor(

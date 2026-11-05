@@ -37,7 +37,10 @@ interface Props {
   workoutId: string;
 }
 
-/** Find the most recent previous workout with the same template/name (for "last time" reference). */
+/**
+ * Find the most recent previous workout with the same template/name (for "last time" reference).
+ * A planned workout, even a past one never started, is never last time (#823).
+ */
 function findPreviousWorkout(workoutId: string) {
   const workout = workouts.value.find((w) => w.id === workoutId);
   if (!workout) return null;
@@ -54,6 +57,7 @@ function findPreviousWorkout(workoutId: string) {
     sorted.find(
       (w) =>
         w.id !== workoutId &&
+        w.status !== 'planned' &&
         w.date + 'T' + (w.time || '00:00') < thisDate &&
         ((workout.template_id && w.template_id === workout.template_id) ||
           (!workout.template_id && w.name === workout.name)),

@@ -42,9 +42,11 @@ export function getLastTimeDataFrom(
   allWorkouts: WorkoutWithRow[],
   section?: string,
 ): LastTimeResult | null {
-  // Build a date lookup for workouts
+  // Build a date lookup for workouts. A planned one (scheduled, not started) is never last time (#823):
+  // it carries the weights it aims at and nothing lifted. This runs before the one-slot rule (#817).
   const workoutDateMap = new Map<string, string>();
   for (const w of allWorkouts) {
+    if (w.status === 'planned') continue;
     workoutDateMap.set(w.id, w.date);
   }
 

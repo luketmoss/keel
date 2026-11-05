@@ -8760,8 +8760,9 @@ body:has(.lift) {
 }
 
 /* ===== Lift Mode, Set up next (#674) =====
-   At the start of every working group: the whole group's exercises with last time and a weight to set,
-   an elapsed clock with no target, then the previous group's log card. */
+   At the start of every working group: an elapsed clock with no target, the previous group's log card
+   (#819: first, so its effort is marked without a scroll), then the whole group's exercises with last
+   time and a weight to set. */
 .lift-setup-since {
   display: flex;
   align-items: baseline;
@@ -9308,7 +9309,8 @@ body:has(.lift) {
     font-size: var(--text-base);
   }
 
-  /* Set up next (#674): the heading, the first exercise's name and Start fit; the rest scrolls. */
+  /* Set up next (#674): the log card's first set and Start fit (#819; before the first group, the heading
+     and the first exercise's name); the rest scrolls. No order rule: the log card stays above the setup. */
   .lift-setup-since-clock {
     font-size: var(--text-base);
   }

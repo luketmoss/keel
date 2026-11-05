@@ -657,7 +657,7 @@ export function SetupScreen({
   weights: Readonly<Record<string, string>>;
   onWeight: (key: string, weight: string) => void;
   disabled: boolean;
-  /** The previous group's log card, after the exercise cards. */
+  /** The previous group's log card, before the group heading (#819): its effort is marked first. */
   children?: ComponentChildren;
 }) {
   return (
@@ -670,6 +670,7 @@ export function SetupScreen({
           </span>
         </div>
       )}
+      {children}
       <div class="lift-setup-head">
         <div class="lift-setup-badge-row">
           <span class={sectionBadgeClass(section)}>{groupName(section)}</span>
@@ -687,7 +688,6 @@ export function SetupScreen({
           disabled={disabled}
         />
       ))}
-      {children}
     </div>
   );
 }

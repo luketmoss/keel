@@ -1345,18 +1345,38 @@ describe('Set up next (#674)', () => {
     expect(container.querySelector('.lift-exercise')?.textContent).toBe('Arnold');
   });
 
-  it('the previous round log card follows the setup cards and saves as on the rest screen', async () => {
+  it('the previous round log card comes after the clock and before the setup, and saves as on the rest screen', async () => {
     const { container } = await toSetup();
     const log = container.querySelector('[aria-label="Log"]')!;
     expect(text(log)).toContain('Log the set you just did');
-    const cards = [...container.querySelectorAll('.lift-content > .lift-card')];
-    expect(cards.indexOf(log)).toBe(cards.length - 1);
+    // #819: since line, log card, heading, exercise cards, top to bottom.
+    const parts = [...container.querySelector('.lift-setup')!.children];
+    const at = (el: Element | null) => parts.indexOf(el!);
+    expect(at(container.querySelector('.lift-setup-since'))).toBe(0);
+    expect(at(log)).toBe(1);
+    expect(at(container.querySelector('.lift-setup-head'))).toBeGreaterThan(at(log));
+    for (const c of container.querySelectorAll('.lift-setup-card')) {
+      expect(at(c)).toBeGreaterThan(at(container.querySelector('.lift-setup-head')));
+    }
     await click(log, 'Hard');
     expect(saveSet).toHaveBeenLastCalledWith(
       expect.objectContaining({ exercise_name: 'OH Press', set_number: 2, effort: 'Hard' }),
       'tok',
       4,
     );
+  });
+
+  it('the earlier-sets line stays with the log card, above the setup', async () => {
+    const { container } = await toSetup();
+    // OH Press set 1 was logged without an effort.
+    await act(async () => {
+      sets.value = sets.value.map((r) => (r.sheetRow === 3 ? { ...r, reps: '5', effort: '' } : r));
+    });
+    const parts = [...container.querySelector('.lift-setup')!.children];
+    const hint = container.querySelector('.lift-missing')!;
+    expect(text(hint)).toBe("1 earlier set without effort. It's in All sets.");
+    expect(parts.indexOf(hint)).toBe(parts.indexOf(container.querySelector('[aria-label="Log"]')!) + 1);
+    expect(parts.indexOf(hint)).toBeLessThan(parts.indexOf(container.querySelector('.lift-setup-head')!));
   });
 
   it('a reload returns to the same setup with the clock from the original Done', async () => {

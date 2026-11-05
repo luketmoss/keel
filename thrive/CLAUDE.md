@@ -499,7 +499,7 @@ Google Sheet "Groundwork" with these tabs:
   The SPA only ever appends A–E (`sr_` + 8 hex, `coros`|`withings`, ISO UTC,
   the signed-in email or blank, `requested`; luketmoss/thrive#315). The one other appender is
   the poller itself: on the first tick in a slot's 15-minute window
-  (`SYNC_SCHEDULE_SLOTS`: 6:30 AM and 6:30 PM daily, America/Denver) it adds
+  (`SYNC_SCHEDULE_SLOTS`: 6:30 AM and 9:00 PM daily and 3:45 PM on Sundays, America/Denver) it adds
   one `coros` row with `requested_by` = `schedule` (once per slot per day, any
   status counts) and dispatches it that tick — GitHub's own cron is best-effort,
   a dispatch is not. The phone opens the COROS app on the first unlock of the

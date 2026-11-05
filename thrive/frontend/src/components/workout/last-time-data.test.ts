@@ -471,3 +471,91 @@ describe('formatLastTimeDate', () => {
     expect(result).toContain('(yesterday)');
   });
 });
+
+// #823 — a planned workout (scheduled, not started) is never last time, whatever its date.
+// Fixture, today Thursday 2026-11-05: X was finished on Oct 30 (4 sets at 130 lb), and a plan has X
+// at 135 lb x 4 with no reps and no effort.
+describe('getLastTimeDataFrom: a planned workout is never last time (#823)', () => {
+  const X = { exercise_id: 'ex_x', exercise_name: 'Squat BB' };
+  const finished = (workout_id: string) =>
+    [1, 2, 3, 4].map((n) =>
+      makeSet({ ...X, workout_id, section: 'primary', exercise_order: 1, set_number: n, weight: '130', reps: '5' }),
+    );
+  const plan = (workout_id: string) =>
+    [1, 2, 3, 4].map((n) =>
+      makeSet({
+        ...X,
+        workout_id,
+        section: 'primary',
+        exercise_order: 1,
+        set_number: n,
+        weight: '135',
+        reps: '',
+        effort: '',
+        planned_reps: '5',
+      }),
+    );
+  const wk = (id: string, date: string, status = '') => makeWorkout({ id, date, status });
+  const oct30 = wk('w_oct30', '2026-10-30');
+  const weights = (r: ReturnType<typeof getLastTimeDataFrom>) => r!.sets.map((s) => `${s.weight}x${s.reps || '?'}`);
+
+  it("reads the Oct 30 sets, not today's plan, with no section (the Exercises screen)", () => {
+    const allSets = [...finished('w_oct30'), ...plan('w_today')];
+    const allWorkouts = [oct30, wk('w_today', '2026-11-05', 'planned')];
+    const result = getLastTimeDataFrom('ex_x', '', allSets, allWorkouts);
+    expect(result!.workoutDate).toBe('2026-10-30');
+    expect(weights(result)).toEqual(['130x5', '130x5', '130x5', '130x5']);
+  });
+
+  it('reads the Oct 30 sets past a plan dated a week ahead, so no negative days ago can appear', () => {
+    const allSets = [...finished('w_oct30'), ...plan('w_nov12')];
+    const allWorkouts = [oct30, wk('w_nov12', '2026-11-12', 'planned')];
+    const result = getLastTimeDataFrom('ex_x', '', allSets, allWorkouts);
+    expect(result!.workoutDate).toBe('2026-10-30');
+  });
+
+  it('reads the Oct 30 sets for Logbook, which logs a different workout, past a later plan', () => {
+    const allSets = [...finished('w_oct30'), ...plan('w_nov12')];
+    const allWorkouts = [oct30, wk('w_now', '2026-11-05', 'active'), wk('w_nov12', '2026-11-12', 'planned')];
+    const result = getLastTimeDataFrom('ex_x', 'w_now', allSets, allWorkouts, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-30');
+    expect(weights(result)).toEqual(['130x5', '130x5', '130x5', '130x5']);
+  });
+
+  it("keeps reading Oct 30 once today's plan has started: it is the current workout", () => {
+    const allSets = [...finished('w_oct30'), ...plan('w_today')];
+    const allWorkouts = [oct30, wk('w_today', '2026-11-05', 'active')];
+    const result = getLastTimeDataFrom('ex_x', 'w_today', allSets, allWorkouts, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-30');
+  });
+
+  it('ignores an old plan that was never started', () => {
+    const allSets = [...finished('w_oct30'), ...plan('w_oct25')];
+    const allWorkouts = [oct30, wk('w_oct25', '2026-10-25', 'planned')];
+    expect(getLastTimeDataFrom('ex_x', '', allSets, allWorkouts)!.workoutDate).toBe('2026-10-30');
+  });
+
+  it('has no last time for an exercise that has only ever been planned', () => {
+    const allSets = plan('w_today');
+    const allWorkouts = [wk('w_today', '2026-11-05', 'planned')];
+    expect(getLastTimeDataFrom('ex_x', '', allSets, allWorkouts)).toBeNull();
+    expect(getLastTimeDataFrom('ex_x', 'w_other', allSets, allWorkouts, 'primary')).toBeNull();
+  });
+
+  it('still counts an active workout other than the one on screen', () => {
+    const allSets = [...finished('w_oct30'), ...finished('w_active')];
+    const allWorkouts = [oct30, wk('w_active', '2026-11-03', 'active'), wk('w_now', '2026-11-05')];
+    expect(getLastTimeDataFrom('ex_x', 'w_now', allSets, allWorkouts, 'primary')!.workoutDate).toBe('2026-11-03');
+  });
+
+  it("applies #817's one-slot rule to what is left after the plan is dropped", () => {
+    // Oct 30: X as a warm-up (order 2) and the primary (order 5). A later plan has X in the primary only.
+    const warm = makeSet({ ...X, workout_id: 'w_oct30', section: 'warmup', exercise_order: 2, weight: '', reps: '' });
+    const worked = finished('w_oct30').map((s) => ({ ...s, exercise_order: 5 }));
+    const allSets = [warm, ...worked, ...plan('w_today')];
+    const allWorkouts = [oct30, wk('w_today', '2026-11-05', 'planned')];
+    const result = getLastTimeDataFrom('ex_x', 'w_now', allSets, allWorkouts, 'primary');
+    expect(result!.workoutDate).toBe('2026-10-30');
+    expect(result!.sets.every((s) => s.exercise_order === 5)).toBe(true);
+  });
+});

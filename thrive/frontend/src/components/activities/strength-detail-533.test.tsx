@@ -249,6 +249,28 @@ describe('AC8: the Last time chip', () => {
     expect(container.querySelector('.last-time-line')).toBeNull();
   });
 
+  // #823 — a planned workout is never last time, even a past plan that was never started.
+  describe('a planned previous workout (#823)', () => {
+    const plan = wk({ id: 'w_plan', date: '2026-10-15', time: '09:00', status: 'planned' });
+    const planSets = [
+      st({ workout_id: 'w_plan', set_number: 1, weight: '135', reps: '', effort: '' }),
+      st({ workout_id: 'w_plan', set_number: 2, weight: '135', reps: '', effort: '' }),
+    ];
+
+    it('reads the finished session before the plan, not the plan', () => {
+      const { container } = show(wk(), [...FULL, ...prevSets, ...planSets], [plan, prev]);
+      fireEvent.click(screen.getByRole('button', { name: 'Last time' }));
+      const lines = [...container.querySelectorAll('.last-time-line')].map((l) => l.textContent);
+      expect(lines).toEqual(['Last time (Oct 12): 50 lb × 10 · Medium']);
+    });
+
+    it('has no chip and no line when the only previous workout is a plan', () => {
+      const { container } = show(wk(), [...FULL, ...planSets], [plan]);
+      expect(screen.queryByRole('button', { name: 'Last time' })).toBeNull();
+      expect(container.querySelector('.last-time-line')).toBeNull();
+    });
+  });
+
   it('uses the best set: the heaviest, the first of equals', () => {
     expect(bestSetText(prevSets)).toBe('50 lb × 10 · Medium');
     expect(bestSetText([st({ weight: '', reps: '' })])).toBe('');

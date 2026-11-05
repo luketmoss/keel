@@ -265,7 +265,7 @@ the stored run and writes nothing for the interrupted step. The start choice is 
 In a window 560 CSS px tall or less (Android split screen under a video, #580) Lift Mode uses a compact layout from one
 `@media (max-height: 560px)` block in `global.css`, live as the divider moves; the tab bar is not rendered on this route at any height.
 Between working sections there is no rest but **Set up next** (#674, phase `setup`): every exercise of the next group
-with its plan, last session (`lastSession`, which skips planned workouts) and a weight held on screen (**last time is one
+with its plan, last session (`lastSession`; a planned workout is never last time on any screen, #823, so the shared `getLastTimeDataFrom` skips it) and a weight held on screen (**last time is one
 slot** (#817): the exercise's rows at one `exercise_order` of the latest earlier workout that has it in a section of the
 same kind, warm-up, cool-down or working, never a merge; Logbook's Copy and the Exercises screen read it the same way), an elapsed
 "since last set" clock with no target or alert, and the previous round's log card. Start <group> writes a changed

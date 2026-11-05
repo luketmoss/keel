@@ -450,6 +450,62 @@ describe('Issue #23 — Exercise card last-workout info', () => {
       expect(map.get('ex1')).toBe('2026-03-10');
     });
 
+    // #823 — a planned workout is never the last time an exercise was done.
+    describe('a planned workout never counts (#823)', () => {
+      const row = (workout_id: string, exercise_id: string): SetWithRow => ({
+        workout_id,
+        exercise_id,
+        exercise_name: exercise_id,
+        section: 'primary',
+        exercise_order: 1,
+        set_number: 1,
+        planned_reps: '',
+        weight: '135',
+        reps: '',
+        effort: '',
+        sheetRow: 2,
+      });
+      const workout = (id: string, date: string, status: string): WorkoutWithRow => ({
+        ...mockWorkouts[0],
+        id,
+        date,
+        status,
+      });
+      const finishedOct30 = workout('w_oct30', '2026-10-30', '');
+
+      it("lists the exercise by its Oct 30 session, not today's plan", () => {
+        const map = buildLastPerformedMap(
+          [row('w_oct30', 'x'), row('w_today', 'x')],
+          [finishedOct30, workout('w_today', '2026-11-05', 'planned')],
+        );
+        expect(map.get('x')).toBe('2026-10-30');
+      });
+
+      it('lists the exercise by its Oct 30 session when the plan is dated ahead', () => {
+        const map = buildLastPerformedMap(
+          [row('w_oct30', 'x'), row('w_nov12', 'x')],
+          [finishedOct30, workout('w_nov12', '2026-11-12', 'planned')],
+        );
+        expect(map.get('x')).toBe('2026-10-30');
+      });
+
+      it('has no entry for an exercise that appears only in planned workouts', () => {
+        const map = buildLastPerformedMap(
+          [row('w_today', 'only_planned')],
+          [workout('w_today', '2026-11-05', 'planned')],
+        );
+        expect(map.has('only_planned')).toBe(false);
+      });
+
+      it('counts an active workout, once started', () => {
+        const map = buildLastPerformedMap(
+          [row('w_oct30', 'x'), row('w_today', 'x')],
+          [finishedOct30, workout('w_today', '2026-11-05', 'active')],
+        );
+        expect(map.get('x')).toBe('2026-11-05');
+      });
+    });
+
     it('formatShortDate formats date as "Mar 10, 2026"', () => {
       expect(formatShortDate('2026-03-10')).toBe('Mar 10, 2026');
     });

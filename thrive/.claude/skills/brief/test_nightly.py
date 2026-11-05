@@ -33,6 +33,10 @@ class BedBy(unittest.TestCase):
         self.assertEqual(us["n"], 10)
         self.assertEqual(n.clock_text(us["bed"]), "10:15 PM")  # 22:20 floors to 22:15
 
+    def test_rounds_down_never_to_the_nearest(self):
+        nights = [night("22:29", "06:29", 8)] * 5
+        self.assertEqual(n.clock_text(n.usual(nights)["bed"]), "10:15 PM")
+
     def test_median_not_latest(self):
         nights = sixty(9) + [night("23:50", "07:50", 8)]
         self.assertEqual(n.clock_text(n.usual(nights)["bed"]), "10:15 PM")

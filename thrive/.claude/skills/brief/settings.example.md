@@ -1,7 +1,8 @@
 # /brief local settings
 
-Copy to `settings.local.md` in this folder. That name is gitignored: keep
-real locations out of the repo, which is public.
+Copy to `settings.local.md` in the briefs' folder, beside the `keel` worktree
+(SKILL.md, *Where it runs*), or in this folder for a hand run. That name is
+gitignored: keep real locations out of the repo, which is public.
 
 Two decimal places (about 1 km) is plenty for a forecast.
 

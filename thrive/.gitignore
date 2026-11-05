@@ -39,6 +39,7 @@ look-*.png
 
 # /brief weather locations — where you live and ride, never committed
 .claude/skills/brief/settings.local.md
+.claude/skills/brief/checkouts-state.json
 
 # #681 spike (scripts/spike-681-osm-trails.mjs): Overpass cache, report, results
 # and marks. They name trails and places and date activities; the repo is public.

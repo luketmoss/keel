@@ -37,7 +37,8 @@ Edit these here rather than in the steps below.
   a planned `weight`, `stretch` or other indoor session, which has a day but no
   time, is drawn at 7:00 for its estimate (45 min when it has none). An
   outdoor session is drawn in its best window instead (Step 4).
-- **Weather locations:** in `settings.local.md` next to this file. That
+- **Weather locations:** in `settings.local.md`, read from beside the worktree
+  the skill runs from, else from this folder (*Where it runs*). That
   file is gitignored, because this repo is public and the locations are
   where you live and ride. `settings.example.md` shows its shape. It names
   two places:
@@ -62,6 +63,68 @@ past, and Hive silently drops any date it can't parse, which means an
 unfiltered list.
 
 ## Where it runs
+
+**The briefs' folder (#835).** A scheduled brief does not run from the
+development checkout, which is often on a feature branch. It runs from a folder
+outside every checkout, chosen once by the owner, that holds:
+
+- `keel\`: a detached worktree of Keel at `origin/main`, used only by the
+  briefs. It sits outside `.claude/worktrees/`, so `worktrees.py clean` keeps
+  it.
+- `settings.local.md`: the file Settings describes. **Read it from the folder
+  holding the worktree you run from.** If there is none there, read the one in
+  this skill's folder, so a hand run from the development checkout still works.
+
+The two scheduled tasks run `python thrive\.claude\skills\brief\checkouts.py
+sync` from that worktree first, before this file is read, then follow that
+worktree's copy of this file. `sync` prints one JSON line:
+
+```
+{"keel": {"state": "updated|current|stale|skipped", "reason": ...},
+ "wiki": {"state": "updated|current|ahead|left", "writable": true, "reason": ...}}
+```
+
+- **Keel** is moved to `origin/main`. With changes of its own (`changes`) or
+  no GitHub (`unreachable`) it is left as it is and is `stale`. A checkout on a
+  branch is never touched (`skipped`).
+- **The wiki** (the `wiki:` line) has `main` fast-forwarded. It is read as it
+  is, and **not writable** for this run, when it has uncommitted changes
+  (`changes`), is on another branch (`branch`), has diverged from `origin/main`
+  (`diverged`) or cannot be fetched (`unreachable`). A wiki only ahead of
+  `origin/main`, an earlier run's unpushed commit, is writable.
+- Nothing is ever reset, stashed, forced or merged.
+
+A brief that writes to the wiki (#830, #831, #832) does it only through
+`checkouts.py writeback "<message>" <path>...`, with paths relative to the
+wiki. It refuses, writing nothing, when `sync` left the wiki alone this run or
+the wiki has other changes. Otherwise it commits exactly those paths, rebases
+onto `origin/main` and pushes. A rebase that stops is aborted and a failed push
+is left, each keeping the local commit and printing `not pushed`; the next
+`sync` carries it. A brief that skips a wiki write for this reason says so in
+the phone `note`.
+
+**The foot line** names a checkout `sync` could not bring up to date, in these
+words, and nothing else about it. Nothing is added when both are up to date.
+
+- Keel `stale`: *"Brief skill not updated: it had changes of its own."* or
+  *"Brief skill not updated: couldn't reach GitHub."*
+- Wiki not writable: *"Wiki read as it was: it had changes of its own."*,
+  *"Wiki read as it was: it's on another branch."*, *"Wiki read as it was: it
+  has diverged."* or *"Wiki read as it was: couldn't reach GitHub."*
+
+A run without a `sync` line (a hand run) adds neither.
+
+**One-time setup**, on the owner's desktop. It asks where the briefs' folder
+goes, adds the worktree and moves the settings in:
+
+```powershell
+$dev = Read-Host 'Keel development checkout (for example D:\Projects\code\keel)'
+$folder = Read-Host 'Briefs folder, outside every checkout'
+New-Item -ItemType Directory -Force $folder | Out-Null
+git -C $dev fetch origin
+git -C $dev worktree add --detach "$folder\keel" origin/main
+Move-Item "$dev\thrive\.claude\skills\brief\settings.local.md" "$folder\settings.local.md"
+```
 
 It needs the `thrive_*` MCP tools: without them there is no brief, so stop
 (a scheduled run signals the phone first, *When it can't publish*). Run it on
@@ -528,8 +591,9 @@ colour and icon.
   readings over the last 7 days, the change in words, and the day's blood
   pressure with how many readings and the recent range.
 - `foot`: the line naming anything not checked, any Hive items whose due date
-  couldn't be read (see Reading a Hive due date), and that this is training
-  guidance, not medical advice.
+  couldn't be read (see Reading a Hive due date), a checkout `sync` could not
+  update (Where it runs), and that this is training guidance, not medical
+  advice.
 
 ## Weekly brief
 
@@ -640,7 +704,7 @@ strings show as text, times are decimal hours as on the daily page):
   date read as an America/Denver date (Reading a Hive due date), "soon" being
   today + 1 to today + 7.
 - `foot`: what wasn't checked, any Hive items whose due date couldn't be read,
-  any thin comparison, such as a week before with only a few nights of data,
+  a checkout `sync` could not update (Where it runs), any thin comparison, such as a week before with only a few nights of data,
   and that this is training guidance, not medical advice.
 
 ## Never

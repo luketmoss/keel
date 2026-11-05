@@ -34,13 +34,14 @@ kill the vendors' refresh tokens.
 | `sync/` | node-jobs |
 | `android/` | android |
 | `scripts/` | — |
+| `.claude/skills/brief/` | — |
 
 **View library:** preact
 
 The authoritative conventions for each component are in its stack skill:
 `.claude/skills/stack-web/SKILL.md`, `.claude/skills/stack-apps-script/SKILL.md`,
-`.claude/skills/stack-node-jobs/SKILL.md` and `.claude/skills/stack-android/SKILL.md`. `scripts/` pins none; this file
-is its only authority.
+`.claude/skills/stack-node-jobs/SKILL.md` and `.claude/skills/stack-android/SKILL.md`. `scripts/` and
+`.claude/skills/brief/` pin none; this file is their only authority.
 
 - **frontend/** — the Preact SPA, built with Vite. It reads and writes the
   Sheets API directly with the signed-in user's Google token, with one
@@ -65,6 +66,28 @@ is its only authority.
 - **`.claude/skills/brief/`** — `/brief`, the Morning and Weekly Brief. A
   product, not part of the pipeline: two scheduled tasks run it. Its
   `settings.local.md` (weather locations) is gitignored and never committed.
+  Its one script, `checkouts.py` (stdlib Python, tested by `python -m unittest`
+  in that folder, which the `brief` job in `thrive.yml` runs), is #835's.
+
+## The briefs' folder (#835)
+
+The scheduled briefs do not run from the development checkout, which is often
+on a feature branch. They run from a folder outside every checkout, chosen once
+by the owner (for example `D:\Projects\code\briefs`), holding:
+
+- `keel\`: a **detached** worktree of Keel at `origin/main`, used only by the
+  briefs, which never commit to Keel. It sits outside `.claude/worktrees/`, so
+  `worktrees.py clean` keeps it.
+- `settings.local.md`: moved here from the skill folder, since a fresh worktree
+  has no gitignored file. A hand run from the development checkout still reads
+  the old place.
+
+Each scheduled brief first runs `checkouts.py sync`, which brings that worktree
+to `origin/main` and fast-forwards the wiki's `main`, leaving either alone, and
+saying why, when it has changes of its own. A brief that writes to the wiki
+(#830, #831, #832) does it through `checkouts.py writeback`, which refuses on a
+wiki that `sync` left alone. The setup and the rules are in the skill's
+*Where it runs*.
 
 ## Route map (#407)
 

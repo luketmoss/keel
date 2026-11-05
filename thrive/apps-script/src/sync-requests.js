@@ -56,8 +56,9 @@ var SYNC_POLL_HANDLER = 'pollSyncRequests';
  * the same tick dispatches it. Each window is as wide as three ticks, so a missed
  * tick still lands before the briefs 15 minutes later. A slot that already has
  * its row today is left alone.
- *   6:30 AM daily  phone opens COROS at 6:15, daily brief at 6:45
- *   6:30 PM daily  phone opens COROS at 6:15, Sunday's weekly brief at 6:45
+ *   6:30 AM daily   the morning brief and the Day screen's morning
+ *   9:00 PM daily   the nightly brief at 9:15
+ *   3:45 PM Sunday  the weekly brief at 4:00
  * `isoDay` is Utilities.formatDate's 'u': 1 Monday ... 7 Sunday; null is every day.
  */
 var SYNC_SCHEDULE_VENDOR = 'coros';
@@ -65,7 +66,8 @@ var SYNC_SCHEDULE_REQUESTED_BY = 'schedule';
 var SYNC_SCHEDULE_WINDOW_MINUTES = 15;
 var SYNC_SCHEDULE_SLOTS = [
   { startMinute: 6 * 60 + 30, isoDay: null },
-  { startMinute: 18 * 60 + 30, isoDay: null },
+  { startMinute: 21 * 60, isoDay: null },
+  { startMinute: 15 * 60 + 45, isoDay: 7 },
 ];
 
 var SYNC_REQUEST_ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;

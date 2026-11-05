@@ -944,26 +944,64 @@ describe('the scheduled morning COROS sync', () => {
     expect(h.rows).toHaveLength(2);
   });
 
-  it('6:30 PM gets one too, on any day', () => {
-    for (const iso of ['2026-10-12T00:31:00.000Z', '2026-10-11T00:31:00.000Z']) { // Sunday and Saturday evening
+  it('9:00 PM gets one on any day, from 21:00 to 21:14 only', () => {
+    // MDT is UTC-6: 21:00 is 03:00Z the next day. 2026-10-09 is a Friday.
+    for (const iso of ['2026-10-10T03:00:00.000Z', '2026-10-10T03:05:00.000Z', '2026-10-10T03:14:00.000Z',
+      '2026-10-12T03:00:00.000Z', '2026-10-11T03:00:00.000Z']) {
       const h = harness({ requests: [], syncLog: [], now: at(iso) });
       h.poll();
       expect(h.fetches).toHaveLength(1);
       expect(h.row(0)).toMatchObject({ requested_by: 'schedule', status: 'started' });
     }
+    for (const iso of ['2026-10-10T00:30:00.000Z', '2026-10-10T03:15:00.000Z']) { // 18:30 and 21:15
+      const h = harness({ requests: [], syncLog: [], now: at(iso) });
+      h.poll();
+      expect(h.fetches).toHaveLength(0);
+      expect(h.rows).toHaveLength(0);
+    }
   });
 
-  it('the morning row does not stand in for the evening one, and vice versa', () => {
+  it('3:45 PM is Sundays only, from 15:45 to 15:59', () => {
+    for (const iso of ['2026-10-11T21:45:00.000Z', '2026-10-11T21:59:00.000Z']) { // Sunday
+      const h = harness({ requests: [], syncLog: [], now: at(iso) });
+      h.poll();
+      expect(h.fetches).toHaveLength(1);
+    }
+    for (const iso of ['2026-10-11T22:00:00.000Z', '2026-10-10T21:45:00.000Z', '2026-10-12T21:45:00.000Z']) {
+      const h = harness({ requests: [], syncLog: [], now: at(iso) }); // 16:00 Sunday, Saturday, Monday
+      h.poll();
+      expect(h.fetches).toHaveLength(0);
+    }
+  });
+
+  it('6:30 AM still runs on Sunday', () => {
+    const h = harness({ requests: [], syncLog: [], now: at('2026-10-11T12:31:00.000Z') });
+    h.poll();
+    expect(h.fetches).toHaveLength(1);
+  });
+
+  it("yesterday's 9:00 PM row does not count as today's", () => {
+    const old = SCHEDULE({ requested_at: '2026-10-10T03:00:00.000Z' }); // Fri 21:00 local
+    const h = harness({ requests: [old], syncLog: [], now: at('2026-10-11T03:01:00.000Z') }); // Sat 21:01
+    h.poll();
+    expect(h.rows).toHaveLength(2);
+  });
+
+  it('the morning, afternoon and evening rows each stand alone', () => {
     const morning = SCHEDULE({ requested_at: '2026-10-11T12:30:00.000Z' });
-    const evening = harness({ requests: [morning], syncLog: [], now: at('2026-10-12T00:35:00.000Z') });
+    const afternoon = SCHEDULE({ requested_at: '2026-10-11T21:45:00.000Z' });
+    const evening = harness({ requests: [morning, afternoon], syncLog: [], now: at('2026-10-12T03:05:00.000Z') });
     evening.poll();
-    expect(evening.rows).toHaveLength(2);
-    const both = harness({
-      requests: [morning, SCHEDULE({ requested_at: '2026-10-12T00:30:00.000Z' })],
-      syncLog: [], now: at('2026-10-12T00:40:00.000Z'),
+    expect(evening.rows).toHaveLength(3);
+    const sunday = harness({ requests: [morning], syncLog: [], now: at('2026-10-11T21:50:00.000Z') });
+    sunday.poll();
+    expect(sunday.rows).toHaveLength(2);
+    const done = harness({
+      requests: [morning, afternoon, SCHEDULE({ requested_at: '2026-10-12T03:00:00.000Z' })],
+      syncLog: [], now: at('2026-10-12T03:10:00.000Z'),
     });
-    both.poll();
-    expect(both.rows).toHaveLength(2);
+    done.poll();
+    expect(done.rows).toHaveLength(3);
   });
 
   it('a recent COROS run makes the scheduled row skipped, not a second dispatch', () => {

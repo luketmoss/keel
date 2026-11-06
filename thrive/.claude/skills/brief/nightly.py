@@ -165,6 +165,7 @@ def past_stop(now, bb):
 
 def moves(inp, bb, lift_tomorrow, commitment_tomorrow):
     out = []
+    finding = drink_finding(inp.get("tests") or [])
     w = inp.get("water") or {}
     if w.get("oz") is not None and w.get("goal_oz") and w["oz"] < w["goal_oz"] and not past_stop(inp.get("now"), bb):
         amt = round_oz(w["goal_oz"] - w["oz"])
@@ -181,6 +182,9 @@ def moves(inp, bb, lift_tomorrow, commitment_tomorrow):
             "kind": "drink", "icon": "alcohol", "action": "Stop at one tonight" if n == 1 else "No more tonight",
             "line": "%s logged%s." % ("One is" if n == 1 else "%d are" % n, wake),
         })
+        if finding:
+            out[-1]["line"] += " " + finding["text"]
+            out[-1]["finding"] = finding["slug"]
     wk = week_average(inp.get("food_week") or [], "protein_g")
     goals = inp.get("goals") or {}
     if wk["complete"] >= MIN_COMPLETE_DAYS:
@@ -207,6 +211,167 @@ def moves(inp, bb, lift_tomorrow, commitment_tomorrow):
                 if last_bp else "No blood pressure in the last 7 days.",
             })
     return out[:3]
+
+
+OUTCOME = {  # measure -> (label in a sentence, short label, unit)
+    "slept_min": ("sleep", "Slept", "min"), "deep_min": ("deep sleep", "Deep sleep", "min"),
+    "sleep_score": ("sleep score", "Sleep score", "pts"), "hrv": ("HRV", "HRV", "ms"),
+    "resting_hr": ("resting HR", "Resting HR", "bpm"), "systolic_am": ("systolic pressure", "Systolic", "mmHg"),
+    "diastolic_am": ("diastolic pressure", "Diastolic", "mmHg"), "weight_am": ("morning weight", "Weight", "kg"),
+    "water_oz": ("water", "Water", "oz"),
+}
+SHOWN = ("strong", "leaning", "ruled-out")
+RANK = {"strong": 0, "leaning": 1}
+
+
+def _base(measure):
+    return measure[:-2] if measure.endswith("+1") else measure
+
+
+def _num(x):
+    return ("%.1f" % x).rstrip("0").rstrip(".")
+
+
+def touches(test, ctx):
+    """True when one of the test's group measures is something tonight or the next five days brings up (#830).
+    ctx: ride_planned, alcohol_today, water_gap_h, water_under_goal, sodium_over_goal, after_dinner, unwind_today."""
+    ms = set(test.get("lever") or [])
+    return bool(
+        "sleep_start" in ms
+        or ("ride_day" in ms and ctx.get("ride_planned"))
+        or ("drank" in ms and ctx.get("alcohol_today"))
+        or ({"water_gap_h", "water_oz"} & ms and ((ctx.get("water_gap_h") or 0) >= 6 or ctx.get("water_under_goal")))
+        or ("sodium_mg" in ms and ctx.get("sodium_over_goal"))
+        or ("late_kcal" in ms and ctx.get("after_dinner"))
+        or ("unwind" in ms and ctx.get("unwind_today")))
+
+
+def chip(test):
+    g = test.get("display_grade")
+    c = test.get("counts") or {}
+    if test.get("grader") == "hand":
+        return "Hand-graded"
+    n_a, n_b = c.get("a", 0), c.get("b", 0)
+    if g == "strong":
+        return "Strong · %d nights" % (n_a + n_b)
+    if g == "leaning":
+        return "Leaning · %d nights each" % min(n_a, n_b)
+    if g == "ruled-out":
+        return "Ruled out · %d nights" % (n_a + n_b)
+    return g or ""
+
+
+def card(test):
+    bars = []
+    for o in test.get("outcomes") or []:
+        if o.get("mean_a") is None or o.get("mean_b") is None:
+            continue
+        lab = OUTCOME.get(_base(o["measure"]), (o["measure"], o["measure"], ""))
+        bars.append({"measure": o["measure"], "label": lab[1] + (" next day" if o["measure"].endswith("+1") else ""),
+                     "unit": lab[2], "a": round(o["mean_a"], 1), "b": round(o["mean_b"], 1),
+                     "diff": round(o["diff"], 1), "over": bool(o.get("over"))})
+    out = {
+        "slug": test["slug"], "title": test["title"], "lead": test.get("lead"), "grade": test.get("display_grade"),
+        "chip": chip(test), "a_label": test.get("a_label") or test.get("a_text") or "Top third",
+        "b_label": test.get("b_label") or test.get("b_text") or "Bottom third", "bars": bars,
+    }
+    if test.get("grader") == "hand":
+        out["hand"] = True
+    if test.get("moved"):
+        out["moved"] = "New tonight: %s → %s" % ((test.get("page_grade") or "none").replace("-", " "),
+                                                    test["display_grade"].replace("-", " "))
+    return out
+
+
+def select_findings(tests, ctx):
+    """At most three cards (#830): a grade that moved tonight, then strong or leaning tests the evening touches,
+    strong before leaning and otherwise in the goals page's order (the order tests arrive in). With none of
+    either, the strongest graded test, so the section is never empty while any test is graded."""
+    idx = {t["slug"]: i for i, t in enumerate(tests)}
+    picked = [t for t in tests if t.get("moved") and t.get("display_grade") in SHOWN]
+    near = [t for t in tests if t.get("display_grade") in RANK and touches(t, ctx) and t not in picked]
+    near.sort(key=lambda t: (RANK[t["display_grade"]], idx[t["slug"]]))
+    picked += near
+    if not picked:
+        best = [t for t in tests if t.get("display_grade") in RANK]
+        best.sort(key=lambda t: (RANK[t["display_grade"]], idx[t["slug"]]))
+        picked = best[:1]
+    return [card(t) for t in picked[:3]]
+
+
+def in_progress(tests):
+    out = []
+    for t in tests:
+        if t.get("grader") == "hand" or t.get("errors"):
+            continue
+        if t.get("tonight") == "collecting" and t.get("progress"):
+            out.append({"slug": t["slug"], "title": t["title"], "kind": "collecting",
+                        "text": t["progress"]["text"], "fraction": round(t["progress"]["fraction"], 2)})
+        elif t.get("tonight") == "blocked":
+            out.append({"slug": t["slug"], "title": t["title"], "kind": "blocked",
+                        "text": "Waiting for %s" % (t.get("awaits") or "data")})
+    return out
+
+
+def _outcome(test, measure):
+    return next((o for o in test.get("outcomes") or [] if o["measure"] == measure), None)
+
+
+def outlook_lines(tests, planned, dates):
+    """{date: line}: a strong test about a morning reading whose group A is a session the day before (#830).
+    planned: {date: [session types]} for today to today + 5; dates: the next-five-days rows, tomorrow first."""
+    out = {}
+    for t in tests:
+        if t.get("display_grade") != "strong" or t.get("grader") == "hand" or not t.get("a_text"):
+            continue
+        a = t["a_text"].strip()
+        words = a.replace(" and ", " ").split()
+        flags = [w for w in words if w in ("ride_day", "lift_day")]
+        if not flags or a.startswith("not "):
+            continue
+        kind = "ride" if flags[0] == "ride_day" else "lift"
+        for m in ("hrv", "resting_hr"):
+            o = _outcome(t, m)
+            if o is None or not o.get("over"):
+                continue
+            nxt = _outcome(t, m + "+1")
+            back = nxt is not None and not nxt.get("over")
+            lab = OUTCOME[m]
+            for d in dates:
+                prev = (_date.fromisoformat(d) - timedelta(days=1)).isoformat()
+                types = planned.get(prev) or []
+                hit = any(str(x).startswith("bike") for x in types) if kind == "ride" else any(str(x) == "weight" for x in types)
+                if not hit or d in out:
+                    continue
+                day = _date.fromisoformat(d)
+                high = o["diff"] > 0
+                line = "%s will read %s: %s runs about %s %s %s after a %s" % (
+                    day.strftime("%A"), "high" if high else "low", lab[0],
+                    _num(abs(round(o["diff"]))), lab[2], "over" if high else "under", kind)
+                line += ", back by %s." % (day + timedelta(days=1)).strftime("%A") if back else "."
+                out[d] = line
+    return out
+
+
+def drink_finding(tests):
+    """The alcohol test to cite on the drink move, when it is leaning or strong (#830)."""
+    cands = [t for t in tests if t.get("display_grade") in RANK and t.get("grader") != "hand"
+             and "drank" in (t.get("lever") or []) and (t.get("a_text") or "").strip() == "drank"]
+    cands.sort(key=lambda t: RANK[t["display_grade"]])
+    for t in cands:
+        o = _outcome(t, t.get("primary") or "")
+        if o is None or o.get("diff") is None:
+            continue
+        lab = OUTCOME.get(_base(o["measure"]), (o["measure"], o["measure"], ""))
+        n = _num(abs(round(o["diff"], 1)))
+        c = t["counts"]
+        if lab[2] == "min":
+            core = "%s min %s %s" % (n, "more" if o["diff"] > 0 else "less", lab[0])
+        else:
+            core = "%s %s %s %s" % (lab[0], n, lab[2], "higher" if o["diff"] > 0 else "lower")
+        return {"slug": t["slug"], "text": "Drinking nights brought %s (%d nights each, %s)." % (
+            core, min(c["a"], c["b"]), t["display_grade"])}
+    return None
 
 
 def _short_date(iso):
@@ -239,7 +404,8 @@ def phone_note(not_read, yesterday):
 def compute(inp):
     """inp: today, now (the run's local time, 'HH:MM'), nights (last 60), mornings (list of {date, sessions, events}, tomorrow first, up to
     five days), water {oz, goal_oz}, alcohol, food_week [{slots, protein_g, sodium_mg}], goals, last_bp,
-    yesterday_slots. Returns the bed-by for tonight and each day, the moves and the food line."""
+    yesterday_slots, and for #830 `tests` (grade.py's results, in the goals page's order), `touch`
+    (see touches()) and `planned` ({date: [session types]}, today to today + 5). Returns the bed-by for tonight and each day, the moves and the food line."""
     us = usual(inp.get("nights") or [])
     mornings = inp.get("mornings") or []
     tonight = bed_by(us, mornings[0] if mornings else {})
@@ -249,6 +415,11 @@ def compute(inp):
         nxt = mornings[i + 1] if i + 1 < len(mornings) else None
         b = bed_by(us, nxt) if nxt is not None else bed_by(us, {})
         days.append(None if b is None else {"date": m.get("date"), "bed_by": clock_text(b["bed"]), "why": b["why"]})
+    tests = inp.get("tests") or []
+    outlook = outlook_lines(tests, inp.get("planned") or {}, [m.get("date") for m in mornings if m.get("date")])
+    for d in days:
+        if d is not None:
+            d["outlook"] = outlook.get(d["date"])
     first = first_commitment(mornings[0]) if mornings else None
     lift = any(str(s.get("type")) == "weight" for s in (mornings[0].get("sessions") or [])) if mornings else False
     return {
@@ -259,6 +430,8 @@ def compute(inp):
         },
         "days": days,
         "moves": moves(inp, tonight, lift, first),
+        "findings": select_findings(tests, inp.get("touch") or {}),
+        "in_progress": in_progress(tests),
         "yesterday_line": yesterday_line(inp["yesterday_slots"]) if inp.get("yesterday_slots") is not None else None,
     }
 

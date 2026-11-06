@@ -281,6 +281,32 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
 .nstrip { width: 100%; height: 22px; display: block; }
 .nstrip .nn { fill: var(--night); } .nstrip .ev { fill: var(--cal); }
 .refresh { font-weight: 700; }
+/* What your data says (#830): the tokens are this page's own; a grade chip takes its colour from --gc. */
+.fc { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border-light); }
+.fc:first-of-type { border-top: 0; padding-top: 0; }
+.fc .new { font-size: .75rem; font-weight: 700; color: var(--primary); }
+.fc h3 { font-size: 1.0625rem; font-weight: 700; line-height: 1.3; }
+.fc .lead-line { font-size: .9375rem; color: var(--text); }
+.gchip { align-self: flex-start; display: inline-flex; align-items: center; font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; color: var(--gc); background: color-mix(in srgb, var(--gc) 14%, transparent); white-space: nowrap; }
+.cmp { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+.cmp .cm { display: flex; flex-direction: column; gap: 4px; }
+.cmp .cmh { font-size: .75rem; color: var(--text-2); font-weight: 600; }
+.cmp .cr { display: grid; grid-template-columns: minmax(0, 9.5em) 1fr auto; align-items: center; gap: 8px; font-size: .8125rem; }
+.cmp .cr span:first-child { color: var(--text-2); overflow-wrap: anywhere; }
+.cmp .cb { height: 10px; border-radius: 5px; background: var(--border-light); overflow: hidden; }
+.cmp .cb i { display: block; height: 100%; border-radius: 5px; background: var(--c); }
+.cmp .cr b { font-weight: 700; min-width: 3.2em; text-align: right; }
+.fc .so { font-size: .9375rem; background: var(--raised); border-radius: var(--r-md); padding: 8px 12px; }
+.fc .from { font-size: .75rem; color: var(--muted); }
+.pg { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border-light); }
+.pg:first-of-type { border-top: 0; padding-top: 0; }
+.pg .pgh { display: flex; justify-content: space-between; gap: 10px; font-size: .9375rem; }
+.pg .pgh span { color: var(--text-2); white-space: nowrap; }
+.pg .meter { height: 6px; border-radius: 3px; background: var(--border-light); overflow: hidden; }
+.pg .meter i { display: block; height: 100%; background: var(--primary); }
+.pg .wait { font-size: .8125rem; color: var(--text-2); }
+.nd .outlook { font-size: .8125rem; color: var(--text); display: flex; gap: 6px; align-items: baseline; }
+.nd .outlook .ic { width: 14px; height: 14px; position: relative; top: 2px; color: var(--hrv); }
 @media (min-width: 720px) {
   .lead .row { grid-template-columns: 1fr 1fr; align-items: end; }
   .moves { flex-direction: row; } .moves .mv { flex: 1; }
@@ -338,6 +364,23 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     "drinks": {"water": {"oz": 40, "pct": 63, "goal": 64}, "coffee": {"cups": 2, "last": "1:40 PM"}, "alcohol": 1, "unwind": null},
     "body": {"value": "182.4", "unit": "lb", "sub": "0.6 lb under last week", "series": [183, 183.2, null, 182.9, 182.7, 183.1, 182.8, 182.6, 182.9, 182.5, 182.7, 182.4, 182.6, 182.4], "bp": null, "bpSub": ""}
   },
+  "findings": {
+    "aside": "Aug 23 to Nov 4 · 74 nights",
+    "cards": [
+      {"slug": "test-early-bed", "title": "Does an earlier bedtime lengthen sleep?", "lead": "Earlier nights ran longer.", "grade": "strong",
+       "chip": "Strong · 40 nights", "moved": "New tonight: leaning → strong", "a_label": "Asleep by 10:30", "b_label": "After 11:00",
+       "bars": [{"measure": "slept_min", "label": "Slept", "unit": "min", "a": 470, "b": 428, "diff": 42, "over": true}],
+       "so": "Your bed-by tonight is 10:15, inside the early group."},
+      {"slug": "test-drinks-deep", "title": "Do drinks cost deep sleep?", "lead": "Drinking nights had less deep sleep.", "grade": "leaning",
+       "chip": "Leaning · 6 nights each", "a_label": "A drink logged", "b_label": "No drink",
+       "bars": [{"measure": "deep_min", "label": "Deep sleep", "unit": "min", "a": 60, "b": 75, "diff": -15, "over": true}],
+       "so": "One is logged tonight, so expect a little less deep sleep."}
+    ],
+    "progress": [
+      {"slug": "test-late-snack", "title": "Do late snacks cost deep sleep?", "kind": "collecting", "text": "3 + 4 of 6 + 6", "fraction": 0.58},
+      {"slug": "test-bp", "title": "Does evening salt raise morning pressure?", "kind": "blocked", "text": "Waiting for a morning blood pressure reading"}
+    ]
+  },
   "next": {
     "aside": "Thu to Mon",
     "overdue": {"text": "1 overdue in Hive · Wipe the shelves, 2 days late", "href": "https://luketmoss.github.io/keel/hive/?board=b1&item=i1"},
@@ -350,7 +393,7 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
       {"dow": "Fri", "n": 6, "wx": {"ic": "rain", "hi": 49, "lo": 33, "wind": 16, "rain": 45, "flag": "Rain 45% from 7 PM"}, "plans": [{"type": "weight", "title": "Legs B", "s": 7, "e": 7.75}], "events": [], "allday": ["Holiday"], "board": [], "bed": {"time": "10:15 PM", "why": "your usual"}},
       {"dow": "Sat", "n": 7, "wx": {"ic": "partly", "hi": 55, "lo": 36, "wind": 8, "rain": 10, "flag": ""}, "plans": [{"type": "bike:mountain", "title": "Mountain Bike", "s": 10, "e": 13}], "events": [], "allday": [], "board": [], "bed": {"time": "10:15 PM", "why": "your usual"}},
       {"dow": "Sun", "n": 8, "wx": {"ic": "cloud", "hi": 52, "lo": 35, "wind": 11, "rain": 20, "flag": ""}, "plans": [], "events": [], "allday": [], "board": [], "bed": {"time": "10:15 PM", "why": "your usual"}},
-      {"dow": "Mon", "n": 9, "wx": {"ic": "sun", "hi": 60, "lo": 37, "wind": 7, "rain": 0, "flag": ""}, "plans": [{"type": "stretch", "title": "Stretch", "s": 7, "e": 7.5}], "events": [], "allday": [], "board": [], "bed": {"time": "10:15 PM", "why": "your usual"}}
+      {"dow": "Mon", "n": 9, "wx": {"ic": "sun", "hi": 60, "lo": 37, "wind": 7, "rain": 0, "flag": ""}, "plans": [{"type": "stretch", "title": "Stretch", "s": 7, "e": 7.5}], "events": [], "allday": [], "board": [], "outlook": "Monday will read high: resting HR runs about 4 bpm over after a ride, back by Tuesday.", "bed": {"time": "10:15 PM", "why": "your usual"}}
     ]
   },
   "foot": "Not read: none. Training guidance from your own data, not medical advice."
@@ -391,7 +434,9 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     yday: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
     ahead: '<path d="M4 7h16M4 12h16M4 17h10"/><rect x="3" y="4" width="18" height="17" rx="2"/>',
     body: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9a4 4 0 0 1 6 0l-2 3"/>',
-    day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+    day: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    outlook: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+    finding: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5M8 11h6M11 8v6"/>'
   };
   var MCOL = { hrv: "var(--hrv)", heart: "var(--heart)", sleep: "var(--sleep)", load: "var(--primary)" };
   var TCOL = { weight: "var(--t-weight)", stretch: "var(--t-stretch)", bike: "var(--t-bike)", hike: "var(--t-hike)", run: "var(--t-run)", walk: "var(--t-walk)" };
@@ -735,6 +780,53 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
   })();
   if (row.length) root.appendChild(el("div", "grid" + (row.length > 1 ? " g2" : ""), row));
 
+  // ---- What your data says (#830): up to three findings, then the tests still collecting
+  (function () {
+    var F = D.findings;
+    if (!F) return;
+    var GC = { strong: "var(--success)", leaning: "var(--warning)", "ruled-out": "var(--text-2)" };
+    var cards = (F.cards || []).slice(0, 3);
+    if (cards.length) {
+      var c = card("What your data says", "finding", F.aside);
+      cards.forEach(function (f) {
+        var kids = [];
+        if (f.moved) kids.push(el("div", "new", f.moved));
+        var chipEl = el("span", "gchip", f.chip);
+        chipEl.style.setProperty("--gc", f.hand ? "var(--text-2)" : (GC[f.grade] || "var(--text-2)"));
+        kids.push(chipEl, el("h3", null, f.title));
+        if (f.lead) kids.push(el("p", "lead-line", f.lead));
+        var cmp = el("div", "cmp");
+        (f.bars || []).forEach(function (b) {
+          var top = Math.max(Math.abs(b.a), Math.abs(b.b), 1e-9);
+          function row(name, v, col) {
+            var bar = el("div", "cb", [el("i")]);
+            bar.firstChild.style.width = Math.max(2, Math.abs(v) / top * 100) + "%";
+            var r = el("div", "cr", [el("span", null, name), bar, el("b", "num", String(v) + (b.unit ? " " + b.unit : ""))]);
+            r.style.setProperty("--c", col);
+            return r;
+          }
+          cmp.appendChild(el("div", "cm", [el("div", "cmh", b.label), row(f.a_label, b.a, "var(--primary)"), row(f.b_label, b.b, "var(--muted)")]));
+        });
+        if (cmp.childNodes.length) kids.push(cmp);
+        if (f.so) kids.push(el("p", "so", [el("b", null, "So: "), f.so]));
+        kids.push(el("p", "from", "From your own data, not a clinical finding."));
+        c.appendChild(el("article", "fc", kids));
+      });
+      root.appendChild(c);
+    }
+    var pr = F.progress || [];
+    if (pr.length) {
+      var p = card("Tests in progress", "clock");
+      pr.forEach(function (t) {
+        if (t.kind === "blocked") { p.appendChild(el("div", "pg", [el("div", "pgh", [el("b", null, t.title)]), el("div", "wait", t.text)])); return; }
+        var m = el("div", "meter", [el("i")]);
+        m.firstChild.style.width = Math.round(Math.max(0, Math.min(1, t.fraction || 0)) * 100) + "%";
+        p.appendChild(el("div", "pg", [el("div", "pgh", [el("b", null, t.title), el("span", "num", t.text)]), m]));
+      });
+      root.appendChild(p);
+    }
+  })();
+
   // ---- Next 5 days
   (function () {
     var N = D.next;
@@ -768,6 +860,7 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
       (d.board || []).forEach(function (b) { kids.push(box("div", "ln", b.href, [el("span", "t", "Hive due"), el("span", null, b.title)])); });
       if (d.why) kids.push(el("div", "why", d.why));
       if (d.bed) kids.push(el("div", "bedln", [icon("moon"), "Bed by " + d.bed.time, el("span", null, d.bed.why)]));
+      if (d.outlook) kids.push(el("div", "outlook", [icon("outlook"), d.outlook]));
       list.appendChild(box("div", "nd", d.href, kids));
     });
     c.appendChild(list);

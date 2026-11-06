@@ -78,7 +78,7 @@ jobs:
       - run: node --test *.test.mjs
 
   # No stack skill: the /brief skill's own script (#835). Python's unittest and
-  # git, nothing to install; #830's grader adds its tests to this job.
+  # git, nothing to install; #830's grade.py tests run here too.
   brief:
     runs-on: ubuntu-latest
     defaults:

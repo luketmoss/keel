@@ -68,11 +68,12 @@ The authoritative conventions for each component are in its stack skill:
   nightly (9:15 PM, #836) and the weekly. The morning task (6:45 AM) is paused
   until #833 removes the mode.
   Its `settings.local.md` (weather locations) is gitignored and never
-  committed. Its two scripts are stdlib Python, tested by `python -m unittest`
+  committed. Its three scripts are stdlib Python, tested by `python -m unittest`
   in that folder, which the `brief` job in `thrive.yml` runs: `checkouts.py`
-  (#835) and `nightly.py` (#829), the nightly page's bed-by, moves, food
-  completeness and tile rules, which the skill calls rather than reasoning them
-  out each run.
+  (#835), `nightly.py` (#829), the nightly page's bed-by, moves, food
+  completeness and tile rules, and `grade.py` (#830), which grades the wiki's
+  test pages the same way every night and writes only grade changes. The skill
+  calls them rather than reasoning them out each run.
 
 ## The briefs' folder (#835)
 

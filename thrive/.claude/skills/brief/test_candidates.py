@@ -63,6 +63,11 @@ class Scan(unittest.TestCase):
         out = self.go(rows_for(deep=lambda u, k, i: (40 if u else 60) if i < 10 else 50))
         self.assertIsNone(out["card"])
 
+    def test_a_later_half_in_the_same_direction_but_under_the_threshold_proposes_none(self):
+        # -30 in the earlier half and -6 in the later: overall -18, but the later half is under the 8-minute threshold
+        out = self.go(rows_for(deep=lambda u, k, i: (30 if u else 60) if i < 10 else (54 if u else 60)))
+        self.assertIsNone(out["card"])
+
     def test_fewer_than_eight_days_a_group_proposes_none(self):
         out = self.go(rows_for(n=14, deep=lambda u, k, i: 40 if u else 60))  # 7 a group
         self.assertIsNone(out["card"])

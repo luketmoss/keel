@@ -731,7 +731,8 @@ python thrive\.claude\skills\brief\nightly.py rules < readings.json
 ```
 
 (a scratch file in the scratchpad, never in the repo). Its input and output are
-documented at the top of `compute()`; the page's `tonight`, `moves`, each day's
+documented at the top of `compute()`, and `now` is the run's local time, so a
+water stop already past leaves the move out (#849); the page's `tonight`, `moves`, each day's
 `bed` and `today.food.yesterday` come from its answer, and a figure the page
 shows still comes from a tool result. `tile_state` is the same file's, for each
 tile's `state`.

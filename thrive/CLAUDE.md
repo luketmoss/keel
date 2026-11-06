@@ -65,7 +65,7 @@ The authoritative conventions for each component are in its stack skill:
   MCP-only key (`MCP_API_KEY`). It holds no row mapping.
 - **`.claude/skills/brief/`** — `/brief`, the Morning, Nightly (#829) and Weekly
   Brief. A product, not part of the pipeline: two scheduled tasks run it, the
-  nightly (9:15 PM, #836) and the weekly. The morning task (6:45 AM) is paused
+  nightly (9:15 PM, #836) and the weekly (Sundays 4 PM, #832). The morning task (6:45 AM) is paused
   until #833 removes the mode.
   Its `settings.local.md` (weather locations) is gitignored and never
   committed. Its three scripts are stdlib Python, tested by `python -m unittest`
@@ -74,8 +74,10 @@ The authoritative conventions for each component are in its stack skill:
   completeness and tile rules, and `grade.py` (#830), which grades the wiki's
   test pages the same way every night and writes only grade changes, and
   `trials.py` (#831), which decides the one trial the nightly proposes, reads a
-  running trial's progress and writes a trial's page and readout to the wiki.
-  The skill calls them rather than reasoning them out each run.
+  running trial's progress and writes a trial's page and readout to the wiki,
+  and `weekly.py` (#832), which pairs the week's plan with what was done, finds
+  the meal gaps and the grades that moved, and files the week's review in the
+  wiki on a Sunday. The skill calls them rather than reasoning them out each run.
 
 ## The briefs' folder (#835)
 
@@ -544,8 +546,8 @@ Google Sheet "Groundwork" with these tabs:
   one `coros` row with `requested_by` = `schedule` (once per slot per day, any
   status counts) and dispatches it that tick — GitHub's own cron is best-effort,
   a dispatch is not. The phone opens the COROS app on the first unlock of the
-  morning (a MacroDroid macro, #617) and the daily brief / Sunday weekly brief
-  run at 6:45, then tell the phone through a MacroDroid webhook that they are
+  morning (a MacroDroid macro, #617) and the nightly (9:15 PM) and the Sunday
+  weekly (4 PM, #832) briefs run after it, then tell the phone through a MacroDroid webhook that they are
   up ([docs/brief-phone.md](docs/brief-phone.md)). `pollSyncRequests`
   (`apps-script/src/sync-requests.js`), a 5-minute Apps Script time-driven
   trigger on the bot account, writes every later value in E–I and never

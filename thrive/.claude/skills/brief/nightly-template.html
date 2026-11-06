@@ -278,7 +278,6 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
 .nd .bedln { font-size: .875rem; font-weight: 600; color: var(--bed); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .nd .bedln .ic { width: 14px; height: 14px; position: relative; top: 2px; }
 .nd .bedln span { font-weight: 400; color: var(--text-2); }
-.axis-t { display: flex; justify-content: space-between; font-size: .6875rem; color: var(--text-2); margin-bottom: 2px; }
 .nstrip { width: 100%; height: 22px; display: block; }
 .nstrip .nn { fill: var(--night); } .nstrip .ev { fill: var(--cal); }
 .refresh { font-weight: 700; }
@@ -494,6 +493,8 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     if (label) { s.setAttribute("role", "img"); s.setAttribute("aria-label", label); } else s.setAttribute("aria-hidden", "true");
     return s;
   }
+  // The cards' inner width in CSS pixels at load: charts draw to it, so a drawing unit is one pixel at any width (#847)
+  var CW = Math.max(300, Math.min(document.documentElement.clientWidth, 960) - 64);
   function hm(h) { // decimal hours on the night scale (24 = midnight) to "10:15 PM"
     var t = Math.round(h * 60) % 1440, hh = Math.floor(t / 60), m = t % 60;
     return (hh % 12 || 12) + ":" + String(m).padStart(2, "0") + " " + (hh >= 12 ? "PM" : "AM");
@@ -526,8 +527,8 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     lead.appendChild(el("div", "row", [bed, up]));
     if (T.why) lead.appendChild(el("p", "why", T.why));
     // timeline, 8 PM to 7:30 AM
-    var A = 20, B = 31.5, W = 340, L = 10, H = 74;
-    var s = svg("0 0 360 " + H, "tl", "Timeline from 8 PM to 7:30 AM" + (T.bedBy ? ", lights out by " + T.bedBy : ""));
+    var A = 20, B = 31.5, W = CW - 20, L = 10, H = 84;
+    var s = svg("0 0 " + CW + " " + H, "tl", "Timeline from 8 PM to 7:30 AM" + (T.bedBy ? ", lights out by " + T.bedBy : ""));
     function X(h) { return L + (Math.max(A, Math.min(B, h)) - A) * W / (B - A); }
     var tl = s;
     var h = "";
@@ -539,7 +540,7 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     if (TL.commit != null) h += bar(TL.commit, Math.min(B, TL.commit + 0.75), 48, 14, "commit");
     h += '<line class="axis" x1="' + L + '" x2="' + (L + W) + '" y1="68" y2="68"/>';
     [20, 22, 24, 26, 28, 30].forEach(function (t) {
-      h += '<text x="' + X(t).toFixed(1) + '" y="' + (H - 0) + '" text-anchor="middle">' + ((t % 24) % 12 || 12) + (t % 24 >= 12 ? "p" : "a") + '</text>';
+      h += '<text x="' + X(t).toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle">' + ((t % 24) % 12 || 12) + (t % 24 >= 12 ? "p" : "a") + '</text>';
     });
     tl.innerHTML = h;
     lead.appendChild(s);
@@ -567,23 +568,36 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     // ribbon
     var R = TD.ribbon;
     if (R) {
-      var from = R.from != null ? R.from : 5, to = R.to != null ? R.to : 23, VW = 360, L = 8, Wd = 344, span = to - from;
-      var s = svg("0 0 " + VW + " 118", "tl", "Your day from " + fmtH(from) + " to " + fmtH(to));
+      var from = R.from != null ? R.from : 5, to = R.to != null ? R.to : 23, VW = CW, L = 8, Wd = CW - 16, span = to - from;
+      // the rows, top down: now and bed, session and event labels, the two lanes, the hours, the dry stretch
+      var dry = R.dry && R.dry.e - R.dry.s >= 3 ? R.dry : null; // only when it is 3 hours or more
+      var s = svg("0 0 " + VW + " " + (dry ? 138 : 114), "tl", "Your day from " + fmtH(from) + " to " + fmtH(to));
       var X = function (v) { return L + (Math.max(from, Math.min(to, v)) - from) * Wd / span; };
-      var h = '<rect class="lane" x="' + L + '" y="14" width="' + Wd + '" height="30" rx="6"/><rect class="lane" x="' + L + '" y="54" width="' + Wd + '" height="30" rx="6"/>';
-      if (R.sleepEnd != null) h += '<rect class="sleepend" x="' + L + '" y="14" width="' + (X(R.sleepEnd) - L).toFixed(1) + '" height="30" rx="6"/>';
-      (R.sessions || []).forEach(function (t) { h += '<rect x="' + X(t.s).toFixed(1) + '" y="18" width="' + Math.max(4, X(t.e) - X(t.s)).toFixed(1) + '" height="22" rx="5" style="fill:' + (TCOL[String(t.type).split(":")[0]] || "var(--primary)") + '"/>'; });
-      (R.events || []).forEach(function (e) { h += '<rect class="cal" x="' + X(e.s).toFixed(1) + '" y="18" width="' + Math.max(4, X(e.e) - X(e.s)).toFixed(1) + '" height="22" rx="5" opacity=".85"/>'; });
-      (R.water || []).forEach(function (t, i) { h += '<circle class="dot-w" cx="' + X(t).toFixed(1) + '" cy="' + (62 + (i % 2) * 4) + '" r="3"/>'; });
-      (R.coffee || []).forEach(function (t) { h += '<rect class="dot-c" x="' + (X(t) - 3).toFixed(1) + '" y="72" width="6" height="8" rx="2"/>'; });
-      // the longest dry stretch, only when it is 3 hours or more
-      var dry = R.dry && R.dry.e - R.dry.s >= 3 ? R.dry : null;
+      var h = '<rect class="lane" x="' + L + '" y="28" width="' + Wd + '" height="30" rx="6"/><rect class="lane" x="' + L + '" y="68" width="' + Wd + '" height="30" rx="6"/>';
+      if (R.sleepEnd != null) h += '<rect class="sleepend" x="' + L + '" y="28" width="' + (X(R.sleepEnd) - L).toFixed(1) + '" height="30" rx="6"/>';
+      (R.sessions || []).forEach(function (t) { h += '<rect x="' + X(t.s).toFixed(1) + '" y="32" width="' + Math.max(4, X(t.e) - X(t.s)).toFixed(1) + '" height="22" rx="5" style="fill:' + (TCOL[String(t.type).split(":")[0]] || "var(--primary)") + '"/>'; });
+      (R.events || []).forEach(function (e) { h += '<rect class="cal" x="' + X(e.s).toFixed(1) + '" y="32" width="' + Math.max(4, X(e.e) - X(e.s)).toFixed(1) + '" height="22" rx="5" opacity=".85"/>'; });
+      // a label over each bar's start, where it fits; about 5.6px a character at this size
+      var labelEnd = -Infinity;
+      (R.sessions || []).map(function (t) { return { s: t.s, t: t.label }; }).concat((R.events || []).map(function (e) { return { s: e.s, t: e.t }; }))
+        .sort(function (p, q) { return p.s - q.s; })
+        .forEach(function (b) {
+          var x = X(b.s), w = String(b.t || "").length * 5.6;
+          if (!w || x < labelEnd + 6 || x + w > L + Wd) return;
+          h += '<text x="' + x.toFixed(1) + '" y="23">' + esc(b.t) + '</text>';
+          labelEnd = x + w;
+        });
+      (R.water || []).forEach(function (t, i) { h += '<circle class="dot-w" cx="' + X(t).toFixed(1) + '" cy="' + (76 + (i % 2) * 4) + '" r="3"/>'; });
+      (R.coffee || []).forEach(function (t) { h += '<rect class="dot-c" x="' + (X(t) - 3).toFixed(1) + '" y="86" width="6" height="8" rx="2"/>'; });
+      [6, 9, 12, 15, 18, 21].forEach(function (t) { if (t >= from && t <= to) h += '<text x="' + X(t).toFixed(1) + '" y="111" text-anchor="middle">' + fmtH(t) + '</text>'; });
       if (dry) {
-        h += '<path class="dry" d="M' + X(dry.s).toFixed(1) + ' 90 v6 H' + X(dry.e).toFixed(1) + ' v-6"/>';
-        h += '<text class="dry-t" x="' + ((X(dry.s) + X(dry.e)) / 2).toFixed(1) + '" y="109" text-anchor="middle">' + esc(dry.label || "no water") + '</text>';
+        h += '<path class="dry" d="M' + X(dry.s).toFixed(1) + ' 116 v6 H' + X(dry.e).toFixed(1) + ' v-6"/>';
+        h += '<text class="dry-t" x="' + ((X(dry.s) + X(dry.e)) / 2).toFixed(1) + '" y="135" text-anchor="middle">' + esc(dry.label || "no water") + '</text>';
       }
-      if (R.now != null) h += '<line class="mk" x1="' + X(R.now).toFixed(1) + '" x2="' + X(R.now).toFixed(1) + '" y1="8" y2="88" style="stroke:var(--text);stroke-dasharray:none"/><text class="mk-t" x="' + X(R.now).toFixed(1) + '" y="8" text-anchor="middle">now</text>';
-      if (R.bed != null) h += '<line class="mk" x1="' + X(R.bed).toFixed(1) + '" x2="' + X(R.bed).toFixed(1) + '" y1="14" y2="88" style="stroke:var(--bed)"/><text class="mk-t" x="' + (X(R.bed) - 3).toFixed(1) + '" y="12" text-anchor="end" style="fill:var(--bed)">bed</text>';
+      // with both markers the earlier label sits left of its line and the later right of its own, so they can't overlap
+      var nowX = R.now != null ? X(R.now) : null, bedX = R.bed != null ? X(R.bed) : null, nowFirst = nowX != null && bedX != null && nowX <= bedX;
+      if (nowX != null) h += '<line class="mk" x1="' + nowX.toFixed(1) + '" x2="' + nowX.toFixed(1) + '" y1="12" y2="102" style="stroke:var(--text);stroke-dasharray:none"/><text class="mk-t" x="' + (bedX == null ? nowX : nowFirst ? nowX - 3 : nowX + 3).toFixed(1) + '" y="9" text-anchor="' + (bedX == null ? "middle" : nowFirst ? "end" : "start") + '">now</text>';
+      if (bedX != null) h += '<line class="mk" x1="' + bedX.toFixed(1) + '" x2="' + bedX.toFixed(1) + '" y1="12" y2="102" style="stroke:var(--bed)"/><text class="mk-t" x="' + (nowFirst ? bedX + 3 : bedX - 3).toFixed(1) + '" y="9" text-anchor="' + (nowFirst ? "start" : "end") + '" style="fill:var(--bed)">bed</text>';
       s.innerHTML = h;
       c.appendChild(s);
       var key = el("div", "tl-key"), ks = [];
@@ -731,7 +745,10 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
     if (N.overdue) top.appendChild(box("div", "dueline", N.overdue.href, [N.overdue.text]));
     if (N.dinners) top.appendChild(box("div", "dinline", N.dinners.href, [N.dinners.text]));
     if (top.childNodes.length) c.appendChild(top);
-    var ax = el("div", "axis-t", [el("span", null, "5a"), el("span", null, "9a"), el("span", null, "1p"), el("span", null, "5p"), el("span", null, "9p")]);
+    // the strips sit inside each day's 12px padding; the hours are drawn on the same scale so they line up
+    var NW = CW - 24, X = function (v) { return 4 + (Math.max(5, Math.min(23, v)) - 5) * (NW - 8) / 18; };
+    var ax = svg("0 0 " + CW + " 14", "tl", null);
+    ax.innerHTML = [5, 9, 13, 17, 21].map(function (t) { return '<text x="' + (12 + X(t)).toFixed(1) + '" y="11" text-anchor="middle">' + fmtH(t) + '</text>'; }).join("");
     c.appendChild(ax);
     var list = el("div", "ahead");
     list.style.gridTemplateColumns = "1fr";
@@ -739,9 +756,8 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
       var kids = [];
       var wx = d.wx ? el("div", "wx", [icon(d.wx.ic), el("span", null, [el("b", "num", d.wx.hi + "°"), " / " + d.wx.lo + "° · wind " + d.wx.wind + " · rain " + d.wx.rain + "%"]), d.wx.flag ? el("span", "flag", d.wx.flag) : null]) : null;
       kids.push(el("div", "hd", [el("div", "dt", [el("span", null, d.dow), el("b", "num", d.n)]), wx]));
-      var st = svg("0 0 360 22", "nstrip", d.dow + " " + d.n + " on the time axis");
-      var X = function (v) { return 4 + (Math.max(5, Math.min(23, v)) - 5) * 352 / 18; };
-      var h = '<rect class="nn" x="4" y="2" width="' + (X(7) - 4).toFixed(1) + '" height="18" rx="4"/><rect class="nn" x="' + X(21).toFixed(1) + '" y="2" width="' + (356 - X(21)).toFixed(1) + '" height="18" rx="4"/>';
+      var st = svg("0 0 " + NW + " 22", "nstrip", d.dow + " " + d.n + " on the time axis");
+      var h = '<rect class="nn" x="4" y="2" width="' + (X(7) - 4).toFixed(1) + '" height="18" rx="4"/><rect class="nn" x="' + X(21).toFixed(1) + '" y="2" width="' + (NW - 4 - X(21)).toFixed(1) + '" height="18" rx="4"/>';
       (d.events || []).forEach(function (e) { if (e.s != null) h += '<rect class="ev" x="' + X(e.s).toFixed(1) + '" y="4" width="' + Math.max(3, X(e.e) - X(e.s)).toFixed(1) + '" height="14" rx="3"/>'; });
       (d.plans || []).forEach(function (p) { if (p.s != null) h += '<rect x="' + X(p.s).toFixed(1) + '" y="4" width="' + Math.max(4, X(p.e) - X(p.s)).toFixed(1) + '" height="14" rx="3" style="fill:' + (TCOL[String(p.type).split(":")[0]] || "var(--primary)") + '"/>'; });
       st.innerHTML = h;

@@ -213,5 +213,139 @@ class Tiles(unittest.TestCase):
         self.assertEqual(n.phone_note([], None), "")
 
 
+def result(slug, grade, lever, a=8, b=9, outcomes=None, **kw):
+    """A grade.py result, made up."""
+    t = {"slug": slug, "title": slug.replace("-", " ").title(), "lead": "Lead.", "grader": "machine",
+         "page_grade": grade, "grade": grade, "display_grade": grade, "tonight": grade, "moved": False,
+         "errors": [], "lever": lever, "counts": {"a": a, "b": b}, "a_label": "Group A", "b_label": "Group B",
+         "outcomes": outcomes or [{"measure": "deep_min", "mean_a": 60.0, "mean_b": 75.0, "diff": -15.0,
+                                   "threshold": 8, "over": True}],
+         "primary": "deep_min"}
+    t.update(kw)
+    return t
+
+
+class Findings(unittest.TestCase):
+    def test_moved_first_then_touching_strong_before_leaning(self):
+        tests = [
+            result("t-ride", "leaning", ["ride_day"]),
+            result("t-bed", "strong", ["sleep_start"]),
+            result("t-drink", "leaning", ["drank"]),
+            result("t-moved", "ruled-out", ["steps"], moved=True, page_grade="leaning"),
+            result("t-sodium", "strong", ["sodium_mg"]),
+        ]
+        ctx = {"ride_planned": True, "alcohol_today": True}
+        cards = n.select_findings(tests, ctx)
+        self.assertEqual([c["slug"] for c in cards], ["t-moved", "t-bed", "t-ride"])  # at most three
+        self.assertEqual(cards[0]["moved"], "New tonight: leaning → ruled out")
+        self.assertNotIn("moved", cards[1])
+
+    def test_with_none_touching_the_strongest_shows(self):
+        tests = [result("t-lean", "leaning", ["sodium_mg"]), result("t-strong", "strong", ["unwind"]),
+                 result("t-ruled", "ruled-out", ["steps"])]
+        cards = n.select_findings(tests, {})
+        self.assertEqual([c["slug"] for c in cards], ["t-strong"])
+
+    def test_nothing_graded_shows_nothing(self):
+        self.assertEqual(n.select_findings([result("t", "collecting", ["steps"])], {}), [])
+
+    def test_the_water_and_late_calories_rules(self):
+        t = [result("w", "leaning", ["water_gap_h"]), result("l", "leaning", ["late_kcal"])]
+        self.assertEqual(n.select_findings(t, {"water_gap_h": 6.5, "after_dinner": False}), n.select_findings(t[:1], {}) * 1)
+        self.assertEqual([c["slug"] for c in n.select_findings(t, {"water_gap_h": 5, "after_dinner": True})], ["l"])
+
+    def test_card_has_chip_lead_comparison_and_labels(self):
+        c = n.select_findings([result("t", "strong", ["sleep_start"], a=22, b=18)], {})[0]
+        self.assertEqual(c["chip"], "Strong · 40 nights")
+        self.assertEqual((c["lead"], c["a_label"], c["b_label"]), ("Lead.", "Group A", "Group B"))
+        self.assertEqual(c["bars"], [{"measure": "deep_min", "label": "Deep sleep", "unit": "min", "a": 60.0, "b": 75.0,
+                                      "diff": -15.0, "over": True}])
+        lean = n.select_findings([result("t", "leaning", ["sleep_start"], a=6, b=9)], {})[0]
+        self.assertEqual(lean["chip"], "Leaning · 6 nights each")
+
+    def test_hand_graded_card_chip(self):
+        c = n.select_findings([result("h", "strong", ["sleep_start"], grader="hand", outcomes=[])], {})[0]
+        self.assertEqual(c["chip"], "Hand-graded")
+
+    def test_in_progress_lists_every_collecting_and_blocked_test(self):
+        tests = [
+            result("c1", "collecting", ["x"], progress={"text": "3 + 4 of 6 + 6", "fraction": 0.58}),
+            result("c2", "collecting", ["x"], progress={"text": "7 of 10", "fraction": 0.7}),
+            result("b1", "blocked", ["x"], awaits="a blood pressure cuff"),
+            result("s", "strong", ["x"]),
+            result("h", "collecting", ["x"], grader="hand"),
+        ]
+        out = n.in_progress(tests)
+        self.assertEqual([(p["slug"], p["kind"], p["text"]) for p in out], [
+            ("c1", "collecting", "3 + 4 of 6 + 6"), ("c2", "collecting", "7 of 10"),
+            ("b1", "blocked", "Waiting for a blood pressure cuff")])
+
+
+def ride_test(**kw):
+    outs = [{"measure": "resting_hr", "mean_a": 56.0, "mean_b": 52.0, "diff": 4.0, "threshold": 2, "over": True},
+            {"measure": "resting_hr+1", "mean_a": 52.5, "mean_b": 52.0, "diff": 0.5, "threshold": 2, "over": False}]
+    return result("t-ride-hr", kw.pop("grade", "strong"), ["ride_day"], a_text="ride_day", outcomes=outs, **kw)
+
+
+class Outlook(unittest.TestCase):
+    DATES = ["2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09", "2026-11-10"]  # Fri to Tue
+    PLANNED = {"2026-11-08": ["bike:mountain"]}  # a ride planned on Sunday
+
+    def rows(self, tests, planned=None):
+        mornings = [{"date": d} for d in self.DATES]
+        out = n.compute({"nights": [], "mornings": mornings, "tests": tests, "planned": planned or self.PLANNED})
+        return {d["date"]: d for d in out["days"] if d}
+
+    def test_a_strong_test_puts_the_line_on_the_morning_after_the_ride(self):
+        # a usual bed-by is needed for the rows to exist
+        mornings = [{"date": d} for d in self.DATES]
+        out = n.compute({"nights": sixty(10), "mornings": mornings, "tests": [ride_test()], "planned": self.PLANNED})
+        by = {d["date"]: d for d in out["days"]}
+        self.assertEqual(by["2026-11-09"]["outlook"],
+                         "Monday will read high: resting HR runs about 4 bpm over after a ride, back by Tuesday.")
+        self.assertIsNone(by["2026-11-08"]["outlook"])
+        self.assertIsNone(by["2026-11-10"]["outlook"])
+
+    def test_a_leaning_test_puts_none(self):
+        mornings = [{"date": d} for d in self.DATES]
+        out = n.compute({"nights": sixty(10), "mornings": mornings, "tests": [ride_test(grade="leaning")],
+                         "planned": self.PLANNED})
+        self.assertTrue(all(d["outlook"] is None for d in out["days"]))
+
+    def test_back_by_only_when_the_next_day_is_under_threshold(self):
+        t = ride_test()
+        t["outcomes"][1].update(diff=3.0, over=True)
+        lines = n.outlook_lines([t], self.PLANNED, self.DATES)
+        self.assertEqual(lines["2026-11-09"], "Monday will read high: resting HR runs about 4 bpm over after a ride.")
+
+    def test_no_planned_ride_no_line(self):
+        self.assertEqual(n.outlook_lines([ride_test()], {"2026-11-08": ["weight"]}, self.DATES), {})
+
+
+class FindingBackedMoves(unittest.TestCase):
+    BASE = {"today": "2026-11-04", "nights": sixty(10), "alcohol": 1, "last_bp": "2026-11-04",
+            "mornings": [{"date": "2026-11-05", "sessions": [{"type": "weight"}]}]}
+
+    def drink(self, tests):
+        out = n.compute(dict(self.BASE, tests=tests))["moves"]
+        return next(m for m in out if m["kind"] == "drink")
+
+    def alcohol(self, grade):
+        return result("t-alcohol", grade, ["drank"], a_text="drank", a=6, b=6)
+
+    def test_cites_a_leaning_or_strong_alcohol_test(self):
+        m = self.drink([self.alcohol("leaning")])
+        self.assertIn("Drinking nights brought 15 min less deep sleep (6 nights each, leaning).", m["line"])
+        self.assertEqual(m["finding"], "t-alcohol")
+        self.assertIn("strong).", self.drink([self.alcohol("strong")])["line"])
+
+    def test_cites_nothing_otherwise(self):
+        for grade in ("collecting", "ruled-out"):
+            m = self.drink([self.alcohol(grade)])
+            self.assertNotIn("finding", m)
+            self.assertNotIn("Drinking nights", m["line"])
+        self.assertNotIn("Drinking nights", self.drink([])["line"])
+
+
 if __name__ == "__main__":
     unittest.main()

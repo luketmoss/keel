@@ -18,6 +18,9 @@ The morning, in order:
 5. **7:00, Macro 4**: if no brief came and no failure was reported, it posts
    *No morning brief by 7:00*.
 
+The evening, for the Nightly Brief (#836), is [below](#the-evening-the-nightly-brief-836);
+the morning macros stay until #833 retires them.
+
 A brief written without sleep says so in its notification. Reply **refresh**
 to the brief's scheduled task in Claude; the refreshed brief signals the phone
 again. A brief written without Hive or the calendar says *Not read: Hive* (or
@@ -35,12 +38,16 @@ permission prompt) can't call anything: that is what Macro 4 is for.
 - **The links.** Open the claude.ai artifacts titled `Morning Brief` and
   `Weekly Brief` and copy each link. They stay the same every run. In
   MacroDroid, make two global string variables, `brief_daily_url` and
-  `brief_weekly_url`, holding them.
+  `brief_weekly_url`, holding them. For the nightly, copy the link of the
+  artifact titled `Nightly Brief` the same way into a third, `brief_nightly_url`.
+  It exists after the nightly's first run: press **Run now** on the task once
+  to publish it.
 - **Today's date.** The macros compare global string variables against
   today's date in magic text, `[year]-[month_digit]-[dayofmonth]`. Make these,
   all empty to start: `coros_last`, `brief_daily_ready`, `brief_daily_opened`,
   `brief_daily_failed`, `brief_weekly_ready`, `brief_weekly_opened`,
-  `brief_weekly_failed`. Use the `...` button beside a
+  `brief_weekly_failed`, and for the nightly `coros_last_pm`,
+  `brief_nightly_ready`, `brief_nightly_opened`, `brief_nightly_failed`. Use the `...` button beside a
   value to insert magic text rather than typing it.
 - **The webhook.** Building Macro 2's trigger gives you its URL,
   `https://trigger.macrodroid.com/<device-id>/brief`. Put it in
@@ -74,7 +81,7 @@ to: going home leaves COROS in the background, finished.
 Named **Brief ready**.
 
 - **Trigger:** Webhook (URL), identifier `brief`. The brief adds `kind`
-  (`daily` or `weekly`), `status` (`complete`, `no-sleep` or `failed`) and,
+  (`daily`, `weekly` or `nightly`), `status` (`complete`, `no-sleep` or `failed`) and,
   sometimes, `note` to the URL. Make local string variables named `kind`,
   `status` and `note` in this macro: MacroDroid fills them from the URL's
   parameters of the same name. `note` is *Not read: Hive* (or calendar) on a
@@ -82,11 +89,27 @@ Named **Brief ready**.
   last value between runs**, and a call without `note` leaves it alone, so
   the macro empties `note` itself before it ends: otherwise one call's note
   shows up on every later notification.
-- **Actions**, as MacroDroid lists them, 23 in all (`today` is
+- **Actions**, as MacroDroid lists them, 38 in all, the first 15 of them the
+  nightly block (`today` is
   `[year]-[month_digit]-[dayofmonth]`, and `{lv=note}` is the `note` local
   variable inserted with the `...` button):
 
 ```
+If kind = nightly
+    If status = failed
+        Set brief_nightly_failed = today
+        Notification: Nightly brief failed / {lv=note}
+    Else
+        Set brief_nightly_ready = today
+        If status = no-sleep
+            Notification: Nightly brief ready, without last night's sleep / Last night hadn't synced. Reply refresh to the brief in Claude. {lv=note}
+        Else
+            Notification: Nightly brief ready / Tonight's bed-by and the days ahead. {lv=note}
+        End If
+    End If
+    Set note = (empty)
+    Cancel Macro Actions (This Macro)
+End If
 If status = failed
     If kind = weekly
         Set brief_weekly_failed = today
@@ -113,7 +136,9 @@ Set note = (empty)
 ```
 
 Each Notification line is *title / text*. Edit the existing macro rather than
-rebuilding it: the new parts are the `If status = failed` block on top, which
+rebuilding it: the nightly block is new and goes on top, ending in its own
+**Cancel Macro Actions** so a nightly never reaches the morning and weekly
+actions below it. Of the rest, the new parts are the `If status = failed` block on top, which
 **Cancel Macro Actions** (under MacroDroid Specific) ends so a failure never
 reaches the "ready" actions below it, `{lv=note}` at the end of each
 text, and the two `Set note = (empty)` actions (Set Variable on the local
@@ -122,13 +147,17 @@ MacroDroid adds an action at the bottom; long-press its handle to drag it up.
 If `note` already holds an old value, empty it once in the macro's Local
 Variables panel.
 
+The nightly's `{lv=note}` carries the yesterday-food line and any *Not read*,
+so both show without opening the page.
+
 A failed brief sets `…_failed`, never `…_ready`, so an unlock doesn't open
 yesterday's page, and Macro 4 stays quiet because the failure was already
 reported.
 
 **What a tap does.** Each Display Notification has a setting for what happens
 when it is pressed: set it to run **Open morning brief** on both morning
-"ready" ones and **Open weekly brief** on the weekly one (Macro 3). Leave the
+"ready" ones **Open weekly brief** on the weekly one, and **Open nightly brief** on both
+nightly "ready" ones (Macro 3). Leave the
 two "failed" ones with no tap action, or set them to open the Claude app.
 
 A refresh that brings sleep in sends `complete`, which posts the plain
@@ -182,6 +211,63 @@ shape.
 A failure the brief reported (Macro 2) sets `…_failed`, so you get one
 notification for it, not two.
 
+## The evening: the Nightly Brief (#836)
+
+The Nightly Brief runs daily at 9:15 PM and uses the same Macro 2 (Brief
+ready), with its own sync, opener and watchdog. In order:
+
+1. **First unlock, 7:30 to 8:55 PM**: **Sync watch, evening** opens COROS for
+   20 s, so the watch hands over the day before Thrive's 9:00 PM sync.
+2. **9:00 PM**: Thrive's scheduled sync (#828).
+3. **9:15 PM**: the nightly runs on the desktop, publishes the Nightly Brief
+   page and calls Macro 2's webhook with `kind=nightly`.
+4. **Macro 2** posts a notification; its `kind = nightly` branch is above.
+   Tap it to open the page.
+5. **3c**: if you haven't tapped it, the next unlock opens the page, once a
+   day.
+6. **9:35 PM, 4c**: if no nightly came and no failure was reported, it posts
+   *No nightly brief by 9:35*.
+
+**Sync watch, evening.** Clone Macro 1 and change it:
+
+- **Trigger:** Device Unlocked, as Macro 1. Leave out Power Disconnected.
+- **Constraints:** Time of Day 7:30 PM to 8:55 PM; `coros_last_pm` is not
+  `[year]-[month_digit]-[dayofmonth]`.
+- **Actions:**
+  1. Set Variable `coros_last_pm` to `[year]-[month_digit]-[dayofmonth]`
+  2. Launch Application: COROS
+  3. Wait Before Next Action: 20 seconds
+  4. Launch Home Screen
+
+It has its own variable, so the morning's `coros_last` neither blocks it nor
+is set by it.
+
+**3c, Open nightly brief** (the third of Macro 3's shape)
+
+- **Trigger:** Device Unlocked. A tap on Macro 2's nightly "ready"
+  notifications runs it too.
+- **Constraints:** two Variable Value (string) constraints:
+  `brief_nightly_ready` equals `[year]-[month_digit]-[dayofmonth]`;
+  `brief_nightly_opened` does not.
+- **Actions:**
+  1. Set Variable `brief_nightly_opened` to `[year]-[month_digit]-[dayofmonth]`
+  2. Open Website: `[v=brief_nightly_url]`
+
+**4c, Nightly brief watchdog** (the third of Macro 4's shape)
+
+- **Trigger:** Day/Time, 9:35 PM, every day. The nightly starts at 9:15 and
+  takes about 3 minutes, so 9:35 leaves room for a slow run.
+- **Constraints:** two Variable Value (string) constraints:
+  `brief_nightly_ready` does not equal `[year]-[month_digit]-[dayofmonth]`;
+  `brief_nightly_failed` does not equal it either.
+- **Actions:**
+  1. Display Notification: title **No nightly brief by 9:35**, text *The
+     desktop may be asleep, or the run is waiting on a prompt. Open the
+     Nightly brief task in Claude.*
+
+A nightly that reported a failure sets `brief_nightly_failed`, so you get one
+notification for it, not two.
+
 ## Testing from the desktop
 
 This reads the webhook from `settings.local.md` and makes the brief's call,
@@ -199,9 +285,28 @@ $hook = $line.Matches[0].Groups[1].Value
 curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=daily&status=complete"
 ```
 
-To test the opening macros again the same day, empty `brief_daily_opened` or
-`brief_weekly_opened` in Variables first. For Sync watch, empty `coros_last`
-and widen its Time of Day if it is past 10:00, then set it back.
+For the nightly, the same lead-in with the three calls Macro 2's
+`kind = nightly` branch answers. Each prints `200`; the first posts *Nightly
+brief ready*, the second *Nightly brief ready, without last night's sleep*, the
+third *Nightly brief failed* with its note:
+
+```powershell
+$line = Select-String -Path 'D:\Projects\code\keel\thrive\.claude\skills\brief\settings.local.md' -Pattern 'webhook\*\*: `(.+)`'
+$hook = $line.Matches[0].Groups[1].Value
+curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=nightly&status=complete"
+curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=nightly&status=no-sleep"
+curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=nightly&status=failed&note=Thrive%20not%20connected."
+```
+
+A nightly test call sets that day's `brief_nightly_ready` or
+`brief_nightly_failed` the same way: empty it again afterwards, or that
+evening's real page won't open on unlock and 4c won't fire.
+
+To test the opening macros again the same day, empty `brief_daily_opened`,
+`brief_weekly_opened` or `brief_nightly_opened` in Variables first. For Sync
+watch, empty `coros_last` and widen its Time of Day if it is past 10:00, then
+set it back; for Sync watch, evening, empty `coros_last_pm` and widen its
+Time of Day if it is outside 7:30 to 8:55 PM.
 
 ## When it doesn't work
 
@@ -209,6 +314,11 @@ and widen its Time of Day if it is past 10:00, then set it back.
   reconnect the Thrive connector in Claude. *The page didn't publish* or *The
   run stopped early*: open the task's latest run in Claude to see what
   happened. Then press **Run now** on the task.
+- **"Nightly brief failed".** The same causes and fixes as the morning's, from
+  its text. Then press **Run now** on the Nightly brief task.
+- **"No nightly brief by 9:35".** The same causes as the morning's: the desktop
+  asleep or off, a permission prompt, or a failure that never reached the
+  phone. Open the Nightly brief task in Claude.
 - **"No morning brief by 7:00".** The desktop was asleep or off, the run is
   waiting on a permission prompt (below), or it failed without reaching the
   phone. The brief's chat reply says *"Couldn't signal the phone."* when the

@@ -8,7 +8,7 @@ you when a brief didn't come.
 
 The nightly took over the macros the Morning Brief used (#833) instead of
 adding a second set, so Macro 3a and the `brief_daily_*` variables keep their
-old names. The 6:45 AM `daily-brief` task is paused.
+old names. The 6:45 AM `daily-brief` task was deleted on 2026-11-06.
 
 The evening, in order:
 
@@ -56,7 +56,8 @@ Edit the existing macros. Nothing new is built and no variable is added:
 - **Macro 3a:** no change. Rename it **Open nightly brief** if you like.
 - **Macro 4a:** trigger 9:35 PM, and the title and text below.
 
-To go back, enable the `daily-brief` task and undo these edits.
+The `daily-brief` task is deleted, so these edits are not undone by enabling it.
+The morning mode is in this skill's git history from before #833.
 
 ## Moving the weekly to Sunday 4 PM (#832)
 
@@ -115,11 +116,11 @@ only these, so it doesn't spend the evening window's once-a-day variable:
 - **Actions:** the same four, with step 1 setting `coros_last_sun` instead of
   `coros_last`.
 
-The morning and evening windows are unchanged. Thrive's 3:45 PM Sunday sync
+The evening window is unchanged. Thrive's 3:45 PM Sunday sync
 (#828) then picks up what COROS already has, before the 4:00 PM weekly.
 
-Thrive's 6:30 AM sync (#828) still runs, but with no morning open it picks up
-only what COROS already has, so last night's sleep may reach the Day screen
+Thrive's 6:30 AM sync (#828) still runs, but with no COROS open before it, it
+picks up only what COROS already has, so last night's sleep may reach the Day screen
 only after the evening open.
 
 ## Macro 2: the brief is up
@@ -187,7 +188,7 @@ A refresh that brings sleep in sends `complete`, which posts the plain
 
 Two macros of the same shape, one per brief.
 
-**3a, Open morning brief** (it opens the nightly; rename it if you like)
+**3a, Open brief** (it opens the nightly; the macro keeps its old name)
 
 - **Trigger:** Device Unlocked. A tap on Macro 2's notification runs it too.
 - **Constraints:** two Variable Value (string) constraints:

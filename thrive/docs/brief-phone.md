@@ -1,6 +1,6 @@
 # The brief on the phone (#617)
 
-The Nightly Brief (daily at 9:15 PM) and the Weekly Brief (Sundays at 6:45
+The Nightly Brief (daily at 9:15 PM) and the Weekly Brief (Sundays at 4:00
 PM) are published to the same two artifact links every run. These MacroDroid
 macros make the phone sync the watch in the evening, open the brief once it is
 actually up, instead of at a fixed time that may show yesterday's, and tell
@@ -22,6 +22,12 @@ The evening, in order:
    Once a day for each brief.
 5. **9:35 PM, Macro 4**: if no brief came and no failure was reported, it posts
    *No nightly brief by 9:35*.
+
+**Sundays (#832)** add an afternoon: the first unlock from 1:00 to 3:40 PM opens
+COROS (Macro 1b), Thrive syncs at 3:45 PM (#828), the weekly runs at 4:00 PM and
+files the week's review in the wiki, and the watchdog fires at 4:20 PM
+(Macro 4b). Open the Weekly brief whenever planning starts that evening, then
+run `/plan-week`.
 
 A brief written without sleep says so in its notification. Reply **refresh**
 to the brief's scheduled task in Claude; the refreshed brief signals the phone
@@ -52,6 +58,19 @@ Edit the existing macros. Nothing new is built and no variable is added:
 
 To go back, enable the `daily-brief` task and undo these edits.
 
+## Moving the weekly to Sunday 4 PM (#832)
+
+Edit the existing macros, and make one variable and one macro:
+
+- **Variables:** add `coros_last_sun`, empty.
+- **Macro 1b:** clone Sync watch as below.
+- **Macro 3b:** nothing to change but its name, if you like.
+- **Macro 4b:** trigger Sunday 4:20 PM, and the title below.
+- **The `weekly-brief` task** in Claude: Sundays at 4:00 PM, starting from the wiki's `/weekly-brief`
+  command (it syncs the checkouts, then follows the brief skill with `weekly scheduled`).
+
+To go back, set the task to 6:45 PM and undo these edits.
+
 ## Before you start
 
 - **The links.** Open the claude.ai artifacts titled `Nightly Brief` and
@@ -62,7 +81,7 @@ To go back, enable the `daily-brief` task and undo these edits.
   today's date in magic text, `[year]-[month_digit]-[dayofmonth]`. Make these,
   all empty to start: `coros_last`, `brief_daily_ready`, `brief_daily_opened`,
   `brief_daily_failed`, `brief_weekly_ready`, `brief_weekly_opened`,
-  `brief_weekly_failed`. Use the `...` button beside a value to insert magic
+  `brief_weekly_failed` and `coros_last_sun`. Use the `...` button beside a value to insert magic
   text rather than typing it.
 - **The webhook.** Building Macro 2's trigger gives you its URL,
   `https://trigger.macrodroid.com/<device-id>/brief`. Put it in the briefs'
@@ -87,6 +106,17 @@ Named **Sync watch**.
 Setting `coros_last` first means a second unlock in those 20 s doesn't start
 it again. MacroDroid can't close another app without root, and doesn't need
 to: going home leaves COROS in the background, finished.
+
+**Macro 1b, Sync watch, Sunday afternoon (#832).** Clone Macro 1 and change
+only these, so it doesn't spend the evening window's once-a-day variable:
+
+- **Constraints:** Day of Week Sunday; Time of Day 1:00 PM to 3:40 PM;
+  `coros_last_sun` is not `[year]-[month_digit]-[dayofmonth]`.
+- **Actions:** the same four, with step 1 setting `coros_last_sun` instead of
+  `coros_last`.
+
+The morning and evening windows are unchanged. Thrive's 3:45 PM Sunday sync
+(#828) then picks up what COROS already has, before the 4:00 PM weekly.
 
 Thrive's 6:30 AM sync (#828) still runs, but with no morning open it picks up
 only what COROS already has, so last night's sleep may reach the Day screen
@@ -169,7 +199,7 @@ Two macros of the same shape, one per brief.
 
 **3b, Open weekly brief:** clone 3a and change it to `brief_weekly_ready`,
 `brief_weekly_opened` and `[v=brief_weekly_url]`. The weekly brief runs on
-Sunday evening, so 3b opens it on the first unlock after about 6:50 PM.
+Sunday at 4:00 PM, so 3b opens it on the first unlock after about 4:05 PM.
 
 The `ready` constraint is what keeps a stale brief from opening: before 9:15
 PM, or on a night the desktop was off and nothing was published, `ready` isn't
@@ -194,9 +224,9 @@ shape.
      Nightly brief task in Claude.*
 
 **4b, Weekly brief watchdog:** clone 4a, set its trigger to Sunday only at
-7:15 PM (the weekly task starts up to 7 minutes after 6:45), and change it to
+4:20 PM (the weekly task starts up to 7 minutes after 4:00), and change it to
 `brief_weekly_ready`, `brief_weekly_failed`, title **No weekly brief by
-7:15** and *the Weekly brief task*.
+4:20** and *the Weekly brief task*.
 
 A failure the brief reported (Macro 2) sets `…_failed`, so you get one
 notification for it, not two.
@@ -224,7 +254,8 @@ and Macro 4 won't fire.
 
 To test the opening macros again the same day, empty `brief_daily_opened` or
 `brief_weekly_opened` in Variables first. For Sync watch, empty `coros_last`
-and widen its Time of Day if it is outside 7:30 to 8:55 PM, then set it back.
+and widen its Time of Day if it is outside 7:30 to 8:55 PM, then set it back. The same goes for
+`coros_last_sun` and Macro 1b's 1:00 to 3:40 PM window.
 
 ## When it doesn't work
 

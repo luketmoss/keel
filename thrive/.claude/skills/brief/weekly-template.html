@@ -186,6 +186,17 @@ h1, h2, h3, p { margin: 0; }
 .trial-line { display: flex; gap: 8px; align-items: baseline; font-size: .9375rem; padding: 2px 2px 0; }
 .trial-line .ic { width: 15px; height: 15px; position: relative; top: 2px; color: var(--text-2); }
 .trial-line a { color: var(--primary); }
+.filed-line { display: flex; gap: 8px; align-items: baseline; font-size: .9375rem; padding: 2px 2px 0; color: var(--text-2); }
+.filed-line .ic { width: 15px; height: 15px; position: relative; top: 2px; }
+.grade-moves { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-light); font-size: .875rem; display: flex; flex-direction: column; gap: 4px; }
+.pad { display: flex; flex-direction: column; }
+.pad-row { display: grid; grid-template-columns: 40px 1fr; gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--border-light); }
+.pad-row:first-child { border-top: 0; padding-top: 0; }
+.pad-row .d { font-size: .6875rem; font-weight: 600; text-transform: uppercase; color: var(--text-2); padding-top: 3px; }
+.pad-row .st { font-size: .875rem; color: var(--text-2); }
+.pad-row .st.ok { color: var(--success); }
+.pad-row .st.miss { color: var(--warning); }
+.pad-target { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light); font-size: .875rem; color: var(--text-2); }
 .foot { font-size: .8125rem; color: var(--muted); padding: 4px 2px; }
 
 @media (min-width: 720px) {
@@ -264,12 +275,16 @@ h1, h2, h3, p { margin: 0; }
 <script id="brief-data" type="application/json">
 {
   "date": "Sun, Oct 18",
+  "filed": "This week's review is filed in your wiki, ready for /plan-week.",
+  "trial": { "text": "Trial: Example change, day 3 of 14.", "href": "https://example.invalid/nightly" },
   "range": "Mon 19 – Sun 25 Oct",
   "sun": [7.28, 18.18],
   "plan": {
     "summary": "Sample data. 3 lifts and a ride planned, one of them on a day you're out all day. Recovery is level with last week, so the plan holds; it just needs the ride moved.",
     "counts": [{ "type": "weight", "text": "3 lifts" }, { "type": "bike", "text": "1 ride" }, { "type": "stretch", "text": "0 stretches" }],
+    "grades": ["Example test: collecting → leaning"],
     "suggestions": [
+      { "kind": "meal", "title": "Tuesday dinner", "why": "Nothing planned for Tuesday dinner. Tuesday's calendar is full until 6:30." },
       { "kind": "move", "title": "Saturday's ride → Sunday", "why": "An all-day event fills Saturday. Sunday is clear, 61°F with wind 10, and lands 72 h after Thursday's legs session." },
       { "kind": "add", "title": "Friday: stretch, 25 min, at 7:00", "why": "The 7:00 slot is free on a day with 3 calendar blocks, two days before the ride. Last week had 2 stretches; this plan has none." },
       { "kind": "keep", "title": "Monday: 5 - Upper Pull B", "why": "HRV 57 and resting HR 51 this morning, at or better than last week's averages (52.5 ms, 51.3 bpm)." }
@@ -304,6 +319,12 @@ h1, h2, h3, p { margin: 0; }
   ],
   "back": {
     "range": "12 – 18 Oct",
+    "pad": { "rows": [
+      { "day": "Mon", "title": "3 - Legs A", "status": "Done", "why": null },
+      { "day": "Tue", "title": "Stretch", "status": "Swapped for an easy walk", "why": "foot sore after Sunday" },
+      { "day": "Thu", "title": "4 - Upper Push B", "status": "Done, moved from Wednesday", "why": null },
+      { "day": "Sat", "title": "Gravel ride", "status": "Missed", "why": "not explained in your notes" } ],
+      "targets": "2 of 3 lifts · 1 of 1–2 stretches · 0 of about 1 ride", "empty": null },
     "stats": [
       { "k": "Sessions", "v": "7", "d": "+1 on the week before", "up": true, "sub": "3 lifts · 2 rides · 2 stretches" },
       { "k": "Moving time", "v": "5:30", "d": "+2:13", "up": true, "sub": "on 5 of 7 sessions" },
@@ -461,18 +482,12 @@ h1, h2, h3, p { margin: 0; }
     return s;
   }
 
-  var KCOL = { keep: "var(--primary)", add: "var(--success)", move: "var(--warning)", skip: "var(--danger)" };
+  var KCOL = { keep: "var(--primary)", add: "var(--success)", move: "var(--warning)", skip: "var(--danger)", meal: "var(--t-walk)" };
 
   root.appendChild(el("header", "top", [el("div", "meta", D.date + " · " + D.range), el("h1", null, "Week ahead")]));
+  // Whether this week's review was filed in the wiki (#832): one line, then the notice if any.
+  if (D.filed) root.appendChild(el("p", "filed-line", [icon("clock"), el("span", null, D.filed)]));
   if (D.notice) root.appendChild(el("div", "notice", [icon("alert"), el("span", null, D.notice)]));
-
-  // A trial (#831): one line, no buttons. It links to the nightly page, where the answer is given.
-  if (D.trial && D.trial.text) (function () {
-    var link = /^https:\/\//.test(D.trial.href || "");
-    var line = el("p", "trial-line", [icon("clock"), link ? el("a", null, D.trial.text) : el("span", null, D.trial.text)]);
-    if (link) { var a = line.querySelector("a"); a.href = D.trial.href; a.target = "_blank"; a.rel = "noopener"; }
-    root.appendChild(line);
-  })();
 
   // The plan, and what to change in it
   if (D.plan) (function () {
@@ -483,6 +498,16 @@ h1, h2, h3, p { margin: 0; }
       var k = el("span", "kind", g.kind); k.style.setProperty("--kc", KCOL[g.kind] || "var(--primary)");
       c.appendChild(el("div", "sug", [k, el("b", null, g.title), el("span", "sub", g.why)]));
     });
+    // A trial (#831): one line, no buttons. It links to the nightly page, where the answer is given.
+    if (D.trial && D.trial.text) {
+      var link = /^https:\/\//.test(D.trial.href || "");
+      var line = el("p", "trial-line", [icon("clock"), link ? el("a", null, D.trial.text) : el("span", null, D.trial.text)]);
+      if (link) { var a = line.querySelector("a"); a.href = D.trial.href; a.target = "_blank"; a.rel = "noopener"; }
+      line.style.marginTop = "12px";
+      c.appendChild(line);
+    }
+    // Grades that moved this week (#830): one line each, left out with none.
+    if ((D.plan.grades || []).length) c.appendChild(el("div", "grade-moves", D.plan.grades.map(function (t) { return el("span", null, t); })));
     root.appendChild(c);
   })();
 
@@ -559,6 +584,19 @@ h1, h2, h3, p { margin: 0; }
     hdr.querySelector("h1").style.fontSize = "1.75rem";
     hdr.style.paddingTop = "12px";
     root.appendChild(hdr);
+    if (B.pad) (function () {
+      var pc = card("Plan against done", "day", "every session planned for the week");
+      var list = el("div", "pad");
+      if (!(B.pad.rows || []).length) list.appendChild(el("p", null, B.pad.empty || "Nothing was planned this week."));
+      (B.pad.rows || []).forEach(function (r) {
+        var cls = "st" + (r.status === "Missed" ? " miss" : r.status === "Done" ? " ok" : "");
+        var txt = r.status + (r.why ? " · " + (r.why === "not explained in your notes" ? r.why : "“" + r.why + "”") : "");
+        list.appendChild(el("div", "pad-row", [el("span", "d", r.day), el("div", null, [el("b", null, r.title), el("div", cls, txt)])]));
+      });
+      pc.appendChild(list);
+      if (B.pad.targets) pc.appendChild(el("p", "pad-target", B.pad.targets));
+      root.appendChild(pc);
+    })();
     if (B.stats) root.appendChild(el("div", "grid g2 g4", B.stats.map(function (s) {
       return el("div", "card stat", [el("span", "k", s.k), figure("v", s.v, s.u), s.d ? el("span", "d" + (s.up ? " up" : ""), (s.up ? "▲ " : "") + s.d) : null, s.sub ? el("span", "sub", s.sub) : null]);
     })));

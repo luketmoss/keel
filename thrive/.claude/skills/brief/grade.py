@@ -529,6 +529,24 @@ def set_key(lines, key, val):
     lines.append("%s: %s" % (key, val))
 
 
+def last_item_end(lines, start, end):
+    """The index just past the last top-level list item, and what is indented under it, in lines[start:end];
+    None when the section has no list item. A note after the list, such as a blockquote, stays after it."""
+    last = None
+    for i in range(start, end):
+        if re.match(r"^[-*]\s", lines[i]):
+            last = i
+    if last is None:
+        return None
+    stop = last + 1
+    for i in range(last + 1, end):
+        if lines[i].strip() and not lines[i][0].isspace():
+            break
+        if lines[i].strip():
+            stop = i + 1
+    return stop
+
+
 def edit_page(text, res, test, today):
     lines, body = split_page(text)
     if not lines:
@@ -539,7 +557,6 @@ def edit_page(text, res, test, today):
     body_lines = body.split("\n")
     at = next((i for i, l in enumerate(body_lines) if re.match(r"^##\s+Timeline\s*$", l)), None)
     if at is None:
-        body_lines = body_lines.rstrip() if False else body_lines
         while body_lines and not body_lines[-1].strip():
             body_lines.pop()
         body_lines += ["", "## Timeline", entry, ""]
@@ -547,32 +564,41 @@ def edit_page(text, res, test, today):
         end = next((i for i in range(at + 1, len(body_lines)) if body_lines[i].startswith("#")), len(body_lines))
         while end > at + 1 and not body_lines[end - 1].strip():
             end -= 1
-        body_lines.insert(end, entry)
+        stop = last_item_end(body_lines, at + 1, end)
+        body_lines.insert(end if stop is None else stop, entry)
     return "---\n" + "\n".join(lines) + "\n---\n" + "\n".join(body_lines)
 
 
 def edit_hub(text, slug, title, grade):
-    """Move a test's line to its new grade's section on `data-findings`, adding the section if needed."""
+    """Move a test's bullet, with the indented lines that continue it, to its new grade's section on
+    `data-findings`, adding the section if needed."""
     name = grade.replace("-", " ")
     lines = text.split("\n")
-    kept, line_for = [], None
-    for l in lines:
-        if re.match(r"^\s*[-*]\s", l) and re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(slug), l):
-            line_for = line_for or l
+    kept, moved = [], None
+    mine = re.compile(r"^[-*]\s+(\[\[)?%s(?![\w-])" % re.escape(slug))
+    i = 0
+    while i < len(lines):
+        if moved is None and mine.match(lines[i]):
+            moved = [lines[i]]
+            i += 1
+            while i < len(lines) and lines[i].strip() and lines[i][0].isspace():
+                moved.append(lines[i])
+                i += 1
             continue
-        kept.append(l)
-    entry = line_for or "- [[%s]]: %s" % (slug, title)
+        kept.append(lines[i])
+        i += 1
+    entry = moved or ["- [[%s]]: %s" % (slug, title)]
     at = next((i for i, l in enumerate(kept)
                if l.startswith("#") and l.lstrip("#").strip().lower() == name), None)
     if at is None:
         while kept and not kept[-1].strip():
             kept.pop()
-        kept += ["", "## " + name[:1].upper() + name[1:], entry, ""]
+        kept += ["", "## " + name[:1].upper() + name[1:]] + entry + [""]
         return "\n".join(kept)
     end = next((i for i in range(at + 1, len(kept)) if kept[i].startswith("#")), len(kept))
     while end > at + 1 and not kept[end - 1].strip():
         end -= 1
-    kept.insert(end, entry)
+    kept[end:end] = entry
     return "\n".join(kept)
 
 

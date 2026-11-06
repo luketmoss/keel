@@ -425,6 +425,42 @@ class Write(unittest.TestCase):
             self.assertEqual(fh.read(), before)
         self.assertTrue(out["tests"][0]["moved"])  # tonight's grade still shows
 
+    def test_a_wrapped_hub_bullet_moves_whole(self):
+        hub = ("# Hub\n\n## Strong\n\n- [[test-a]]: a long line that\n  wraps onto a second line\n  and a third.\n"
+               "- [[test-b]]: stays.\n\n## Leaning\n\n- [[test-c]]: one line.\n\n## Collecting\n")
+        text = g.edit_hub(hub, "test-a", "A", "leaning")
+        self.assertIn("## Leaning\n\n- [[test-c]]: one line.\n- [[test-a]]: a long line that\n  wraps onto a second line\n"
+                      "  and a third.\n\n## Collecting", text)
+        self.assertIn("## Strong\n\n- [[test-b]]: stays.\n", text)
+        self.assertEqual(text.count("wraps onto"), 1)
+        self.assertEqual(text.count("and a third"), 1)
+
+    def test_a_one_line_hub_bullet_moves_as_before(self):
+        hub = "## Strong\n- [[test-a]]: x.\n- [[test-b]]: y.\n\n## Leaning\n- [[test-c]]: z.\n"
+        text = g.edit_hub(hub, "test-b", "B", "leaning")
+        self.assertEqual(text, "## Strong\n- [[test-a]]: x.\n\n## Leaning\n- [[test-c]]: z.\n- [[test-b]]: y.\n")
+
+    def test_a_timeline_entry_goes_before_a_trailing_blockquote(self):
+        res = {"grade": "strong", "page_grade": "leaning", "counts": {"a": 6, "b": 6}, "primary": "slept_min",
+               "outcomes": [{"measure": "slept_min", "mean_a": 500.0, "mean_b": 440.0, "diff": 60.0, "threshold": 20.0}],
+               "window": {"from": "2026-08-23", "to": TODAY}, "empty": []}
+        t = parse(PAGE)
+        body = (PAGE.rstrip("\n") + "\n  - nested figure.\n\n  (thrive: made up)\n\n> **Inference:** a note.\n")
+        out = g.edit_page(body, res, t, TODAY)
+        tail = out[out.index("## Timeline"):]
+        lines = [l for l in tail.split("\n") if l.strip()]
+        self.assertEqual(lines[-1], "> **Inference:** a note.")
+        self.assertTrue(lines[-2].startswith("- **%s:**" % TODAY))
+        self.assertLess(tail.index("(thrive: made up)"), tail.index("**%s:**" % TODAY))
+        self.assertEqual(out.count("> **Inference:** a note."), 1)
+
+    def test_a_timeline_with_no_trailing_note_still_appends_at_the_end(self):
+        res = {"grade": "strong", "page_grade": "leaning", "counts": {"a": 6, "b": 6}, "primary": "slept_min",
+               "outcomes": [{"measure": "slept_min", "mean_a": 500.0, "mean_b": 440.0, "diff": 60.0, "threshold": 20.0}],
+               "window": {"from": "2026-08-23", "to": TODAY}, "empty": []}
+        out = g.edit_page(PAGE, res, parse(PAGE), TODAY)
+        self.assertTrue(out.rstrip("\n").split("\n")[-1].startswith("- **%s:**" % TODAY))
+
     def test_the_hub_gains_a_missing_section(self):
         text = g.edit_hub("# Hub\n\n## Collecting\n- [[test-x]]: X\n", "test-x", "X", "ruled-out")
         self.assertIn("## Ruled out\n- [[test-x]]: X", text)

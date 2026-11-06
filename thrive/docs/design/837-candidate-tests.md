@@ -74,3 +74,25 @@ An owner's question isn't found by searching, so it has no `from:` unless the ow
 measure can express is said plainly, and the command offers a `grader: hand` page instead.
 
 `grade.py check <page>` validates one page's keys and measures and prints what it would group, writing nothing.
+
+## How it is built
+
+Decisions made while building it, where the note above left room.
+
+- **The rules are `candidates.py`** (stdlib, tested in `test_candidates.py`); `grade.py scan` runs its `scan`, and
+  `grade.py check` is in `grade.py`. `candidates.py add` is the nightly's write, run before `trials.py` and `grade.py`.
+- **Only a pair that serves a goal is offered.** Outcomes are the night and morning measures that have a threshold
+  (`sleep_start` is a lever, not an outcome). The skill passes `goals`, a map from a measure to the goal it serves,
+  read from the goals page; a pair serves a goal when its lever or its outcome is in the map. The furthest over its bar
+  is `|difference| / (2 x threshold)`.
+- **A pair is "asked" by the raw keys of a test page** (`a`, `b`, `thirds` for the lever, `y` for the outcome), so a
+  page that can't be graded still counts. A trial's page and a `grader: hand` page ask nothing.
+- **Answers** are one document per card, `candidates/<id>`, `cand-<date>-<lever>-<outcome>`, holding `decision`,
+  `decided_at`, `lever`, `outcome`, `found_on`, `diff`, `a` and `b` (days a group). The page text is rebuilt from the
+  lever, the outcome and those numbers; no text from a row is written anywhere. A `never` always wins, a `not_now` holds
+  a pair for 56 days from `decided_at`, and an `add` keeps the pair out of the scan.
+- **The page** is `test-<lever>-<outcome>` with hyphens, `kind: watching`, `grade: collecting`, `per_side: 8`,
+  `total: 20`, `from:` the day it is written and `drop: excluded, ride_day`. A flag lever writes `a` and `b`, a number
+  `thirds`. The index is not touched by the nightly: the issue names `data-findings` and `log.md`.
+- **`grade.py check PAGE`** prints one JSON object (`ok`, `errors`, `groups`, `outcomes`) and exits 1 on any error. It
+  keeps going after the first problem so it reports all of them.

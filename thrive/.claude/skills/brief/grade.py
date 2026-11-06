@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Grade the wiki's tests the same way every run (#830).
 
+  grade.py scan  ...      the Sunday scan for a candidate test (#837), see candidates.py
+  grade.py check PAGE     every problem on one test page and what it would group; writes nothing (#837)
+  grade.py scan ...       the Sunday scan for a candidate test (#837), see candidates.py
+  grade.py check PAGE     every problem on one test page and what it would group; writes nothing (#837)
   grade.py --data SCRATCH.json --today YYYY-MM-DD [--write] [--wiki DIR]
            [--syntheses DIR] [--hub FILE] [--keel DIR] [--folder DIR]
 
@@ -688,7 +692,88 @@ def run(data, today, tests, excluded, hub=None, write=False, wiki=None, keel=Non
     return out
 
 
+def check_page(path, text):
+    """Every problem on one test page, by name, and what it would group (#837). Reads only; unlike parse_test
+    it keeps going after the first problem."""
+    lines, body = split_page(text)
+    fm = frontmatter(lines)
+    out = {"page": path, "grader": fm.get("grader", "machine"), "errors": [], "groups": None, "outcomes": [],
+           "drop": [], "per_side": None, "total": None, "from": fm.get("from")}
+    errs = out["errors"]
+    if not lines:
+        errs.append("no frontmatter")
+    if out["grader"] not in ("machine", "hand"):
+        errs.append("grader must be machine or hand: %s" % out["grader"])
+    if out["grader"] == "hand":
+        return out
+
+    def attempt(fn):
+        try:
+            return fn()
+        except Bad as e:
+            errs.append(str(e))
+
+    groups = {}
+    if "thirds" in fm and ("a" in fm or "b" in fm):
+        errs.append("a/b and thirds together")
+    elif "thirds" in fm:
+        def thirds():
+            name, plus = measure_ref(fm["thirds"])
+            if plus or MEASURES[name][0] == FLAG:
+                raise Bad("malformed thirds: %s" % fm["thirds"])
+            return name
+        name = attempt(thirds)
+        if name:
+            groups = {"A": "the top third of %s" % name, "B": "the bottom third of %s" % name}
+    else:
+        for key, label in (("a", "A"), ("b", "B")):
+            if key not in fm:
+                errs.append("missing %s (or thirds)" % key)
+            elif attempt(lambda: parse_condition(fm[key])) is not None:
+                groups[label] = fm[key]
+    if len(groups) == 2:
+        out["groups"] = groups
+    ys = []
+    if not listed(fm.get("y")):
+        errs.append("missing y")
+    for item in listed(fm.get("y")):
+        ref = attempt(lambda: measure_ref(item))
+        if ref:
+            ys.append(ref)
+    out["drop"] = [d for d in listed(fm.get("drop")) if attempt(lambda: measure_ref(d))]
+    matters = attempt(lambda: parse_matters(fm.get("matters"))) or {}
+    for name, plus in ys:
+        full = name + ("+1" if plus else "")
+        thr = matters.get(full, matters.get(name, DEFAULT_MATTERS.get(name)))
+        if thr is None:
+            errs.append("no threshold for %s" % full)
+        else:
+            out["outcomes"].append({"measure": full, "threshold": thr})
+    for key in ("per_side", "total"):
+        out[key] = attempt(lambda: whole(fm, key))
+    if fm.get("from") and not re.match(r"^\d{4}-\d{2}-\d{2}$", fm["from"]):
+        errs.append("malformed from: %s" % fm["from"])
+    return out
+
+
+def check_main(argv):
+    """grade.py check PAGE: report a test page's problems and what it would group. Writes nothing."""
+    p = argparse.ArgumentParser(prog="grade.py check", description=check_main.__doc__)
+    p.add_argument("page")
+    args = p.parse_args(argv)
+    result = check_page(args.page, read(args.page))
+    result["ok"] = not result["errors"]
+    print(json.dumps(result))
+    return 0 if result["ok"] else 1
+
+
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] == "check":
+        return check_main(argv[1:])
+    if argv and argv[0] == "scan":
+        import candidates
+        return candidates.main(argv)
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--data", required=True, help="the scratch file; deleted when the run ends")
     p.add_argument("--today", required=True)

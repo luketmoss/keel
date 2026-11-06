@@ -15,6 +15,7 @@
   --lv-rest: #4f6f8f; --lv-easy: #2e7d32; --lv-plan: #a05d00; --lv-push: #c62828;
   --night: rgba(30, 40, 70, .09); --cal: #c3d2ee; --cal-text: #1d2b48; --strip-track: #e9ecf1; --strip-night: #cfd4dc;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --on: #ffffff;
   --r-lg: 16px; --r-md: 8px;
 }
 @media (prefers-color-scheme: dark) {
@@ -28,6 +29,7 @@
     --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
     --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
     --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb; --strip-track: #2c2c31; --strip-night: #18181b;
+    --on: #10131a;
     color-scheme: dark;
   }
 }
@@ -41,6 +43,7 @@
   --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
   --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
   --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb; --strip-track: #2c2c31; --strip-night: #18181b;
+  --on: #10131a;
   color-scheme: dark;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -197,6 +200,18 @@ h1, h2, h3, p { margin: 0; }
 .pad-row .st.ok { color: var(--success); }
 .pad-row .st.miss { color: var(--warning); }
 .pad-target { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light); font-size: .875rem; color: var(--text-2); }
+/* A question worth testing (#837): one card after the plan. Buttons are 44px tall; the chip takes --gc. */
+.cq { display: flex; flex-direction: column; gap: 10px; }
+.cq h3 { font-size: 1.0625rem; font-weight: 700; line-height: 1.3; }
+.cq p { font-size: .9375rem; }
+.cq .gchip { align-self: flex-start; display: inline-flex; align-items: center; font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; color: var(--gc); background: color-mix(in srgb, var(--gc) 14%, transparent); white-space: nowrap; }
+.cq .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.cq button { font: inherit; font-weight: 600; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--raised); color: var(--text); cursor: pointer; }
+.cq button.primary { background: var(--primary); border-color: var(--primary); color: var(--on); }
+.cq button:disabled { opacity: .45; cursor: default; }
+.cq button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.cq .err { color: var(--danger); font-size: .875rem; }
+.cq .note { font-size: .875rem; color: var(--text-2); }
 .foot { font-size: .8125rem; color: var(--muted); padding: 4px 2px; }
 
 @media (min-width: 720px) {
@@ -277,6 +292,12 @@ h1, h2, h3, p { margin: 0; }
   "date": "Sun, Oct 18",
   "filed": "This week's review is filed in your wiki, ready for /plan-week.",
   "trial": { "text": "Trial: Example change, day 3 of 14.", "href": "https://example.invalid/nightly" },
+  "candidate": {
+    "id": "cand-2026-10-18-late-kcal-deep-min", "lever": "late_kcal", "outcome": "deep_min", "found_on": "2026-10-18",
+    "diff": -14, "a": 22, "b": 22, "chip": "found by searching",
+    "question": "Does eating after dinner change that night's deep sleep?",
+    "text": "In the last 90 days, nights after the highest third of after-dinner calories had 14 min less deep sleep than nights after the lowest third (22 nights each). This was found by searching many pairs, so it counts only from today."
+  },
   "range": "Mon 19 – Sun 25 Oct",
   "sun": [7.28, 18.18],
   "plan": {
@@ -509,6 +530,67 @@ h1, h2, h3, p { margin: 0; }
     // Grades that moved this week (#830): one line each, left out with none.
     if ((D.plan.grades || []).length) c.appendChild(el("div", "grade-moves", D.plan.grades.map(function (t) { return el("span", null, t); })));
     root.appendChild(c);
+  })();
+
+  // A question worth testing (#837): one card, after the plan. The answer is saved through the db capability,
+  // owner-only, as the nightly's trial card does. Only the owner can write; anyone else sees the question.
+  if (D.candidate) (function () {
+    var Q = D.candidate;
+    var c = card("A question worth testing", "load", null);
+    var body = el("div", "cq");
+    c.appendChild(body);
+    root.appendChild(c);
+    var v = { db: null, ready: false, owner: true, row: null, busy: null, err: false };
+    function btn(text, cls, fn, disabled) {
+      var b = el("button", cls, text);
+      b.type = "button";
+      b.disabled = !!disabled;
+      b.addEventListener("click", fn);
+      return b;
+    }
+    function save(decision) {
+      if (v.busy) return;
+      v.busy = decision; v.err = false; draw();
+      var doc = { decision: decision, decided_at: new Date().toISOString(), lever: Q.lever, outcome: Q.outcome, found_on: Q.found_on, diff: Q.diff, a: Q.a, b: Q.b };
+      v.db.doc("candidates/" + Q.id).set(doc).then(function () { v.busy = null; v.row = doc; draw(); },
+        function () { v.busy = null; v.err = true; draw(); });
+    }
+    function draw() {
+      body.textContent = "";
+      var kids = [];
+      var d = v.row && v.row.decision;
+      if (d === "not_now") kids.push(el("p", null, "Not now. It won't come back for 8 weeks."));
+      else if (d === "never") kids.push(el("p", null, "Won't suggest this again."));
+      else {
+        var chip = el("span", "gchip", Q.chip);
+        chip.style.setProperty("--gc", "var(--text-2)");
+        kids.push(chip, el("h3", null, Q.question), el("p", null, Q.text));
+        if (d === "add") kids.push(el("p", null, "Added. Tomorrow night's brief writes the page."));
+        else if (v.db && v.owner) {
+          var off = !!v.busy;
+          kids.push(el("div", "btns", [
+            btn(v.busy === "add" ? "Saving…" : "Add this test", "primary", function () { save("add"); }, off),
+            btn(v.busy === "not_now" ? "Saving…" : "Not now", null, function () { save("not_now"); }, off),
+            btn(v.busy === "never" ? "Saving…" : "Don't suggest again", null, function () { save("never"); }, off)]));
+          if (v.err) kids.push(el("p", "err", "Couldn't save. Try again."));
+        } else if (v.ready) kids.push(el("p", "note", "Open this page in Claude to answer."));
+      }
+      kids.forEach(function (k) { body.appendChild(k); });
+    }
+    draw();
+    // the answer is read once and kept; a missing database leaves the card readable with no buttons
+    var waits;
+    try { waits = [claude.use("db"), claude.use("user")]; } catch (e) { waits = [Promise.resolve(null), Promise.resolve(null)]; }
+    var timer = new Promise(function (res) { setTimeout(function () { res("timeout"); }, 10000); });
+    Promise.race([Promise.all(waits), timer]).then(function (got) {
+      if (got !== "timeout" && got && got[0]) {
+        v.db = got[0];
+        if (got[1] && typeof got[1].isOwner === "function") v.owner = !!got[1].isOwner();
+        v.db.doc("candidates/" + Q.id).onSnapshot(function (s) { if (!v.busy && s.exists) { v.row = s.data(); draw(); } }, function () {});
+      }
+      v.ready = true;
+      draw();
+    }, function () { v.ready = true; draw(); });
   })();
 
   // Day by day: a 6 AM to 10 PM bar for each day, night shaded, calendar blocks and sessions labelled in place

@@ -77,7 +77,8 @@ The authoritative conventions for each component are in its stack skill:
   running trial's progress and writes a trial's page and readout to the wiki,
   and `weekly.py` (#832), which pairs the week's plan with what was done, finds
   the meal gaps and the grades that moved, and files the week's review in the
-  wiki on a Sunday. The skill calls them rather than reasoning them out each run.
+  wiki on a Sunday. `candidates.py` (#837), also `grade.py scan`, finds at most one candidate test a week and
+  writes the page of one the owner added; `grade.py check` reports every problem on one test page. The skill calls them rather than reasoning them out each run.
 
 ## The briefs' folder (#835)
 

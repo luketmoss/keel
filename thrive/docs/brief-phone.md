@@ -288,10 +288,12 @@ curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=daily&status=com
 For the nightly, the same lead-in with the three calls Macro 2's
 `kind = nightly` branch answers. Each prints `200`; the first posts *Nightly
 brief ready*, the second *Nightly brief ready, without last night's sleep*, the
-third *Nightly brief failed* with its note:
+third *Nightly brief failed* with its note. It reads the file from the briefs'
+folder (#835), which it asks for:
 
 ```powershell
-$line = Select-String -Path 'D:\Projects\code\keel\thrive\.claude\skills\brief\settings.local.md' -Pattern 'webhook\*\*: `(.+)`'
+$folder = Read-Host 'Briefs folder (the one holding settings.local.md)'
+$line = Select-String -Path "$folder\settings.local.md" -Pattern 'webhook\*\*: `(.+)`'
 $hook = $line.Matches[0].Groups[1].Value
 curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=nightly&status=complete"
 curl.exe -s -o NUL -w "%{http_code}" --max-time 10 "$hook`?kind=nightly&status=no-sleep"

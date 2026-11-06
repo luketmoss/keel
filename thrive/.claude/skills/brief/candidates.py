@@ -279,7 +279,6 @@ def page_text(lever, outcome, found_on, today, diff, na, nb, goal=None):
     """The test page for an `add`, in the wiki's form (CLAUDE.md section 2), counting from `today`."""
     ttl = title(lever, outcome)
     a, b = group_labels(lever)
-    unit = OUTCOME_WORDS[outcome][1]
     start = iso(to_date(found_on) - timedelta(days=WINDOW - 1))
     fm = ["title: %s" % ttl, "type: synthesis", "domain: training", "tags: [test, scan]",
           "created: %s" % today, "updated: %s" % today, "sources: []", "confidence: low"]
@@ -307,8 +306,7 @@ def page_text(lever, outcome, found_on, today, diff, na, nb, goal=None):
     return "\n".join(["---"] + fm + ["---", "", "# %s" % ttl, "",
                                      "**%s** Part of [[data-findings]]." % question(lever, outcome), "",
                                      "Found by the weekly scan and added on the owner's answer. The scan's figures are a "
-                                     "reason to ask, never a grade: the %s unit is %s." % (
-                                         "outcome", unit), "",
+                                     "reason to ask, never a grade.", "",
                                      "## Timeline", entry, ""])
 
 

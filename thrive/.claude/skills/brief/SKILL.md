@@ -830,13 +830,10 @@ journal or a note go in as plain strings.
 
 ### Links
 
-**Phone check: not yet done, so links are off.** Until the owner has confirmed
-that a link in a published page opens Thrive on the phone, set `"links": false`:
-the page then has no anchors and nothing else changes, and the foot says
-*"Links are off until the phone check."* To run the check, publish a test page
-holding one Thrive link, ask the owner to tap it on the phone, and on a yes
-change this paragraph to *"Phone check: passed on <date>, links are on."* in a
-PR (#829's owner check).
+**Phone check: passed on 2026-11-05, links are on.** Set `"links": true`. The
+owner tapped a Thrive day link and a Forage Eaten link in a published test page
+on the phone, and both opened the right screen (#829's owner check). With
+`"links": false` the page has no anchors and nothing else changes.
 
 With links on, every `href` opens in a new tab and is built **only from ids and
 dates**, never from text in a calendar event, note, journal entry or Hive item:

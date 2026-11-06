@@ -430,6 +430,24 @@ class Write(unittest.TestCase):
         self.assertIn("## Ruled out\n- [[test-x]]: X", text)
         self.assertNotIn("## Collecting\n- [[test-x]]", text)
 
+    def test_a_failed_source_names_itself_in_the_foot_and_is_not_written(self):
+        data = dict(self.data, failed=["Thrive sleep"])
+        out = self.go(data=data)
+        self.assertIn("Not graded tonight: Thrive sleep couldn't be read.", out["foot"])
+        self.assertEqual(out["write"]["status"], "nothing to write")
+        with open(self.path, encoding="utf-8") as fh:
+            self.assertIn("grade: leaning", fh.read())
+
+    def test_windows_that_disagree_write_nothing(self):
+        edge = dict(self.data)
+        edge = sleepers(6, 5, early_min=500, late_min=440)
+        edge[day(0)] = {"sleep_start": "23:30", "slept_min": 440}
+        before = self.commits()
+        out = self.go(data={"days": edge})
+        self.assertFalse(out["tests"][0]["agreed"])
+        self.assertEqual(out["write"]["status"], "nothing to write")
+        self.assertEqual(self.commits(), before)
+
 
 class Scratch(unittest.TestCase):
     def setUp(self):

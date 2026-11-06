@@ -66,9 +66,12 @@ def slept_s(night):
 
 
 def good_nights(nights):
-    """Nights with 7:30 or more slept and a bed and wake time; the caller passes the last 60."""
+    """Nights with 7:30 or more slept and a bed and wake time; the caller passes the last 60.
+    A night with no awake figure is unknown, not one with none awake, so it never counts (#849)."""
     out = []
     for n in nights:
+        if n.get("sleep_awake_s") in (None, ""):
+            continue
         s = slept_s(n)
         bed, wake = parse_clock(n.get("bed_time")), parse_clock(n.get("wake_time"))
         if s is not None and s >= GOOD_NIGHT_S and bed is not None and wake is not None:
@@ -154,10 +157,16 @@ def week_average(days, key):
     return {"complete": len(comp), "avg": (sum(vals) / len(vals)) if vals else None}
 
 
+def past_stop(now, bb):
+    """True when an evening run's local time is after the water stop time, bed-by less an hour (#849)."""
+    m = parse_clock(now)
+    return bool(bb) and m is not None and m >= NIGHT_START and m > bb["bed"] - 60
+
+
 def moves(inp, bb, lift_tomorrow, commitment_tomorrow):
     out = []
     w = inp.get("water") or {}
-    if w.get("oz") is not None and w.get("goal_oz") and w["oz"] < w["goal_oz"]:
+    if w.get("oz") is not None and w.get("goal_oz") and w["oz"] < w["goal_oz"] and not past_stop(inp.get("now"), bb):
         amt = round_oz(w["goal_oz"] - w["oz"])
         stop = clock_text(bb["bed"] - 60) if bb else None
         out.append({
@@ -228,7 +237,7 @@ def phone_note(not_read, yesterday):
 
 
 def compute(inp):
-    """inp: today, nights (last 60), mornings (list of {date, sessions, events}, tomorrow first, up to
+    """inp: today, now (the run's local time, 'HH:MM'), nights (last 60), mornings (list of {date, sessions, events}, tomorrow first, up to
     five days), water {oz, goal_oz}, alcohol, food_week [{slots, protein_g, sodium_mg}], goals, last_bp,
     yesterday_slots. Returns the bed-by for tonight and each day, the moves and the food line."""
     us = usual(inp.get("nights") or [])

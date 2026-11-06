@@ -77,6 +77,23 @@ class BedBy(unittest.TestCase):
         self.assertEqual(out["days"][0]["bed_by"], "10:00 PM")
 
 
+class BlankAwake(unittest.TestCase):
+    def test_a_night_with_no_awake_figure_is_not_a_good_night(self):
+        unknown = dict(night("21:00", "07:00", 10), sleep_awake_s=None)
+        self.assertEqual(n.good_nights([unknown]), [])
+        self.assertIsNone(n.usual([unknown] * 60))
+
+    def test_a_blank_string_is_unknown_too(self):
+        self.assertEqual(n.good_nights([dict(night("21:00", "07:00", 10), sleep_awake_s="")]), [])
+
+    def test_zero_awake_is_a_figure_and_counts(self):
+        self.assertEqual(len(n.good_nights([night("22:00", "06:00", 8, awake_min=0)])), 1)
+
+    def test_it_stays_out_of_the_time_in_bed(self):
+        unknown = [dict(night("20:30", "07:30", 11), sleep_awake_s=None)] * 20
+        self.assertEqual(n.usual(sixty(10) + unknown)["tib"], 480)
+
+
 class Moves(unittest.TestCase):
     def base(self, **kw):
         inp = {"today": "2026-11-04", "nights": sixty(10), "mornings": [{"date": "2026-11-05", "sessions": []}],
@@ -91,6 +108,30 @@ class Moves(unittest.TestCase):
 
     def test_no_trigger_no_moves(self):
         self.assertEqual(n.compute(self.base())["moves"], [])
+
+    def water(self, now=None):
+        inp = {"nights": sixty(10), "mornings": [], "water": {"oz": 56, "goal_oz": 64}}  # bed-by 10:15 PM
+        if now is not None:
+            inp["now"] = now
+        return [m for m in n.compute(inp)["moves"] if m["kind"] == "water"]
+
+    def test_water_left_out_after_the_stop_time(self):
+        self.assertEqual(self.water("21:16"), [])
+
+    def test_water_kept_at_the_stop_time(self):
+        self.assertEqual(len(self.water("21:15")), 1)
+        self.assertEqual(self.water("21:15")[0]["action"], "8 oz now, then stop by 9:15 PM")
+
+    def test_water_kept_with_no_run_time(self):
+        self.assertEqual(len(self.water()), 1)
+
+    def test_water_kept_on_a_morning_hand_run(self):
+        self.assertEqual(len(self.water("09:30")), 1)
+
+    def test_other_moves_survive_a_passed_stop_time(self):
+        inp = {"nights": sixty(10), "mornings": LIFT, "water": {"oz": 56, "goal_oz": 64}, "alcohol": 1,
+               "now": "22:00"}
+        self.assertEqual([m["kind"] for m in n.compute(inp)["moves"]], ["drink"])
 
     def test_water_gap_capped_and_rounded_with_stop_time(self):
         m = n.compute(self.base(water={"oz": 40, "goal_oz": 64}))["moves"]

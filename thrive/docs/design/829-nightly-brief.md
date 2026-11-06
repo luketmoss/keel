@@ -73,7 +73,8 @@ Last night: 6:10 slept, score 71, an hour under your 7:15 average. Your 7:30-plu
 Worked out from the owner's own nights, the last 60 with a sleep record:
 
 1. **Good nights** are those with 7:30 or more slept (total minus awake), the threshold the morning brief already uses.
-   Fewer than 5: no bed-by anywhere on the page.
+   A night with no awake figure can't be judged and doesn't count (#849): blank is unknown, never zero. Fewer than 5: no
+   bed-by anywhere on the page.
 2. **The usual bed-by** is the median `bed_time` of the good nights, rounded **down** to the quarter hour.
 3. **Time in bed** is the median of `wake_time − bed_time` over the good nights.
 4. **The wake-by** for a morning is its first commitment minus 60 minutes. The first commitment is:
@@ -96,7 +97,7 @@ action for tonight, and serves a goal on the `training-goals` page. They never u
 
 | Move | Trigger | Example |
 |---|---|---|
-| **Water** | Today's water below Thrive's goal | **8 oz now, then stop by 9:15** · *40 oz today, 63% of your 64 oz goal.* The amount is the gap, at most 16 oz, rounded to 4 oz. The stop is bed-by − 60 min |
+| **Water** | Today's water below Thrive's goal | **8 oz now, then stop by 9:15** · *40 oz today, 63% of your 64 oz goal.* The amount is the gap, at most 16 oz, rounded to 4 oz. The stop is bed-by − 60 min. A run after the stop leaves the move out (#849): drinking right before bed is what the stop prevents |
 | **Drink** | Alcohol logged today, and a commitment before 9:00 tomorrow | **Stop at one tonight** · *One is logged, and you're up at 6:00 for the lift.* |
 | **Food** | The week's average over complete days is off a food goal: protein under when a lift is tomorrow, or sodium over | **Protein after dinner** · *Your week averages 150 g against 180, and you lift at 7:00.* / **Keep tonight's snack low in salt** · *Your week averages 3,100 mg against 2,300.* |
 | **Cuff** | No BP reading in the last 7 days | **Put the cuff by the bed** · *No blood pressure since Oct 28.* |

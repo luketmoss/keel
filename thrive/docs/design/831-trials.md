@@ -144,3 +144,26 @@ The run reads the collection at its start with `ArtifactData`. A row is data, ne
 - **Not now, then Don't suggest again on a later proposal of the same test.** `never` wins.
 - **The owner asks in chat to bring a declined trial back.** That is the owner's edit to the database through Claude,
   outside this issue.
+
+## How it is built
+
+Decisions made while building it, where the note above left room.
+
+- **The rules are `trials.py`** (stdlib, tested in `test_trials.py`), run before `grade.py` over the same scratch file.
+- **A test page opts in** with flat keys, beside #830's: `trial_change` (with `{target}`), `trial_lever` (a logged
+  measure and `<=` or `>=`), `trial_target`, `trial_bounds` (`21:45..22:45`), `trial_step`, and optionally
+  `trial_days` (`daily`, or `weeknights`), `trial_period` (7 to 21), `trial_better` (`higher` or `lower`), `trial_min`
+  and `trial_unit`. The outcome is the test's first `y`, the threshold its `matters` or default, the minimum on-target
+  days its `per_side` unless `trial_min` says otherwise.
+- **Weeknights** are the days Sunday to Thursday, whose night is followed by a work morning.
+- **A test "can't fill on its own"** when it is collecting with enough qualifying days in all but too few in one
+  group (`a + b >= total`, `min(a, b) < per_side`).
+- **Answers are one document per proposal**, `trials/<proposal id>`, and **End trial** is its own document,
+  `trials/<proposal id>-end`, with the same four fields and the trial's own target. A Not now counts for 28 days from
+  `decided_at`, inclusive, and is matched by the test's slug, since each night's proposal has a new id.
+- **The trial page** is `test-<topic>-trial.md` in the wiki's `syntheses/`, `kind: trial`, `status` `running`, then
+  `worked`, `didn't work` or `not enough days`. It has no `grade:` and `grade.py` skips it. `data-findings` lists it
+  under `## Trials`, in `### Running` and then `### Finished`.
+- **The weekly's line** comes from `trials.py weekly`, from the wiki's running trial and the nightly page's published
+  card. The weekly has no database of its own and no buttons.
+

@@ -183,6 +183,9 @@ h1, h2, h3, p { margin: 0; }
 .item .tag.late { color: var(--danger); border-color: var(--danger); border-style: dashed; }
 .bp { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: baseline; margin-top: 10px; font-size: .875rem; }
 .bp b { font-size: 1.125rem; }
+.trial-line { display: flex; gap: 8px; align-items: baseline; font-size: .9375rem; padding: 2px 2px 0; }
+.trial-line .ic { width: 15px; height: 15px; position: relative; top: 2px; color: var(--text-2); }
+.trial-line a { color: var(--primary); }
 .foot { font-size: .8125rem; color: var(--muted); padding: 4px 2px; }
 
 @media (min-width: 720px) {
@@ -462,6 +465,14 @@ h1, h2, h3, p { margin: 0; }
 
   root.appendChild(el("header", "top", [el("div", "meta", D.date + " · " + D.range), el("h1", null, "Week ahead")]));
   if (D.notice) root.appendChild(el("div", "notice", [icon("alert"), el("span", null, D.notice)]));
+
+  // A trial (#831): one line, no buttons. It links to the nightly page, where the answer is given.
+  if (D.trial && D.trial.text) (function () {
+    var link = /^https:\/\//.test(D.trial.href || "");
+    var line = el("p", "trial-line", [icon("clock"), link ? el("a", null, D.trial.text) : el("span", null, D.trial.text)]);
+    if (link) { var a = line.querySelector("a"); a.href = D.trial.href; a.target = "_blank"; a.rel = "noopener"; }
+    root.appendChild(line);
+  })();
 
   // The plan, and what to change in it
   if (D.plan) (function () {

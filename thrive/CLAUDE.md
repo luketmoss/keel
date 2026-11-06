@@ -63,10 +63,9 @@ The authoritative conventions for each component are in its stack skill:
 - **The MCP server** is not here: it is Keel's `mcp/`, a Cloudflare Worker
   serving `/thrive/mcp` as a thin client of the Apps Script API with its own
   MCP-only key (`MCP_API_KEY`). It holds no row mapping.
-- **`.claude/skills/brief/`** — `/brief`, the Morning, Nightly (#829) and Weekly
+- **`.claude/skills/brief/`** — `/brief`, the Nightly (#829) and Weekly
   Brief. A product, not part of the pipeline: two scheduled tasks run it, the
-  nightly (9:15 PM, #836) and the weekly (Sundays 4 PM, #832). The morning task (6:45 AM) is paused
-  until #833 removes the mode.
+  nightly (9:15 PM, #836) and the weekly (Sundays 4 PM, #832).
   Its `settings.local.md` (weather locations) is gitignored and never
   committed. Its three scripts are stdlib Python, tested by `python -m unittest`
   in that folder, which the `brief` job in `thrive.yml` runs: `checkouts.py`
@@ -547,7 +546,7 @@ Google Sheet "Groundwork" with these tabs:
   one `coros` row with `requested_by` = `schedule` (once per slot per day, any
   status counts) and dispatches it that tick — GitHub's own cron is best-effort,
   a dispatch is not. The phone opens the COROS app on the first unlock of the
-  morning (a MacroDroid macro, #617) and the nightly (9:15 PM) and the Sunday
+  evening and Sunday afternoon (MacroDroid macros, #617), and the nightly (9:15 PM) and the Sunday
   weekly (4 PM, #832) briefs run after it, then tell the phone through a MacroDroid webhook that they are
   up ([docs/brief-phone.md](docs/brief-phone.md)). `pollSyncRequests`
   (`apps-script/src/sync-requests.js`), a 5-minute Apps Script time-driven

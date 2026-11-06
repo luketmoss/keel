@@ -17,6 +17,7 @@
   --e-easy: #2e7d32; --e-medium: #a05d00; --e-hard: #c62828; --e-none: #b9c0c8;
   --lv-rest: #4f6f8f; --lv-easy: #2e7d32; --lv-plan: #a05d00; --lv-push: #c62828;
   --night: rgba(30, 40, 70, .09); --cal: #c3d2ee; --cal-text: #1d2b48;
+  --on: #ffffff;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   --r-lg: 16px; --r-md: 8px;
 }
@@ -31,6 +32,7 @@
     --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
     --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
     --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb;
+    --on: #10131a;
     color-scheme: dark;
   }
 }
@@ -44,6 +46,7 @@
   --e-easy: #86efac; --e-medium: #ffb74d; --e-hard: #ef9a9a; --e-none: #3c3c42;
   --lv-rest: #8fb0d0; --lv-easy: #86efac; --lv-plan: #ffb74d; --lv-push: #ef9a9a;
   --night: rgba(0, 0, 0, .4); --cal: #4a5f8f; --cal-text: #eef2fb;
+  --on: #10131a;
   color-scheme: dark;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -313,6 +316,24 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
   .tiles { grid-template-columns: repeat(4, 1fr); }
   .fgoal { grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; }
 }
+
+/* Try this / Trial (#831): one card, at the end of What your data says. Buttons are 44px tall. */
+.tr { display: flex; flex-direction: column; gap: 10px; }
+.tr .trh { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tr h3 { font-size: 1.0625rem; font-weight: 700; line-height: 1.3; }
+.tr p { font-size: .9375rem; }
+.tr .k { color: var(--text-2); font-weight: 600; }
+.tr .stp { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tr .stp b { min-width: 5.5em; text-align: center; font-size: 1.125rem; }
+.tr .stp .rng { font-size: .8125rem; color: var(--text-2); }
+.tr .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.tr button { font: inherit; font-weight: 600; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--raised); color: var(--text); cursor: pointer; }
+.tr button.primary { background: var(--primary); border-color: var(--primary); color: var(--on); }
+.tr button.danger { background: var(--danger); border-color: var(--danger); color: var(--on); }
+.tr button:disabled { opacity: .45; cursor: default; }
+.tr button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tr .err { color: var(--danger); font-size: .875rem; }
+.tr .note { font-size: .875rem; color: var(--text-2); }
 </style>
 <div class="wrap" id="root"></div>
 
@@ -380,6 +401,13 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
       {"slug": "test-late-snack", "title": "Do late snacks cost deep sleep?", "kind": "collecting", "text": "3 + 4 of 6 + 6", "fraction": 0.58},
       {"slug": "test-bp", "title": "Does evening salt raise morning pressure?", "kind": "blocked", "text": "Waiting for a morning blood pressure reading"}
     ]
+  },
+  "trial": {
+    "state": "proposed", "id": "tr-2026-11-04-early-bed", "slug": "test-early-bed", "period": 14, "chip": "Strong", "grade": "strong",
+    "changeT": "Lights out by {target} on weeknights", "kind": "time", "unit": "", "value": 1335, "lo": 1305, "hi": 1365, "step": 15,
+    "why": "Asleep by 10:30: 7:50 slept; After 11:00: 7:08 (40 days). Your goal: sleep and recovery.",
+    "measured": "minutes slept, weeknights, against your last 28 days.",
+    "success": "you average 20 min more on the nights you hit the target."
   },
   "next": {
     "aside": "Thu to Mon",
@@ -825,6 +853,117 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
       });
       root.appendChild(p);
     }
+  })();
+
+  // ---- Try this / Trial (#831): one card. The answer is saved through the db capability, owner-only.
+  (function () {
+    var T = D.trial;
+    if (!T) return;
+    var GC = { Worked: "var(--success)", "Didn't work": "var(--text-2)", "Not enough days": "var(--warning)" };
+    var c = card(T.state === "proposed" || T.state === "accepted" ? "Try this" : "Trial", "finding", T.state === "proposed" ? T.period + " days" : null);
+    var body = el("div", "tr");
+    c.appendChild(body);
+    root.appendChild(c);
+    var v = { db: null, ready: false, owner: true, row: null, endRow: null, busy: null, err: false, ending: false, value: T.value };
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function show(kind, x, unit) {
+      if (kind === "time") { var m = ((x % 1440) + 1440) % 1440, h = Math.floor(m / 60); return (h % 12 || 12) + ":" + pad(m % 60) + " " + (h >= 12 ? "PM" : "AM"); }
+      return x + (unit ? " " + unit : "");
+    }
+    function rowVal(kind, x) { if (kind === "time") { var m = ((x % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ":" + pad(m % 60); } return x; }
+    function fromRow(kind, raw) { if (kind === "time") { var p = String(raw).split(":"), m = +p[0] * 60 + +p[1]; return m < 720 ? m + 1440 : m; } return +raw; }
+    function chip(text, col) { var e = el("span", "gchip", text); e.style.setProperty("--gc", col || "var(--primary)"); return e; }
+    function head(label, right) { return el("div", "trh", [el("span", "sub", label), right]); }
+    function when(iso) { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } }
+    function change() { return T.changeT.replace("{target}", show(T.kind, v.value, T.unit)); }
+    function save(decision) {
+      if (v.busy) return;
+      v.busy = decision; v.err = false; draw();
+      var doc = { decision: decision, target: rowVal(T.kind, v.value), decided_at: new Date().toISOString(), slug: T.slug };
+      v.db.doc("trials/" + T.id).set(doc).then(function () { v.busy = null; v.row = doc; draw(); },
+        function () { v.busy = null; v.err = true; draw(); });
+    }
+    function endTrial() {
+      if (v.busy) return;
+      v.busy = "end"; v.err = false; draw();
+      var doc = { decision: "end", target: T.target, decided_at: new Date().toISOString(), slug: T.slug };
+      v.db.doc("trials/" + T.endId).set(doc).then(function () { v.busy = null; v.ending = false; v.endRow = doc; draw(); },
+        function () { v.busy = null; v.err = true; draw(); });
+    }
+    function btn(text, cls, fn, disabled) {
+      var b = el("button", cls, text);
+      b.type = "button";
+      b.disabled = !!disabled;
+      b.addEventListener("click", fn);
+      return b;
+    }
+    function canAnswer() { return !!(v.db && v.owner); }
+    function noDb() { return v.ready && !canAnswer() ? el("p", "note", "Open this page in Claude to answer.") : null; }
+    function draw() {
+      body.textContent = "";
+      var kids = [];
+      if (T.state === "proposed") {
+        if (v.row && v.row.decision === "not_now") { kids.push(el("p", null, "Not now. It won't come back for 4 weeks.")); }
+        else if (v.row && v.row.decision === "never") { kids.push(el("p", null, "Won't suggest this again.")); }
+        else if (v.row && v.row.decision === "accept") {
+          var tv = fromRow(T.kind, v.row.target);
+          kids.push(head(T.period + " days", chip("Accepted")), el("h3", null, T.changeT.replace("{target}", show(T.kind, tv, T.unit))),
+            el("p", null, "Accepted at " + when(v.row.decided_at) + ". Tomorrow night's brief records it and starts the count."));
+        } else {
+          kids.push(head("Proposed", chip(T.chip, T.grade === "strong" ? "var(--success)" : T.grade === "leaning" ? "var(--warning)" : "var(--text-2)")),
+            el("h3", null, change()),
+            el("p", null, [el("span", "k", "Why: "), T.why]),
+            el("p", null, [el("span", "k", "Measured by: "), T.measured]),
+            el("p", null, [el("span", "k", "Counts as working if: "), T.success]));
+          var step = T.step;
+          var minus = btn("\u2212", null, function () { v.value = Math.max(T.lo, v.value - step); draw(); }, v.busy || v.value - step < T.lo);
+          var plus = btn("+", null, function () { v.value = Math.min(T.hi, v.value + step); draw(); }, v.busy || v.value + step > T.hi);
+          minus.setAttribute("aria-label", "Lower the target"); plus.setAttribute("aria-label", "Raise the target");
+          kids.push(el("div", "stp", [el("span", "k", "Target"), minus, el("b", "num", show(T.kind, v.value, T.unit)), plus,
+            el("span", "rng", show(T.kind, T.lo, T.unit) + " to " + show(T.kind, T.hi, T.unit))]));
+          if (canAnswer()) {
+            var off = !!v.busy;
+            kids.push(el("div", "btns", [
+              btn(v.busy === "accept" ? "Saving\u2026" : "Accept", "primary", function () { save("accept"); }, off),
+              btn(v.busy === "not_now" ? "Saving\u2026" : "Not now", null, function () { save("not_now"); }, off),
+              btn(v.busy === "never" ? "Saving\u2026" : "Don't suggest again", null, function () { save("never"); }, off)]));
+            if (v.err) kids.push(el("p", "err", "Couldn't save. Try again."));
+          } else kids.push(noDb());
+        }
+      } else if (T.state === "accepted") {
+        kids.push(head(T.period + " days", chip(T.waits ? "Waiting" : "Starts " + T.start)), el("h3", null, T.change),
+          el("p", null, T.waits ? "Your wiki couldn't be updated tonight, so this starts once it can." : "Recorded in your wiki. The count starts " + T.start + "."));
+      } else if (T.state === "running") {
+        kids.push(head("Day " + T.day + " of " + T.of, chip("Running")), el("h3", null, T.change), el("p", null, T.line));
+        if (v.endRow) kids.push(el("p", null, "Ending. Tomorrow's brief writes the readout."));
+        else if (v.ending) {
+          kids.push(el("p", null, "End this trial now? Its readout will use the " + T.day + " days so far."),
+            el("div", "btns", [btn(v.busy ? "Saving\u2026" : "End trial", "danger", endTrial, !!v.busy), btn("Keep going", null, function () { v.ending = false; v.err = false; draw(); }, !!v.busy)]));
+          if (v.err) kids.push(el("p", "err", "Couldn't save. Try again."));
+        } else if (canAnswer()) kids.push(el("div", "btns", [btn("End trial", null, function () { v.ending = true; draw(); })]));
+        else kids.push(noDb());
+      } else if (T.state === "ended") {
+        var r = T.result.charAt(0).toUpperCase() + T.result.slice(1);
+        kids.push(head(T.end, chip(r, GC[r])), el("h3", null, T.change), el("p", null, T.line),
+          el("p", "note", T.pending ? "Your wiki couldn't be updated tonight, so the readout waits." : "The readout is in your wiki."));
+      }
+      kids.forEach(function (k) { if (k) body.appendChild(k); });
+    }
+    draw();
+    // the answers are read once and kept; a missing database leaves the card readable with no buttons
+    var waits;
+    try { waits = [claude.use("db"), claude.use("user")]; } catch (e) { waits = [Promise.resolve(null), Promise.resolve(null)]; }
+    var timer = new Promise(function (res) { setTimeout(function () { res("timeout"); }, 10000); });
+    Promise.race([Promise.all(waits), timer]).then(function (got) {
+      if (got !== "timeout" && got && got[0]) {
+        v.db = got[0];
+        if (got[1] && typeof got[1].isOwner === "function") v.owner = !!got[1].isOwner();
+        if (T.state === "proposed") v.db.doc("trials/" + T.id).onSnapshot(function (s) { if (!v.busy && s.exists) { v.row = s.data(); draw(); } }, function () {});
+        if (T.state === "running") v.db.doc("trials/" + T.endId).onSnapshot(function (s) { if (!v.busy && s.exists) { v.endRow = s.data(); draw(); } }, function () {});
+      }
+      v.ready = true;
+      draw();
+    }, function () { v.ready = true; draw(); });
   })();
 
   // ---- Next 5 days

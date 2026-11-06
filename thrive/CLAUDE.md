@@ -72,8 +72,10 @@ The authoritative conventions for each component are in its stack skill:
   in that folder, which the `brief` job in `thrive.yml` runs: `checkouts.py`
   (#835), `nightly.py` (#829), the nightly page's bed-by, moves, food
   completeness and tile rules, and `grade.py` (#830), which grades the wiki's
-  test pages the same way every night and writes only grade changes. The skill
-  calls them rather than reasoning them out each run.
+  test pages the same way every night and writes only grade changes, and
+  `trials.py` (#831), which decides the one trial the nightly proposes, reads a
+  running trial's progress and writes a trial's page and readout to the wiki.
+  The skill calls them rather than reasoning them out each run.
 
 ## The briefs' folder (#835)
 

@@ -659,7 +659,10 @@ def inside(path, repo):
 def load_pages(folder):
     tests = {}
     for path in sorted(glob.glob(os.path.join(folder, "test-*.md"))):
-        t = parse_test(path, read(path))
+        text = read(path)
+        if frontmatter(split_page(text)[0]).get("kind") == "trial":
+            continue  # a trial's page (#831) is not a test to grade
+        t = parse_test(path, text)
         tests[t["slug"]] = t
     return tests
 

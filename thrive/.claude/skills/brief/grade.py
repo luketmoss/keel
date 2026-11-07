@@ -58,6 +58,10 @@ DEFAULT_MATTERS = {
     "water_oz": 6, "systolic_am": 4, "diastolic_am": 3, "weight_am": 0.5,
 }
 GRADES = ("blocked", "collecting", "ruled-out", "leaning", "strong")
+GRADE_WORDS = {"blocked": "Blocked", "collecting": "Collecting", "ruled-out": "Ruled out", "leaning": "Leaning",
+               "strong": "Strong"}
+LEAD_RE = re.compile(r"\*\*(.+?)\*\*", re.S)
+LEAD_GRADE_RE = re.compile(r"(Blocked|Collecting|Ruled out|Leaning|Strong)(?: for now)?(?=:)")
 OPS = ("<=", ">=", "<", ">", "=")
 NUM_RE = re.compile(r"^-?\d+(\.\d+)?$")
 TIME_RE = re.compile(r"^\d{1,2}:\d{2}$")
@@ -102,8 +106,17 @@ def page_title(fm, body, slug):
 
 def page_lead(body):
     """The first bold sentence of the body."""
-    m = re.search(r"\*\*(.+?)\*\*", body, re.S)
+    m = LEAD_RE.search(body)
     return " ".join(m.group(1).split()) if m else None
+
+
+def relabel(lead, grade):
+    """A lead with its opening grade word set to `grade`; one that opens with no grade word is left as it is."""
+    m = LEAD_GRADE_RE.match(lead or "")
+    word = GRADE_WORDS.get(grade)
+    if not m or not word or m.group(1) == word:
+        return lead
+    return word + lead[m.end():]
 
 
 def listed(value):
@@ -488,6 +501,7 @@ def grade_test(ctx, test, today, failed):
     out["agreed"] = agreed
     out["grade"] = tonight["grade"] if agreed else (test["page_grade"] or tonight["grade"])
     out["display_grade"] = out["grade"]
+    out["lead"] = relabel(test.get("lead"), out["grade"])
     out["moved"] = agreed and tonight["grade"] != test["page_grade"]
     if tonight["grade"] == "collecting":
         out["progress"] = progress(test, tonight)
@@ -558,6 +572,9 @@ def edit_page(text, res, test, today):
     set_key(lines, "grade", res["grade"])
     set_key(lines, "updated", today)
     entry = entry_text(test, res, today)
+    lead = LEAD_RE.search(body)
+    if lead:
+        body = body[:lead.start(1)] + relabel(lead.group(1), res["grade"]) + body[lead.end(1):]
     body_lines = body.split("\n")
     at = next((i for i, l in enumerate(body_lines) if re.match(r"^##\s+Timeline\s*$", l)), None)
     if at is None:

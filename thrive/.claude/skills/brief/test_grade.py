@@ -461,6 +461,34 @@ class Write(unittest.TestCase):
         out = g.edit_page(PAGE, res, parse(PAGE), TODAY)
         self.assertTrue(out.rstrip("\n").split("\n")[-1].startswith("- **%s:**" % TODAY))
 
+    def moved_page(self, lead, grade="leaning", tail=""):
+        res = {"grade": grade, "page_grade": "strong", "counts": {"a": 6, "b": 6}, "primary": "slept_min",
+               "outcomes": [{"measure": "slept_min", "mean_a": 500.0, "mean_b": 480.0, "diff": 20.0, "threshold": 20.0}],
+               "window": {"from": "2026-08-23", "to": TODAY}, "empty": []}
+        text = PAGE.replace("**Earlier nights sleep longer.**", lead + tail)
+        return g.edit_page(text, res, parse(text), TODAY)
+
+    def test_a_moved_grade_replaces_the_word_opening_the_lead(self):
+        out = self.moved_page("**Strong: earlier nights\nsleep longer.**")
+        self.assertIn("**Leaning: earlier nights\nsleep longer.**", out)
+
+    def test_a_lead_with_no_grade_word_is_left_alone(self):
+        self.assertIn("**Earlier nights sleep longer.**", self.moved_page("**Earlier nights sleep longer.**"))
+
+    def test_ruled_out_for_now_counts_as_ruled_out(self):
+        self.assertEqual(g.relabel("Ruled out for now: nothing varies.", "ruled-out"), "Ruled out for now: nothing varies.")
+        self.assertEqual(g.relabel("Ruled out for now: nothing varies.", "collecting"), "Collecting: nothing varies.")
+
+    def test_only_the_lead_changes(self):
+        out = self.moved_page("**Strong: a claim.**", tail="\n\n**Strong: not the lead.**")
+        self.assertIn("**Leaning: a claim.**", out)
+        self.assertIn("**Strong: not the lead.**", out)
+
+    def test_a_hand_tests_lead_is_untouched(self):
+        hand = parse(page(grader="hand", grade="strong"))
+        hand["lead"] = "Leaning: a claim."
+        self.assertEqual(g.grade_test({}, hand, TODAY, [])["lead"], "Leaning: a claim.")
+
     def test_the_hub_gains_a_missing_section(self):
         text = g.edit_hub("# Hub\n\n## Collecting\n- [[test-x]]: X\n", "test-x", "X", "ruled-out")
         self.assertIn("## Ruled out\n- [[test-x]]: X", text)
@@ -473,6 +501,14 @@ class Write(unittest.TestCase):
         self.assertEqual(out["write"]["status"], "nothing to write")
         with open(self.path, encoding="utf-8") as fh:
             self.assertIn("grade: leaning", fh.read())
+
+    def test_a_graded_lead_follows_the_grade_tonight(self):
+        with open(self.path, encoding="utf-8") as fh:
+            text = fh.read()
+        with open(self.path, "w", encoding="utf-8", newline="") as fh:
+            fh.write(text.replace("**Earlier nights sleep longer.**", "**Collecting: earlier nights sleep longer.**"))
+        res = self.go()["tests"][0]
+        self.assertEqual(res["lead"], "%s: earlier nights sleep longer." % g.GRADE_WORDS[res["grade"]])
 
     def test_windows_that_disagree_write_nothing(self):
         edge = dict(self.data)

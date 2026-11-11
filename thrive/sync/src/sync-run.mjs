@@ -113,7 +113,8 @@ export async function syncRun({ env = process.env, force = false, now = () => ne
     failures.push(...summary.failures);
     const { created, updated, unchanged } = summary.activities;
     out.info(
-      `Archive: ${created} created, ${updated} updated, ${unchanged} unchanged. ` +
+      `Archive: ${created} created, ${updated} updated, ${unchanged} unchanged` +
+      `${summary.detailSkipped ? ` (${summary.detailSkipped} not re-fetched)` : ''}. ` +
       `Health bundle: ${summary.health ?? 'not written'}.`,
     );
 

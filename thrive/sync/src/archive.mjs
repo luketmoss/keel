@@ -47,7 +47,7 @@ export const trackProps = (activityId) => ({ source: 'coros', kind: 'track', tra
  * and that number moves whenever a newer activity lands, so it is not part of
  * what the entry says about this activity.
  */
-const entryIdentity = (entry) =>
+export const entryIdentity = (entry) =>
   JSON.stringify(entry ? { ...entry, text: String(entry.text ?? '').replace(/^\d+\. /, '') } : null);
 
 /**

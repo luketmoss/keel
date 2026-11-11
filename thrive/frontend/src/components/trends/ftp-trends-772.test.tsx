@@ -317,8 +317,9 @@ describe('the readout and the table', () => {
       ['Date', 'VO2max (mL/kg/min)', 'Training Load', 'FTP (W)', 'FTP per kg (W/kg)'].map((x) => x),
     );
     const row = (date: string) =>
-      [...container.querySelectorAll('tbody tr')].find((tr) =>
-        text(tr.querySelector('th'))!.startsWith(rowDate(date, TODAY)),
+      // By exact date: a prefix of the visible text lets "Mon, Aug 3" match "Mon, Aug 31" (#862).
+      [...container.querySelectorAll('tbody tr')].find(
+        (tr) => tr.querySelector('th a[data-date]')?.getAttribute('data-date') === date,
       )!;
     const cells = (date: string) => [...row(date).querySelectorAll('td')].map((td) => text(td));
     expect(cells(ago(10))).toEqual(['—', '—', '250 ramp test', '3.19 ramp test']);

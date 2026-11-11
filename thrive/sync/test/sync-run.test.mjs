@@ -446,3 +446,18 @@ test('#310 AC5: the gone-file note reaches the SyncLog row, and the run is not p
   assert.equal(r.rows[0].n_fit_fetched, 1, 'one COROS request');
   assert.equal(r.writes[0].fit.file_id, 'new-fit-file');
 });
+
+test('#860: the archive line counts the activities whose detail was not re-fetched', async () => {
+  const ingestResult = {
+    window: { start: '2026-09-14', end: '2026-09-25', runDate: '2026-09-24' },
+    activities: { created: 1, updated: 0, unchanged: 2 },
+    detailSkipped: 2,
+    activityIds: ['a1', 'a2', 'a3'],
+    failures: [],
+    health: 'unchanged',
+  };
+  const { lines } = await run({ env: { ...ACTIONS_ENV, SYNC_LOG: 'summary' }, ingestResult });
+  assert.ok(lines.includes('Archive: 1 created, 0 updated, 2 unchanged (2 not re-fetched). Health bundle: unchanged.'));
+  const { lines: plain } = await run({ env: { ...ACTIONS_ENV, SYNC_LOG: 'summary' } });
+  assert.ok(plain.includes('Archive: 0 created, 0 updated, 3 unchanged. Health bundle: unchanged.'));
+});

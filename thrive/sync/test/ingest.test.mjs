@@ -5,7 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createArchive, sha256 } from '../src/archive.mjs';
 import { CorosUnavailableError } from '../src/errors.mjs';
-import { callTool, CorosToolError, healthCalls, ingest, parseSportRecords } from '../src/ingest.mjs';
+import {
+  ANOMALY_BUDGET_MS, ANOMALY_DELAYS_MS, anomalyBudget, callTool, CorosToolError, healthCalls, ingest, parseSportRecords,
+} from '../src/ingest.mjs';
 import { corosText, fakeCoros, memoryDrive, noWait } from './helpers.mjs';
 
 // 03:00 UTC on 24 Sept: Denver's run date is still the 23rd.
@@ -166,13 +168,13 @@ test('a changed payload updates the same file in place and keeps normalized', as
 test('a moved and renamed file is found by its app properties, not duplicated', async () => {
   const drive = memoryDrive();
   await run(coros(), drive);
-  const file = activityFile(drive, '999');
+  const file = activityFile(drive, '700000000000000101');
   file.name = 'renamed.json';
   file.parentId = 'somewhere-else';
 
   await run(coros({ getActivityDetail: ({ labelId }) => detail(labelId, '\nEdited') }), drive, LATER);
-  assert.equal([...drive.files.values()].filter((f) => f.props.activity_id === '999').length, 1);
-  assert.match(activityFile(drive, '999').data.payload, /Edited/);
+  assert.equal([...drive.files.values()].filter((f) => f.props.activity_id === '700000000000000101').length, 1);
+  assert.match(activityFile(drive, '700000000000000101').data.payload, /Edited/);
 });
 
 // --- AC3 ---------------------------------------------------------------------
@@ -289,12 +291,12 @@ test('a detail that keeps failing is never archived, and the other activities st
 test('an error on an activity already archived leaves its file untouched', async () => {
   const drive = memoryDrive();
   await run(coros(), drive);
-  const before = JSON.stringify(activityFile(drive, '999').data);
+  const before = JSON.stringify(activityFile(drive, '700000000000000101').data);
   const summary = await run(coros({
-    getActivityDetail: ({ labelId }) => (labelId === '999' ? corosText('x', { isError: true }) : detail(labelId)),
+    getActivityDetail: ({ labelId }) => (labelId === '700000000000000101' ? corosText('x', { isError: true }) : detail(labelId)),
   }), drive, LATER);
   assert.equal(summary.failures.length, 1);
-  assert.equal(JSON.stringify(activityFile(drive, '999').data), before);
+  assert.equal(JSON.stringify(activityFile(drive, '700000000000000101').data), before);
 });
 
 test('a failed list call ends the run before any detail call', async () => {
@@ -351,4 +353,155 @@ test('the ingest calls only COROS read tools', async () => {
   const client = coros();
   await run(client, memoryDrive());
   for (const { name } of client.calls) assert.match(name, /^(query|get)/);
+});
+
+// --- #860: detail only for new or changed activities, and the anomaly guard ---
+
+const HOUR = 60 * 60 * 1000;
+const detailIds = (client) => client.calls.filter((c) => c.name === 'getActivityDetail').map((c) => c.args.labelId);
+const ANOMALY = 'Tool call anomalies detected. High risk of session context pollution.';
+
+test('#860: an archived, unchanged activity older than 48 h is not fetched again', async () => {
+  const drive = memoryDrive();
+  await run(coros(), drive);
+  const before = JSON.stringify(activityFile(drive, '999').data);
+
+  const client = coros();
+  const logs = [];
+  const summary = await ingest({
+    client, archive: createArchive(drive, { now: () => LATER }), now: LATER, log: (l) => logs.push(l), retry: noWait,
+  });
+  assert.deepEqual(detailIds(client), ['700000000000000101', '700000000000000102'],
+    'the two recent activities are fetched; the month-old one is not');
+  assert.deepEqual(summary.activities, { created: 0, updated: 0, unchanged: 3 });
+  assert.equal(summary.detailSkipped, 1);
+  assert.deepEqual(summary.activityIds, ['700000000000000101', '700000000000000102', '999'],
+    'a skipped activity is still handed to the later stages');
+  assert.equal(JSON.stringify(activityFile(drive, '999').data), before);
+  assert.ok(logs.some((l) => /activity 999 .*not re-fetched/.test(l)));
+});
+
+test('#860: an activity the archive does not hold is fetched, however old', async () => {
+  const client = coros();
+  const summary = await run(client, memoryDrive(), NOW + 30 * 24 * HOUR);
+  assert.deepEqual(detailIds(client), ['700000000000000101', '700000000000000102', '999']);
+  assert.equal(summary.activities.created, 3);
+  assert.equal(summary.detailSkipped, 0);
+});
+
+test('#860: an activity whose list entry changed is fetched again and its file updated', async () => {
+  const drive = memoryDrive();
+  await run(coros(), drive);
+  const id = activityFile(drive, '999').id;
+  const trimmed = LIST.replace('endTimestamp=1788240600', 'endTimestamp=1788239000');
+
+  const client = coros({
+    querySportRecords: corosText(trimmed),
+    getActivityDetail: ({ labelId }) => detail(labelId, labelId === '999' ? '\nTrimmed' : ''),
+  });
+  const summary = await run(client, drive, LATER);
+  assert.ok(detailIds(client).includes('999'));
+  assert.equal(summary.activities.updated, 1);
+  assert.equal(summary.detailSkipped, 0);
+  const file = activityFile(drive, '999');
+  assert.equal(file.id, id);
+  assert.match(file.data.payload, /Trimmed/);
+  assert.match(file.data.list_entry.text, /endTimestamp=1788239000/);
+});
+
+test('#860: a rename shown only in the list is fetched again', async () => {
+  const drive = memoryDrive();
+  await run(coros(), drive);
+  const client = coros({ querySportRecords: corosText(LIST.replace('3. Outdoor Bike', '3. Evening Ride')) });
+  const summary = await run(client, drive, LATER);
+  assert.ok(detailIds(client).includes('999'));
+  assert.equal(summary.activities.updated, 1);
+  assert.equal(activityFile(drive, '999').data.list_entry.name, 'Evening Ride');
+});
+
+test('#860: an unchanged activity is fetched while it is 48 h old or less, and skipped after', async () => {
+  const drive = memoryDrive();
+  await run(coros(), drive);
+  // 101 started at 1790170000 (2026-09-23T13:26:40Z).
+  const start = 1790170000 * 1000;
+
+  const within = coros();
+  await run(within, drive, start + 47 * HOUR);
+  assert.ok(detailIds(within).includes('700000000000000101'));
+
+  const after = coros();
+  const summary = await run(after, drive, start + 49 * HOUR);
+  assert.ok(!detailIds(after).includes('700000000000000101'));
+  assert.equal(summary.detailSkipped, 3, '102 started before 101, so all three are past 48 h');
+});
+
+test('#860: the anomaly text waits 30 s then 90 s, three attempts in all', async () => {
+  const waited = [];
+  const logs = [];
+  const client = fakeCoros({ getActivityDetail: corosText(ANOMALY) });
+  await assert.rejects(callTool(client, 'getActivityDetail', { labelId: '1', sportType: 400 }, {
+    retry: { wait: async (ms) => { waited.push(ms); } }, log: (l) => logs.push(l),
+  }), CorosToolError);
+  assert.equal(client.calls.length, 3);
+  assert.deepEqual(waited, ANOMALY_DELAYS_MS);
+  assert.deepEqual(ANOMALY_DELAYS_MS, [30_000, 90_000]);
+  assert.deepEqual(logs, [
+    '  COROS anomaly guard on getActivityDetail, attempt 1 of 3: waiting 30 s',
+    '  COROS anomaly guard on getActivityDetail, attempt 2 of 3: waiting 90 s',
+  ]);
+});
+
+test('#860: every other failure still waits 2 s then 8 s', async () => {
+  const failures = [
+    new Error('fetch failed'),
+    corosText('Internal error', { isError: true }),
+    corosText('COROS API is temporarily unavailable. Please try again later.'),
+    { content: [] },
+  ];
+  for (const failure of failures) {
+    const waited = [];
+    const client = fakeCoros({ getActivityDetail: failure });
+    await assert.rejects(callTool(client, 'getActivityDetail', { labelId: '1', sportType: 400 }, {
+      retry: { wait: async (ms) => { waited.push(ms); } },
+    }));
+    assert.deepEqual(waited, [2000, 8000]);
+  }
+});
+
+test('#860: once a run has spent its 5 minutes on anomaly waits, it falls back to 2 s / 8 s', async () => {
+  assert.equal(ANOMALY_BUDGET_MS, 5 * 60_000);
+  const waited = [];
+  const summary = await ingest({
+    client: coros({ getActivityDetail: corosText(ANOMALY) }),
+    archive: createArchive(memoryDrive(), { now: () => NOW }),
+    now: NOW,
+    log: silent,
+    retry: { wait: async (ms) => { waited.push(ms); } },
+  });
+  // 120 s + 120 s leaves 60 s: the third activity's 30 s fits, its 90 s does not.
+  assert.deepEqual(waited.slice(0, 6), [30_000, 90_000, 30_000, 90_000, 30_000, 8000]);
+  assert.ok(waited.slice(0, 6).filter((ms) => ms >= 30_000).reduce((a, b) => a + b, 0) <= ANOMALY_BUDGET_MS);
+  assert.equal(summary.failures.length, 3);
+
+  const spent = [];
+  await assert.rejects(callTool(fakeCoros({ x: corosText(ANOMALY) }), 'x', {}, {
+    anomaly: anomalyBudget(0), retry: { wait: async (ms) => { spent.push(ms); } },
+  }));
+  assert.deepEqual(spent, [2000, 8000]);
+});
+
+test('#860: an anomaly answer then a good payload archives only the payload, with no failure', async () => {
+  const drive = memoryDrive();
+  const logs = [];
+  const client = coros({
+    getActivityDetail: ({ labelId }, n) => (labelId === '999' && n === 3 ? corosText(ANOMALY) : detail(labelId)),
+  });
+  const summary = await ingest({
+    client, archive: createArchive(drive, { now: () => NOW }), now: NOW, log: (l) => logs.push(l), retry: noWait,
+  });
+  assert.deepEqual(summary.failures, []);
+  assert.equal(activityFile(drive, '999').data.payload, detail('999').content[0].text);
+  const guard = logs.filter((l) => /anomaly guard/.test(l));
+  assert.equal(guard.length, 1);
+  assert.doesNotMatch(guard[0], /999/, 'the guard line names the tool, not the activity');
 });

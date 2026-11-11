@@ -9,15 +9,19 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Runs `fn`, retrying while `isRetryable(err)` is true. The last error is
- * rethrown unchanged, so the caller still classifies it.
+ * rethrown unchanged, so the caller still classifies it. `delayFor(err,
+ * attempt, ms)` may replace the wait before the next attempt (#860: COROS's
+ * anomaly guard gets a longer one); the number of attempts never changes.
  */
-export async function withRetry(fn, { isRetryable, delays = DEFAULT_DELAYS_MS, wait = sleep } = {}) {
+export async function withRetry(fn, {
+  isRetryable, delays = DEFAULT_DELAYS_MS, wait = sleep, delayFor = (_err, _attempt, ms) => ms,
+} = {}) {
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn(attempt);
     } catch (err) {
       if (attempt >= delays.length || !isRetryable(err)) throw err;
-      await wait(delays[attempt]);
+      await wait(delayFor(err, attempt, delays[attempt]));
     }
   }
 }

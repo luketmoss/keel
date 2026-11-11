@@ -175,9 +175,18 @@ the COROS cloud only when the phone gets signal again (sync plan §6). Everythin
   in Drive is harmless. An unchanged `payload_hash` writes nothing; a changed one rewrites the
   same file, so its Drive ID (the future `Workouts!raw_ref`) never changes, and `normalized`
   (#153's) is carried over untouched.
+- **Detail only for what is new or changed (#860).** The list is read every run, but an activity's
+  detail is fetched only when the archive does not hold it, its list entry changed (name, times,
+  duration, distance, speed, HR, calories, location; its position in the list is ignored), or it
+  started 48 hours or less before the run. Any other activity counts as unchanged without a call,
+  and the summary's archive line says how many (`(N not re-fetched)`). Re-fetching every detail
+  every run was what tripped COROS's anomaly guard. An edit that shows only in the detail (laps,
+  max speed, training effect) on an older activity whose list entry did not change is not picked up.
 - **Errors are never archived.** A thrown call, an `isError` result, or error text served as a
   result ("temporarily unavailable", "Tool call anomalies detected") is retried, three attempts in
-  all. A detail that still fails is logged with its activity ID and the run carries on; a failed
+  all. The anomaly text waits 30 s and then 90 s rather than 2 s and 8 s, and the detail log
+  notes each wait. A run spends at most 5 minutes on those long waits; after that it uses 2 s and 8 s
+  again, so a COROS that flags every call cannot push a run into the job's timeout. A detail that still fails is logged with its activity ID and the run carries on; a failed
   list call ends the run; a failed health call skips that run's bundle. Any failure exits non-zero.
 - Recovery and fitness take no date, so the bundle holds them as of `fetched_at`.
 - A payload containing a FIT download URL (`s3.coros.com/fit/…`, an unauthenticated secret) is

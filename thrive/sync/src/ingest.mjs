@@ -7,6 +7,7 @@
 // and where the file goes (the start timestamp). Everything else is stored as
 // served.
 
+import { entryIdentity } from './archive.mjs';
 import { SPORT_RECORDS_LIMIT } from './config.mjs';
 import { chunkRange, corosDate, localDate, syncWindow } from './dates.mjs';
 import { CorosUnavailableError, DriveAuthError } from './errors.mjs';
@@ -21,17 +22,39 @@ export const DETAIL_TOOL = 'getActivityDetail';
  * The first is the May 2026 outage (sync plan §2); the second is what an
  * unknown labelId gets, with `isError: false` (seen in #152).
  */
-const ERROR_TEXT = [/temporarily unavailable/i, /Tool call anomalies detected/i];
+const ANOMALY_TEXT = /Tool call anomalies detected/i;
+const ERROR_TEXT = [/temporarily unavailable/i, ANOMALY_TEXT];
+
+/**
+ * COROS's anomaly guard (#860) answers a burst of calls with ANOMALY_TEXT.
+ * Retrying it 2 s later lands in the same burst, so it waits longer, still
+ * three attempts in all. A run spends at most ANOMALY_BUDGET_MS on these
+ * waits; past that it falls back to the normal delays, so a COROS that flags
+ * everything cannot push a run into the job's 20-minute timeout.
+ */
+export const ANOMALY_DELAYS_MS = [30_000, 90_000];
+export const ANOMALY_BUDGET_MS = 5 * 60_000;
+
+/** A run's allowance for anomaly waits, shared by every call in it. */
+export const anomalyBudget = (ms = ANOMALY_BUDGET_MS) => ({ remainingMs: ms });
+
+/**
+ * An archived activity that started longer ago than this, and whose list entry
+ * is unchanged, is not fetched again (#860). A recent one is, while COROS may
+ * still be settling its numbers.
+ */
+export const REFETCH_RECENT_MS = 48 * 60 * 60 * 1000;
 
 /** The unauthenticated FIT URL (sync plan §2) must never be archived. */
 const FIT_URL = /s3\.coros\.com\/fit\//i;
 
 /** A tool call that failed, however COROS chose to say so. */
 export class CorosToolError extends Error {
-  constructor(tool, detail) {
+  constructor(tool, detail, { anomaly = false } = {}) {
     super(`${tool}: ${detail}`);
     this.name = 'CorosToolError';
     this.tool = tool;
+    this.anomaly = anomaly;
   }
 }
 
@@ -47,18 +70,28 @@ export function resultText(result) {
  * The payload of one tool call, or a CorosToolError. Errors, error results and
  * error text are retried with backoff, three attempts in all, and never
  * returned as a payload: an archived error would change the hash and be
- * normalized as data.
+ * normalized as data. The anomaly text waits ANOMALY_DELAYS_MS instead, while
+ * `anomaly` (the run's anomalyBudget; a fresh one when omitted) has room.
  */
-export async function callTool(client, tool, args, { retry = {} } = {}) {
+export async function callTool(client, tool, args, { retry = {}, anomaly = anomalyBudget(), log = () => {} } = {}) {
+  const delayFor = (err, attempt, ms) => {
+    const long = ANOMALY_DELAYS_MS[attempt];
+    if (!err?.anomaly || long === undefined || long > anomaly.remainingMs) return ms;
+    anomaly.remainingMs -= long;
+    log(`  COROS anomaly guard on ${tool}, attempt ${attempt + 1} of 3: waiting ${long / 1000} s`);
+    return long;
+  };
   try {
     return await withRetry(async () => {
       const result = await client.callTool({ name: tool, arguments: args });
       const text = resultText(result);
       if (result?.isError) throw new CorosToolError(tool, `error result: ${text.slice(0, 200)}`);
-      if (ERROR_TEXT.some((re) => re.test(text))) throw new CorosToolError(tool, `error text: ${text.slice(0, 200)}`);
+      if (ERROR_TEXT.some((re) => re.test(text))) {
+        throw new CorosToolError(tool, `error text: ${text.slice(0, 200)}`, { anomaly: ANOMALY_TEXT.test(text) });
+      }
       if (!text) throw new CorosToolError(tool, 'empty result');
       return text;
-    }, { isRetryable: () => true, ...retry });
+    }, { isRetryable: () => true, delayFor, ...retry });
   } catch (err) {
     if (err instanceof CorosToolError) throw err;
     throw new CorosToolError(tool, redact(err.message || String(err)));
@@ -108,6 +141,17 @@ export function parseSportRecords(text) {
   return entries;
 }
 
+/**
+ * Whether the archive already holds this activity as the list now describes
+ * it, long enough ago that its detail has settled. An activity with no start
+ * time is always fetched.
+ */
+async function unchangedSinceArchived(archive, entry, now) {
+  if (entry.startTimestamp == null || now - entry.startTimestamp * 1000 <= REFETCH_RECENT_MS) return false;
+  const archived = await archive.readActivity(entry.activityId);
+  return Boolean(archived?.data?.payload) && entryIdentity(archived.data.list_entry) === entryIdentity(entry);
+}
+
 /** The activity's local start date: its timestamp in Denver, else COROS's own date. */
 const activityLocalDate = (entry) =>
   entry.startTimestamp ? localDate(entry.startTimestamp * 1000) : entry.date;
@@ -146,8 +190,15 @@ function guardPayload(tool, payload) {
 }
 
 /**
+ * An archived activity whose list entry is unchanged and which started more
+ * than REFETCH_RECENT_MS ago is not fetched again: it counts as `unchanged`
+ * and in `detailSkipped` (#860). The list carries what an edit in COROS
+ * changes (name, times, duration, distance, HR, calories), so re-fetching
+ * every detail every run only fed COROS's anomaly guard.
+ *
  * @returns {Promise<{ window: object, activities: { created: number, updated: number,
- *   unchanged: number }, activityIds: string[], failures: string[], health: string | null }>}
+ *   unchanged: number }, detailSkipped: number, activityIds: string[], failures: string[],
+ *   health: string | null }>}
  *   `failures` is empty on a clean run. The caller exits non-zero otherwise.
  *   `activityIds` is every activity the list named, fetched or not: #166
  *   merges each one from whatever the archive holds for it.
@@ -156,15 +207,18 @@ function guardPayload(tool, payload) {
 export async function ingest({ client, archive, now = Date.now(), log = console.log, retry = {} }) {
   const window = syncWindow(now);
   const summary = {
-    window, activities: { created: 0, updated: 0, unchanged: 0 }, activityIds: [], failures: [], health: null,
+    window, activities: { created: 0, updated: 0, unchanged: 0 }, detailSkipped: 0,
+    activityIds: [], failures: [], health: null,
   };
+  const anomaly = anomalyBudget();
+  const call = (tool, args) => callTool(client, tool, args, { retry, anomaly, log });
   log(`Window ${window.start} to ${window.end} (run date ${window.runDate}, America/Denver).`);
 
   // --- activities ---------------------------------------------------------
   const listArgs = { startDate: corosDate(window.start), endDate: corosDate(window.end), limit: SPORT_RECORDS_LIMIT };
   let listText;
   try {
-    listText = await callTool(client, LIST_TOOL, listArgs, { retry });
+    listText = await call(LIST_TOOL, listArgs);
   } catch (err) {
     throw new CorosUnavailableError(`${LIST_TOOL} failed, so no activity was fetched: ${err.message}`);
   }
@@ -180,7 +234,13 @@ export async function ingest({ client, archive, now = Date.now(), log = console.
   for (const entry of entries) {
     const args = { labelId: entry.activityId, sportType: entry.sportType };
     try {
-      const payload = await callTool(client, DETAIL_TOOL, args, { retry });
+      if (await unchangedSinceArchived(archive, entry, now)) {
+        summary.activities.unchanged += 1;
+        summary.detailSkipped += 1;
+        log(`  activity ${entry.activityId} (${entry.name}, ${entry.date}): unchanged in the list, detail not re-fetched`);
+        continue;
+      }
+      const payload = await call(DETAIL_TOOL, args);
       guardPayload(DETAIL_TOOL, payload);
       const { status, fileId } = await archive.upsertActivity({
         activityId: entry.activityId,
@@ -206,7 +266,7 @@ export async function ingest({ client, archive, now = Date.now(), log = console.
   try {
     const calls = [];
     for (const [tool, args] of healthCalls(window)) {
-      const payload = await callTool(client, tool, args, { retry });
+      const payload = await call(tool, args);
       guardPayload(tool, payload);
       calls.push({ tool, args, payload });
     }

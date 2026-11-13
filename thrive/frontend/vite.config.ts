@@ -34,3 +34,5 @@ export default defineConfig({
     env: { VITE_GOOGLE_MAPS_API_KEY: '', VITE_THRIVE_API_URL: '' },
   },
 });
+
+# Automated fix for issue #729: Morning Brief lists Hive items by reading due dates itself, not through due_before

@@ -41,7 +41,7 @@ describe('upsertFood: the seven', () => {
     expect(api.sandbox.hasNutrition(rice)).toBe(true);
     // Blank is stored blank, never 0.
     const row = api.rows('Foods')[0];
-    expect(row.slice(26)).toEqual(['', '', '', '', '', '', '']);
+    expect(row.slice(26, 33)).toEqual(['', '', '', '', '', '', '']);
   });
 
   const refusals: [string, Record<string, unknown>, RegExp][] = [

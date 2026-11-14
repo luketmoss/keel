@@ -237,14 +237,15 @@ function recipeNutrition(lines, servings, foodsById) {
  * the values are null and partial true when the food has no nutrition. Each of
  * the seven the food lacks is null, never 0 (#755).
  */
-function foodEntryNutrition(food, qty, unit) {
+function foodEntryNutrition(food, qty, unit, keptGramsPerUnit) {
   var grams;
   if (canonicalUnit(unit) === 'g') {
     grams = qty;
   } else {
     var serving = foodServings(food).filter(function (s) { return s.name === unit; })[0];
-    if (!serving) throw new Error('unit "' + unit + '" is not one of this food\'s servings, or g');
-    grams = qty * serving.g;
+    if (serving) grams = qty * serving.g;
+    else if (keptGramsPerUnit) grams = qty * keptGramsPerUnit;
+    else throw new Error('unit "' + unit + '" is not one of this food\'s servings, or g');
   }
   if (!hasNutrition(food)) {
     var none = { grams: round1(grams), kcal: null, protein_g: null, carbs_g: null, fat_g: null, partial: true };

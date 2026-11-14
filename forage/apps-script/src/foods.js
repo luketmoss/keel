@@ -11,6 +11,9 @@ var MAX_KCAL_100G = 902;
 /** The most cholesterol or sodium 100 g can hold, in mg: all of it (#755). */
 var MAX_MG_100G = 100000;
 
+/** The longest `short_name` (#880): what fits a pick-one button. */
+var MAX_SHORT_NAME = 20;
+
 /** A food's name as the app shows it: brand, then name. Unique, case-insensitively. */
 function displayName(food) {
   return (cell(food.brand).trim() + ' ' + cell(food.name).trim()).trim();
@@ -18,7 +21,7 @@ function displayName(food) {
 
 /**
  * Foods, optionally narrowed: `q` matches a substring of the name or brand,
- * `regular` keeps the regulars, `barcode` the one with that barcode.
+ * (#880: or of its short name), `regular` keeps the regulars, `barcode` the one with that barcode.
  */
 function getFoods(params) {
   params = params || {};
@@ -26,7 +29,7 @@ function getFoods(params) {
   var regular = params.regular !== undefined && params.regular !== '' ? toBool(params.regular) : null;
   var barcode = cell(params.barcode).trim();
   return listRecords('Foods', function (food) {
-    if (q && (food.name + ' ' + food.brand).toLowerCase().indexOf(q) === -1) return false;
+    if (q && (food.name + ' ' + food.brand + ' ' + food.short_name).toLowerCase().indexOf(q) === -1) return false;
     if (regular !== null && food.regular !== regular) return false;
     if (barcode && food.barcode !== barcode) return false;
     return true;
@@ -89,6 +92,10 @@ function upsertFood(payload) {
   ['brand', 'category', 'buy_unit', 'buy_unit_plural', 'last_buy', 'source_ref', 'barcode'].forEach(function (f) {
     food[f] = optionalString(f, food[f]);
   });
+  food.short_name = optionalString('short_name', food.short_name).trim();
+  if (food.short_name.length > MAX_SHORT_NAME) {
+    throw new Error('short_name must be at most ' + MAX_SHORT_NAME + ' characters');
+  }
   NUTRITION_FIELDS.forEach(function (f) { food[f] = optionalNumber(f, food[f], { min: 0 }); });
   var set = NUTRITION_FIELDS.filter(function (f) { return food[f] !== null; }).length;
   if (set !== 0 && set !== 4) {

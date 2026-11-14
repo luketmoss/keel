@@ -593,7 +593,7 @@ describe('forage_search_foods and forage_get_food (read)', () => {
     const out = JSON.parse(r.content[0].text)
     expect(out.foods).toEqual([
       {
-        id: 'fd_1', name: 'Oats', brand: '', kind: 'ingredient', kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52,
+        id: 'fd_1', name: 'Oats', brand: '', short_name: '', kind: 'ingredient', kcal_100g: 379, protein_100g: 13.2, carbs_100g: 67.7, fat_100g: 6.52,
         // #755: an API from before it, with none of the seven, reads as null.
         satfat_100g: null, transfat_100g: null, cholesterol_mg_100g: null, sodium_mg_100g: null, fiber_100g: null,
         sugars_100g: null, added_sugars_100g: null,
@@ -811,6 +811,24 @@ describe('#755: the seven nutrients beyond the four', () => {
       satfat_100g: null, transfat_100g: null, cholesterol_mg_100g: null, sodium_mg_100g: 6, fiber_100g: 10,
       sugars_100g: null, added_sugars_100g: null,
     })
+  })
+
+  it('#880: forage_update_food and forage_add_food send short_name; forage_search_foods answers it and sends q', async () => {
+    const sent = foodApi()
+    await call('forage_update_food', { id: 'fd_9', short_name: 'Crunchy PB' })
+    expect(sent[0].payload).toMatchObject({ id: 'fd_9', short_name: 'Crunchy PB' })
+    const add = foodApi()
+    await call('forage_add_food', { food: { name: 'NuttZo Crunchy', short_name: 'Crunchy PB' }, dry_run: false })
+    expect(add.find((s) => s.action === 'upsertFood')!.payload).toMatchObject({ short_name: 'Crunchy PB' })
+
+    const seen = fakeForage((r) =>
+      r.action === 'getFoods'
+        ? { success: true, data: [{ id: 'fd_1', name: 'NuttZo Crunchy', short_name: 'Crunchy PB', kind: 'packaged' }] }
+        : { success: false, error: 'no' },
+    )
+    const out = JSON.parse((await call('forage_search_foods', { q: 'crunchy pb' })).content[0].text)
+    expect(seen[0].params.get('q')).toBe('crunchy pb')
+    expect(out.foods[0]).toMatchObject({ id: 'fd_1', short_name: 'Crunchy PB' })
   })
 
   it("a recipe's nutrition text gains a second line of the known values; none known, no second line", async () => {

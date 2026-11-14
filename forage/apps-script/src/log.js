@@ -140,6 +140,18 @@ function sameAmount(existing, entry) {
     existing.qty === entry.qty && existing.unit === entry.unit;
 }
 
+/**
+ * #880: an edit that keeps the entry's stored unit, on a food that has since
+ * renamed or dropped that serving, still means what it did: the grams a unit
+ * is worth come from the entry itself, stored grams over stored qty. Null
+ * otherwise, so a unit the entry never had is refused as before.
+ */
+function keptGramsPerUnit(existing, entry) {
+  if (!existing || existing.food_id !== entry.food_id || existing.unit !== entry.unit) return null;
+  if (!existing.grams || !existing.qty) return null;
+  return existing.grams / existing.qty;
+}
+
 var SNAPSHOT_FIELDS = [
   'grams', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial',
   // #755: the seven, written with the rest and kept with them. An entry from before has them blank.
@@ -165,7 +177,8 @@ function writeLogEntry(existing, fields, id, caller, dryRun) {
     var food = getRecord('Foods', { id: entry.food_id });
     if (!food) throw new Error('food_id "' + entry.food_id + '" is not a food');
     if (!entry.unit) throw new Error('unit is required: one of the food\'s servings, or g');
-    snapshot = existing && sameAmount(existing, entry) ? existing : foodEntryNutrition(food, entry.qty, entry.unit);
+    snapshot = existing && sameAmount(existing, entry) ? existing
+      : foodEntryNutrition(food, entry.qty, entry.unit, keptGramsPerUnit(existing, entry));
   } else {
     var recipe = getRecord('Recipes', { id: entry.recipe_id });
     if (!recipe) throw new Error('recipe_id "' + entry.recipe_id + '" is not a recipe');

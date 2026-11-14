@@ -2411,6 +2411,39 @@ a.text-btn {
   gap: var(--space-sm);
 }
 
+.meal-total {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.meal-total .low-chip {
+  margin-right: var(--space-xs);
+}
+
+.meal-totals {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.meal-line {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.meal-totals + .plain-list,
+.meal-line + .plain-list {
+  margin-top: var(--space-xs);
+}
+
+.nowrap,
+.meal-group {
+  white-space: nowrap;
+}
+
 .meal-head-row .text-btn {
   flex: none;
   white-space: nowrap;

@@ -61,6 +61,17 @@ export const wholeKcal = (n: number) => Math.round(n).toLocaleString('en-US');
 /** `62 g`, or `—` when unknown. Grams to the whole number, as the day card shows them. */
 export const wholeGrams = (n: number | null) => (n === null ? '—' : `${Math.round(n)} g`);
 
+/** `22 g`; a value above 0 that would round to 0 reads `<1 g`, so a real value is never shown as a zero (#866). */
+export function mealGrams(n: number | null): string {
+  if (n === null) return '—';
+  return n > 0 && Math.round(n) === 0 ? '<1 g' : `${Math.round(n)} g`;
+}
+
+/** `1,840 mg`, or `<1 mg` for a value above 0 under 1 (#866). */
+export function mealMg(n: number): string {
+  return n > 0 && Math.round(n) === 0 ? '<1 mg' : `${Math.round(n).toLocaleString('en-US')} mg`;
+}
+
 /** `0.4`, `6`: a stored figure to 0.1, as the amount sheet shows it. */
 export const tenth = (n: number) => String(Math.round(n * 10) / 10);
 

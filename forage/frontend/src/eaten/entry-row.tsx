@@ -36,6 +36,7 @@ export function EntryRow({
   fresh,
   amount,
   below,
+  onSwap,
 }: {
   entry: FoodLogEntry;
   name: string;
@@ -45,6 +46,8 @@ export function EntryRow({
   amount?: RowEditing;
   /** What sits under line two, before the editor: a usual's pick-one choice (#885). */
   below?: ComponentChildren;
+  /** Given on an Always line of a usual's group (#886): the ⇄ swap button after the amount. */
+  onSwap?: () => void;
 }) {
   const edit = editing.value?.id === entry.id ? editing.value : null;
   // While the editor is open the row shows the amount being set and the preview's calories (the stored ones until it answers).
@@ -114,6 +117,17 @@ export function EntryRow({
           {grams !== null && <span class="amount-chip-g"> · {grams} g</span>}
         </button>
         {suffix}
+        {onSwap && (
+          <button
+            type="button"
+            class="text-btn swap-btn"
+            aria-label={`Swap ${name}`}
+            onClick={onSwap}
+            data-testid="swap-entry"
+          >
+            ⇄ swap
+          </button>
+        )}
       </div>
       {below}
       {edit && <AmountEditor api={amount.api} entry={entry} name={name} food={amount.food} />}

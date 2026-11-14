@@ -15,6 +15,7 @@ import {
   type PlanEntry,
   type Slot,
   type Usual,
+  type UsualLine,
   type UsualOption,
 } from '../api/types';
 import { BarcodeSheet } from '../library/barcode-sheet';
@@ -32,7 +33,10 @@ import { AddSheet, type AddLists } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
 import { GroupHeading, GroupMenuSheet, PickOne } from './group-view';
+import { NewUsualSheet } from './new-usual-sheet';
 import { SaveRecipeSheet } from './save-recipe-sheet';
+import { SwapSheet } from './swap-sheet';
+import { pickOneInput, pickOneOffers, pickOneToast, swapAmount, swapToast } from './swap';
 import {
   copiedToast,
   dayWord,
@@ -354,7 +358,10 @@ type Overlay =
   | { kind: 'copyFrom'; slot: Slot }
   // #885: a group's ⋯ menu, and its Copy to… sheet.
   | { kind: 'groupMenu'; slot: Slot; groupId: string }
-  | { kind: 'groupCopy'; slot: Slot; groupId: string };
+  | { kind: 'groupCopy'; slot: Slot; groupId: string }
+  // #886: an entry's Swap sheet, and the New usual sheet over a meal in select mode or from a group's menu.
+  | { kind: 'swap'; slot: Slot; entryId: string }
+  | { kind: 'newUsual'; slot: Slot; ids: string[]; name?: string };
 
 /**
  * A pass (#786): from an Add row's tap until the Add sheet closes, one meal's adding. The screen holds it because the
@@ -399,6 +406,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const [openPick, setOpenPick] = useState<string | null>(null);
   const [pickBusy, setPickBusy] = useState<string | null>(null);
   const [groupBusy, setGroupBusy] = useState(false);
+  // #886: a swap saving, or failed.
+  const [swapBusy, setSwapBusy] = useState(false);
+  const [swapFailed, setSwapFailed] = useState(false);
 
   function leaveSelect() {
     setSelecting(null);
@@ -571,7 +581,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   /** Why an entry can't go in a recipe, or null when it can: recipes are not lines, and a removed food has none. */
   function blockedReason(e: FoodLogEntry): string | null {
-    if (!e.food_id) return "Recipes can't go in a recipe";
+    if (!e.food_id) return "Recipes can't go in a usual or a recipe";
     return foods.some((f) => f.id === e.food_id) ? null : 'This food was deleted';
   }
 
@@ -829,6 +839,69 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     }
   }
 
+  /** Swap (#886): the entry becomes another food in place, for this day only; Undo puts it back. */
+  async function swap(entry: FoodLogEntry, line: UsualLine, food: Food) {
+    if (swapBusy) return;
+    setSwapBusy(true);
+    setSwapFailed(false);
+    const was = { food_id: entry.food_id, qty: entry.qty, unit: entry.unit };
+    const amount = swapAmount(entry, food);
+    try {
+      const saved = await api.updateLogEntry(entry.id, { food_id: food.id, qty: amount.qty, unit: amount.unit });
+      knowFood(food);
+      upsertEntry(saved);
+      void refreshDay(api);
+      void loadDayUsuals(api);
+      setOverlay(null);
+      showToast(swapToast(food.name, food.id === line.food_id), {
+        label: 'Undo',
+        run: () => void undoSwap(entry.id, was),
+      });
+    } catch {
+      setSwapFailed(true);
+    } finally {
+      setSwapBusy(false);
+    }
+  }
+
+  async function undoSwap(id: string, was: { food_id: string; qty: number; unit: string }) {
+    try {
+      upsertEntry(await api.updateLogEntry(id, was));
+      void refreshDay(api);
+      void loadDayUsuals(api);
+    } catch {
+      showToast("Couldn't undo. The swap is still there.");
+    }
+  }
+
+  /** Make it a pick-one (#886): the swapped line becomes a pick-one of its food and the entry's. */
+  async function makePickOne(group: Group, usual: Usual, entryId: string) {
+    const entry = group.entries.find((e) => e.id === entryId);
+    const offer = pickOneOffers(group.entries, usual, foodMap).find((o) => o.entryId === entryId);
+    if (groupBusy || !entry || !offer) return;
+    setGroupBusy(true);
+    try {
+      keepDayUsual(await api.upsertUsual(pickOneInput(usual, entry)));
+      setOverlay(null);
+      showToast(pickOneToast(usual.name, offer.from, offer.to));
+    } catch {
+      showToast("Couldn't save. Try again.");
+    } finally {
+      setGroupBusy(false);
+    }
+  }
+
+  /** The usual saved from a meal (#886): the entries are its first group, or only the usual exists when grouping failed. */
+  function usualSaved(usual: Usual, grouped: FoodLogEntry[] | null) {
+    keepDayUsual(usual);
+    for (const e of grouped ?? []) upsertEntry(e);
+    void refreshDay(api);
+    void loadDayUsuals(api);
+    setOverlay(null);
+    leaveSelect();
+    showToast(grouped ? `Saved ${usual.name} to your usuals` : `Saved ${usual.name}. Couldn't group today's items.`);
+  }
+
   /** An entry's row; one on a pick-one line of its usual shows the choice under it (#885). */
   function renderEntry(e: FoodLogEntry, usual: Usual | null) {
     const amount = rowEditing(e);
@@ -840,6 +913,15 @@ export function EatenScreen({ api }: { api: ForageApi }) {
         name={entryName(e, foods, recipes)}
         onOpen={() => openEntry(e)}
         amount={amount}
+        onSwap={
+          amount && usual && line && !line.options && e.food_id
+            ? () =>
+                afterEditor(api, () => {
+                  setSwapFailed(false);
+                  setOverlay({ kind: 'swap', slot: e.slot, entryId: e.id });
+                })
+            : undefined
+        }
         below={
           line?.options ? (
             <PickOne
@@ -996,6 +1078,21 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                     type="button"
                     class="btn btn-primary btn-block select-save"
                     disabled={count === 0}
+                    onClick={() =>
+                      setOverlay({
+                        kind: 'newUsual',
+                        slot,
+                        ids: mine.filter((e) => ticked.includes(e.id) && !blockedReason(e)).map((e) => e.id),
+                      })
+                    }
+                    data-testid="save-as-usual"
+                  >
+                    {count === 0 ? 'Save as a usual' : `Save ${count} as a usual`}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-block select-save"
+                    disabled={count === 0}
                     onClick={() => setOverlay({ kind: 'saveRecipe', slot })}
                     data-testid="save-as-recipe"
                   >
@@ -1075,8 +1172,21 @@ export function EatenScreen({ api }: { api: ForageApi }) {
               name={group.name}
               count={group.entries.length}
               update={usual ? { usual: usual.name, changes: groupChanges(group.entries, usual, foodMap) } : null}
+              pickOnes={usual ? pickOneOffers(group.entries, usual, foodMap) : []}
               busy={groupBusy}
               onUpdate={() => usual && void updateUsual(group, usual)}
+              onPickOne={(entryId) => usual && void makePickOne(group, usual, entryId)}
+              onSaveUsual={
+                usual
+                  ? undefined
+                  : () =>
+                      setOverlay({
+                        kind: 'newUsual',
+                        slot: overlay.slot,
+                        ids: group.entries.filter((e) => !blockedReason(e)).map((e) => e.id),
+                        name: group.name,
+                      })
+              }
               onCopy={() => {
                 setCopyFailed(false);
                 setOverlay({ kind: 'groupCopy', slot: overlay.slot, groupId: group.id });
@@ -1149,6 +1259,43 @@ export function EatenScreen({ api }: { api: ForageApi }) {
             if (day) pull(day, overlay.slot, true);
           }}
           onClose={() => !copyBusy && setOverlay(null)}
+        />
+      )}
+      {overlay?.kind === 'swap' &&
+        (() => {
+          const entry = entries.find((e) => e.id === overlay.entryId);
+          const usual = entry ? (usuals.find((u) => u.id === entry.usual_id) ?? null) : null;
+          const line = entry ? lineOf(entry, usual) : null;
+          if (!entry || !usual || !line) return null;
+          return (
+            <SwapSheet
+              api={api}
+              entry={entry}
+              name={entryName(entry, foods, recipes)}
+              usualId={usual.id}
+              usualName={usual.name}
+              line={line}
+              foods={foods}
+              busy={swapBusy}
+              failed={swapFailed}
+              onPick={(food) => void swap(entry, line, food)}
+              onClose={() => !swapBusy && setOverlay(null)}
+            />
+          );
+        })()}
+      {overlay?.kind === 'newUsual' && (
+        <NewUsualSheet
+          api={api}
+          slot={overlay.slot}
+          date={date}
+          today={today}
+          foods={foods}
+          initialName={overlay.name}
+          lines={entries
+            .filter((e) => overlay.ids.includes(e.id))
+            .map((e) => ({ entry: e, name: entryName(e, foods, recipes) }))}
+          onSaved={usualSaved}
+          onClose={() => setOverlay(null)}
         />
       )}
       {overlay?.kind === 'saveRecipe' && (

@@ -4,6 +4,8 @@ import { labelOf, pickLayout } from '../library/usuals-store';
 import { Sheet } from '../ui/sheet';
 import { fractionQty } from './amount-edit';
 import { wholeKcal } from './format';
+import type { PickOneOffer } from './swap';
+import { SUGGEST_AFTER } from './swap';
 import { optionKcal } from './usual-group';
 
 interface HeadingProps {
@@ -154,8 +156,13 @@ interface MenuProps {
   count: number;
   /** Null when the group has no usual that still exists (no Update item); else the differences, empty when none. */
   update: { usual: string; changes: string[] } | null;
+  /** A swapped Always line each, to turn into a pick-one (#886). */
+  pickOnes?: PickOneOffer[];
   busy: boolean;
   onUpdate: () => void;
+  onPickOne?: (entryId: string) => void;
+  /** Given when the group has no usual: Save as a usual (#886). */
+  onSaveUsual?: () => void;
   onCopy: () => void;
   onUngroup: () => void;
   onRemove: () => void;
@@ -167,8 +174,11 @@ export function GroupMenuSheet({
   name,
   count,
   update,
+  pickOnes = [],
   busy,
   onUpdate,
+  onPickOne,
+  onSaveUsual,
   onCopy,
   onUngroup,
   onRemove,
@@ -179,7 +189,7 @@ export function GroupMenuSheet({
     title: string,
     line: string | null,
     onClick: () => void,
-    opts: { disabled?: boolean; danger?: boolean } = {},
+    opts: { disabled?: boolean; danger?: boolean; chip?: boolean } = {},
   ) => (
     <li>
       <button
@@ -191,7 +201,16 @@ export function GroupMenuSheet({
         data-testid={testId}
       >
         <span class="recipe-text">
-          <span class={opts.danger ? 'recipe-name danger-text' : 'recipe-name'}>{title}</span>
+          <span class={opts.danger ? 'recipe-name danger-text' : 'recipe-name'}>
+            {opts.chip && (
+              <>
+                <span class="group-chip suggested-chip" data-testid="suggested-chip">
+                  Suggested
+                </span>{' '}
+              </>
+            )}
+            {title}
+          </span>
           {line && <span class="recipe-meta">{line}</span>}
         </span>
       </button>
@@ -209,6 +228,17 @@ export function GroupMenuSheet({
             onUpdate,
             { disabled: none },
           )}
+        {pickOnes.map((o) =>
+          row(
+            'group-pick-one',
+            `Make it a pick-one: ${o.from} / ${o.to}`,
+            `${o.count >= SUGGEST_AFTER ? `You've swapped this line ${o.count} times. ` : ''}Both become options, and you choose each time`,
+            () => onPickOne?.(o.entryId),
+            { chip: o.count >= SUGGEST_AFTER },
+          ),
+        )}
+        {onSaveUsual &&
+          row('group-save-usual', 'Save as a usual', `Use these ${count} as a starting point`, onSaveUsual)}
         {row('group-copy', 'Copy to…', 'Another day or meal, exactly as it is', onCopy)}
         {row(
           'group-ungroup',

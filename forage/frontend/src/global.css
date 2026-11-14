@@ -3211,3 +3211,42 @@ a.text-btn {
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
+
+/* === Swap and save a usual (#886) === */
+
+.swap-btn {
+  margin-left: var(--space-sm);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.suggested-chip {
+  text-transform: none;
+}
+
+.usual-new-line {
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.usual-new-line:last-child {
+  border-bottom: 0;
+}
+
+.usual-new-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.usual-new-options {
+  margin-top: var(--space-xs);
+}
+
+.usual-new-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}

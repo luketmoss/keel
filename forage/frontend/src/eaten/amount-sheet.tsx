@@ -3,9 +3,11 @@ import { ApiError, type ForageApi } from '../api/client';
 import { SLOTS, type Food, type FoodLogEntry, type LogEntryInput, type RecipeSummary, type Slot } from '../api/types';
 import { parseAmount } from '../import/amount';
 import { displayName } from '../library/food-math';
+import { MacroBar } from '../ui/macro-bar';
+import { MacroCols } from '../ui/macro-cols';
 import { MoreNutrition } from '../ui/more-nutrition';
 import { ConfirmSheet, Sheet } from '../ui/sheet';
-import { MAX_QTY, dayPossessive, defaultQty, macrosLine, newLogId, qtyText, stepFor, tenth, wholeKcal } from './format';
+import { MAX_QTY, dayPossessive, defaultQty, newLogId, qtyText, sheetGrams, stepFor, tenth, wholeKcal } from './format';
 
 /** What is being logged: a food, or a recipe in servings. */
 export type LogTarget = { kind: 'food'; food: Food } | { kind: 'recipe'; recipe: RecipeSummary };
@@ -85,6 +87,8 @@ export function AmountSheet({
   const qty = parseAmount(typed);
   const valid = typeof qty === 'number' && qty > 0 && qty <= MAX_QTY;
   const step = stepFor(unit);
+  // #870: aria-disabled, not disabled, so Less keeps focus when a tap reaches the minimum.
+  const atMin = valid && (qty as number) <= step;
 
   function input(q: number): LogEntryInput {
     return target.kind === 'food'
@@ -204,10 +208,11 @@ export function AmountSheet({
     preview !== entry &&
     (qty !== entry.qty || unit !== entry.unit) &&
     preview.kcal !== entry.kcal;
+  const macros = { protein: preview?.protein_g ?? null, carbs: preview?.carbs_g ?? null, fat: preview?.fat_g ?? null };
   const partial = target.kind === 'recipe' && !!preview?.partial && preview.kcal !== null;
 
   return (
-    <Sheet title={name} onClose={onClose} testId="amount-sheet">
+    <Sheet title={name} onClose={onClose} testId="amount-sheet" focusPanel>
       {subline && (
         <p class="hint" data-testid="amount-subline">
           {subline}
@@ -222,8 +227,10 @@ export function AmountSheet({
           type="button"
           class="icon-btn"
           aria-label="Less"
-          onClick={() => nudge(-step)}
-          disabled={valid && (qty as number) <= step}
+          onClick={() => {
+            if (!atMin) nudge(-step);
+          }}
+          aria-disabled={atMin ? 'true' : undefined}
         >
           −
         </button>
@@ -235,7 +242,6 @@ export function AmountSheet({
           onInput={(e) => setTyped((e.target as HTMLInputElement).value)}
           aria-describedby={valid ? undefined : 'log-amount-help'}
           data-testid="log-amount"
-          data-autofocus
         />
         <button type="button" class="icon-btn" aria-label="More" onClick={() => nudge(step)}>
           +
@@ -282,17 +288,15 @@ export function AmountSheet({
         ) : (
           <span class="hint">kcal{partial && <span class="chip-flag plan-chip">partial</span>}</span>
         )}
-        {preview && (
-          <span class="amount-macros tabular" data-testid="amount-macros">
-            {macrosLine(preview)}
-          </span>
-        )}
+        <MacroBar protein={macros.protein} carbs={macros.carbs} fat={macros.fat} size="day" />
+        <MacroCols protein={macros.protein} carbs={macros.carbs} fat={macros.fat} format={sheetGrams} />
         {preview && preview.kcal !== null && (
           <MoreNutrition
             values={preview}
             fat={preview.fat_g}
             carbs={preview.carbs_g}
             rounding="tenth"
+            parts
             noneText={
               target.kind === 'food'
                 ? "This food doesn't have sodium, fiber or the rest yet."

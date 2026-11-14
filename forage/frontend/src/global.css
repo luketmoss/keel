@@ -416,6 +416,14 @@ p {
   background: var(--overlay-sm);
 }
 
+.icon-btn[aria-disabled='true'] {
+  color: var(--color-text-muted);
+}
+
+.icon-btn[aria-disabled='true']:hover {
+  background: none;
+}
+
 .field-label {
   display: block;
   margin: var(--space-sm) 0 var(--space-xs);
@@ -2586,7 +2594,7 @@ a.text-btn {
   flex-direction: column;
   gap: var(--space-xs);
   margin: var(--space-md) 0;
-  background: var(--color-surface-raised);
+  background: var(--color-surface);
   box-shadow: none;
 }
 

@@ -900,8 +900,9 @@ under ~2 s, by changing the constant, pushing, and running
    `installSyncRequestTrigger`). Pinned, so `DriveApp` cannot widen anything
    by inference. `drive.file` would not do: it covers only files the script's
    own OAuth client created, and the archive was created by the sync's client,
-   as the sheet was by hand. Only `snapshot.js` writes to Drive;
-   `getWorkoutPayload` still only reads.
+   as the sheet was by hand. `snapshot.js` and `saveRide` (#765: the Spin
+   ride's FIT and streams files) write to Drive; `getWorkoutPayload` still
+   only reads.
 
    **Whenever a scope is added, the owner re-authorizes once.** The editor
    prompts only for the scopes **the function being run actually uses**, not
@@ -911,15 +912,30 @@ under ~2 s, by changing the constant, pushing, and running
    throwaway function that calls the new service, e.g. for Drive:
 
    ```javascript
-   function testDriveAccess() { Logger.log(DriveApp.getRootFolder().getName()); }
+   function testDriveWrite() {
+     var file = DriveApp.getRootFolder().createFile('thrive-scope-check.txt', 'scope check');
+     Logger.log('Drive write ok: ' + file.getId());
+     file.setTrashed(true);
+   }
    ```
 
+   The call must **use** the scope. `getRootFolder().getName()` is a read: it
+   runs on `drive.readonly` alone, so it proves nothing about `drive` (#917).
    Save, pick it in the function menu, **Run**, and allow the dialog. The
    grant belongs to the account and script, not a deployment, so `@2` uses it
    at once — **no redeploy**, and don't use the editor's Deploy button, which
    would publish the throwaway. The next `clasp push` removes it. Until the
    grant, only calls that need the new scope fail, each with a message saying
    so. #179 confirmed this on a temporary deployment before updating `@2`.
+
+   **No dialog, and the call still fails?** The account holds a partial grant
+   for this script, for example `drive.readonly` without `drive`, and the
+   editor does not prompt again over it (#917: `saveRide` failed this way with
+   "not allowed to write to Drive"). Signed in as luketmossbot, open
+   myaccount.google.com/connections, remove **Thrive API**'s access, then run
+   the function again and allow the dialog with **every** box ticked. Until it
+   is allowed, the API and the triggers fail, so do the two steps back to
+   back, then check the Triggers page still lists `pollSyncRequests`.
 4. The deployment URL and key become `THRIVE_API_URL` / `THRIVE_API_KEY` for
    consumers, and GitHub Actions secrets for the sync. The URL alone (not a
    secret) is also the repo **variable** `VITE_THRIVE_API_URL`, which

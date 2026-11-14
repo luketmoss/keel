@@ -66,10 +66,16 @@ class RideUploader(
                 Answer.Offline -> {
                     retry = true
                     uploads.update(rideId) {
-                        it.copy(attempts = it.attempts + 1, lastTryUtc = isoSeconds(now()), lastFailure = Failure.Offline, serverErrors = 0)
+                        it.copy(
+                            attempts = it.attempts + 1,
+                            lastTryUtc = isoSeconds(now()),
+                            lastFailure = Failure.Offline,
+                            serverErrors = 0,
+                            message = null,
+                        )
                     }
                 }
-                Answer.ServerError -> uploads.update(rideId) {
+                is Answer.ServerError -> uploads.update(rideId) {
                     val errors = it.serverErrors + 1
                     val stuck = errors >= STUCK_AFTER
                     if (!stuck) retry = true
@@ -79,6 +85,7 @@ class RideUploader(
                         serverErrors = errors,
                         lastTryUtc = isoSeconds(now()),
                         lastFailure = Failure.Server,
+                        message = serverText(outcome.text),
                     )
                 }
             }
@@ -92,6 +99,12 @@ class RideUploader(
     companion object {
         const val BAD_REQUEST = Answers.BAD_REQUEST
         const val STUCK_AFTER = 10
+
+        /** The most of Thrive's error text kept on a ride (#917): its texts are short sentences, this guards the card. */
+        const val SERVER_TEXT_MAX = 500
+
+        /** Thrive's text for a server error, trimmed and capped, or null when it sent none. */
+        fun serverText(text: String?): String? = text?.trim()?.take(SERVER_TEXT_MAX)?.takeIf { it.isNotEmpty() }
         const val MISSING_FILES = "The ride's files are missing from this phone."
     }
 }

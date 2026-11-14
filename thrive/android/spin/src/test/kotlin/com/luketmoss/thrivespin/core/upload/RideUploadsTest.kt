@@ -338,6 +338,90 @@ class RideUploadsTest {
         assertEquals(1, state().serverErrors)
     }
 
+    // ---- #917: Thrive's error text is kept ----
+
+    @Test
+    fun theClassifierCarriesTheServerTextAndNoneWhenBlank() {
+        assertEquals(Answer.ServerError("X"), Answers.classify("""{"success":false,"error":"X"}""", "r"))
+        assertEquals(Answer.ServerError(null), Answers.classify("""{"success":false,"error":"  "}""", "r"))
+        assertEquals(Answer.ServerError(null), Answers.classify("""{"success":false}""", "r"))
+        assertEquals(Answer.ServerError("Lock timeout"), Answers.classify("""{"success":false,"error":"Lock timeout","code":"x"}""", "r"))
+    }
+
+    @Test
+    fun aServerErrorStoresItsTextAndTheNextAnswerReplacesOrClearsIt() {
+        setUp()
+        ride()
+        save()
+        val drive = "The script is not allowed to write to Drive: its owner must grant the full drive scope."
+        transport.reply = { FakeTransport.error(drive) }
+        run()
+        assertEquals(Failure.Server, state().lastFailure)
+        assertEquals(drive, state().message)
+        // A newer server error with no text leaves no older text behind.
+        transport.reply = { FakeTransport.error("") }
+        run()
+        assertNull(state().message)
+        transport.reply = { FakeTransport.error("  Lock timeout  ") }
+        run()
+        assertEquals("Lock timeout", state().message)
+        // A network failure clears it: the card then says "sends when online".
+        transport.failure = IOException("offline")
+        run()
+        assertEquals(Failure.Offline, state().lastFailure)
+        assertNull(state().message)
+        transport.failure = null
+        // A refusal writes its own text, as before.
+        transport.reply = { FakeTransport.error("Lock timeout") }
+        run()
+        transport.reply = { FakeTransport.error("bad effort", "bad_request") }
+        run()
+        assertEquals(UploadStage.Rejected, state().state)
+        assertEquals("bad effort", state().message)
+    }
+
+    @Test
+    fun aLongServerTextIsCappedAtFiveHundred() {
+        setUp()
+        ride()
+        save()
+        transport.reply = { FakeTransport.error("a".repeat(800)) }
+        run()
+        assertEquals(500, state().message!!.length)
+    }
+
+    @Test
+    fun theSummaryShowsTheServerTextInFullForQueuedAndStuck() {
+        setUp()
+        ride()
+        val prep = uploads.prepare("ride-1") as Preparation.Ready
+        fun view(st: UploadState) = SummaryStates.of(prep, st, false, clock, ZoneId.of("UTC"))
+        val text = "The script is not allowed to write to Drive: its owner must grant the full drive scope. " +
+            "If running a function that writes to Drive in the editor shows no permission dialog, first remove " +
+            "the script's access at myaccount.google.com/connections (apps-script/README.md, \"Setup\")."
+        val queued = state().copy(state = UploadStage.Queued, lastTryUtc = "2026-11-07T18:30:00Z", lastFailure = Failure.Server, message = text)
+        view(queued).let {
+            assertEquals("Thrive answered with an error · trying again", it.step3Note)
+            assertEquals(
+                listOf("Thrive said: $text", "Last try 6:30 PM. It sends by itself when there's a connection."),
+                it.extraLines,
+            )
+        }
+        view(queued.copy(message = null)).let {
+            assertEquals(listOf("Last try 6:30 PM. It sends by itself when there's a connection."), it.extraLines)
+        }
+        // An offline failure never shows a server's words, even a stale one.
+        view(queued.copy(lastFailure = Failure.Offline)).let {
+            assertEquals(listOf("Last try 6:30 PM. It sends by itself when there's a connection."), it.extraLines)
+        }
+        view(queued.copy(state = UploadStage.Stuck)).let {
+            assertEquals(listOf("Thrive said: $text", "It stopped trying."), it.extraLines)
+        }
+        view(queued.copy(state = UploadStage.Stuck, message = null)).let {
+            assertEquals(listOf("It stopped trying."), it.extraLines)
+        }
+    }
+
     @Test
     fun anyOtherOutcomeResetsTheRunOfServerErrors() {
         setUp()

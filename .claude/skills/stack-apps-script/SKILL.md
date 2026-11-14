@@ -81,7 +81,7 @@ What `/test` cannot verify here, and how the owner proves each after the deploy:
 | Category | The owner proves it by |
 |---|---|
 | The 302 redirect and CORS behaviour | Calling the deployed URL: `curl -L` with `action=` and `key=`, and from a browser a `fetch` POST with a `URLSearchParams` body and no hand-set headers. Every call answers a 302 to `script.googleusercontent.com`; both hops must carry `Access-Control-Allow-Origin: *`. A request that needs a preflight fails, because there is no `doOptions` |
-| Granted scopes | Running, in the editor, a function that uses the service. The editor prompts only for the scopes the function being run uses, so running `doGet` grants nothing new. A call needing an ungranted scope fails with a message naming it |
+| Granted scopes | Running, in the editor, a function that uses the scope itself: a write for a write scope, since a read proves only the read-only one (#917). The editor prompts only for the scopes the function being run uses, so running `doGet` grants nothing new. A call needing an ungranted scope fails with a message naming it. No dialog and still failing means a partial grant: remove the script's access at myaccount.google.com/connections and run it again |
 | Installed triggers | The editor's Triggers page, and the log line the install function writes. A trigger runs the **pushed** code, not a deployment |
 | Script properties | Project Settings → Script Properties. Behaviour is proved by calling an action that reads the property: set answers, unset refuses |
 | Lock contention | Two overlapping calls to an action that takes the script lock: the second waits, and past 30 s answers `Lock timeout` and writes nothing. Read the result in the Executions dashboard |
@@ -132,11 +132,18 @@ third is always the owner's, and a change that needs it parks:
 3. If a scope was added to `appsscript.json`, **re-authorize once**: the editor
    prompts only for the scopes the function being run uses, so signed in as the
    script's owner, open the script (`clasp open-script`), paste a throwaway
-   function that calls the new service (`DriveApp.getRootFolder().getName()`
-   for Drive), save, pick it, **Run** and allow the dialog. The grant belongs
-   to the account and the script, not a deployment, so the live deployment uses
-   it at once and needs no redeploy. Do not use the editor's Deploy button for
-   this, which would publish the throwaway; the next `clasp push` removes it.
+   function that uses the new scope itself, save, pick it, **Run** and allow
+   the dialog. For full `drive` that is a write, such as creating a file in
+   `DriveApp.getRootFolder()` and trashing it: `getRootFolder().getName()` is a
+   read, which `drive.readonly` alone satisfies, so it proves nothing (#917).
+   The grant belongs to the account and the script, not a deployment, so the
+   live deployment uses it at once and needs no redeploy. Do not use the
+   editor's Deploy button for this, which would publish the throwaway; the next
+   `clasp push` removes it. **No dialog, and the call still fails:** the
+   account holds a partial grant and the editor won't prompt over it. Remove
+   the script's access at myaccount.google.com/connections, run the function
+   again and tick every box. The web app and the triggers fail between those
+   two steps, so do them back to back.
 
 Two behaviours to plan around. A **trigger** runs the pushed code at once; the
 **web app** runs only the deployed version. So a change that serves both needs

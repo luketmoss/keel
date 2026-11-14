@@ -30,7 +30,8 @@ the step 3 note stays one short line.
 - A network failure clears it: the card then says "sends when online", and an old server text beside that would
   mislead.
 - Success deletes the ride as today. A refusal writes its own text, as today.
-- "Send now" and "Try again" leave it in place until the next answer replaces or clears it.
+- "Send now" leaves it in place until the next answer replaces or clears it. "Try again" on a `stuck` ride already
+  resets its counters and `last_failure` (#769), and clears it with them, so the card reads as a fresh queue.
 
 ## Edge cases
 

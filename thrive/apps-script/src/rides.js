@@ -44,6 +44,14 @@ var RIDE_ERRORS_SAVE = {
   streamsShape: 'streams is not a thrive-spin-streams v1 file for this ride',
 };
 
+// #917: saveRide writes to Drive, so its permission failure names the full `drive` scope,
+// not getWorkoutPayload's read-only one. The owner's grant can hold drive.readonly
+// without drive, and the editor then shows no dialog, hence the revoke step.
+var DRIVE_WRITE_UNAUTHORIZED =
+  'The script is not allowed to write to Drive: its owner must grant the full drive scope. ' +
+  'If running a function that writes to Drive in the editor shows no permission dialog, first remove ' +
+  'the script\'s access at myaccount.google.com/connections (apps-script/README.md, "Setup").';
+
 var NOT_A_STREAMS_FILE =
   'streams_ref on this workout does not name its ride streams, so nothing was read from it.';
 
@@ -316,7 +324,7 @@ function saveRide(payload, fit, streams) {
       ride.ride_id + '.json',
       Utilities.newBlob(streams, 'application/json', ride.ride_id + '.json'));
   } catch (err) {
-    if (isDrivePermissionError(err)) throw new Error(DRIVE_UNAUTHORIZED);
+    if (isDrivePermissionError(err)) throw new Error(DRIVE_WRITE_UNAUTHORIZED);
     throw err;
   }
 

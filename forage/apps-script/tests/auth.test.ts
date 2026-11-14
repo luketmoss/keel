@@ -149,6 +149,13 @@ describe('#714: a Thrive caller', () => {
     expect(res).toMatchObject({ success: true, data: { days: [] } });
   });
 
+  it('may send by_meal on getFoodLogTotals, as an app token may (#865)', () => {
+    for (const api of [thriveApi(), tokenApi()]) {
+      const res = api.post({ action: 'getFoodLogTotals', access_token: TOKEN, from: '2026-11-01', to: '2026-11-07', by_meal: 'true' });
+      expect(res).toMatchObject({ success: true, data: { days: [] } });
+    }
+  });
+
   it('is refused every other action, the same way an unlisted action is', () => {
     const api = thriveApi();
     const { sandbox } = api;

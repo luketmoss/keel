@@ -28,37 +28,72 @@ function getFoodLog(params) {
  * entries that have it and null when none does, and `unknown: { satfat_g, ...
  * }`, for each the entries with a kcal but not that value. They change none
  * of the fields above, `partial` included.
+ *
+ * #865: `by_meal` (true or "true") adds `meals` to each day, last, one object
+ * per slot with an entry that date, in SLOTS order, with the day's fields
+ * minus `date` and plus `slot`, accumulated by the same functions. The day
+ * stays the sum over its entries, rounded once. Without it nothing changes.
  */
 function getFoodLogTotals(params) {
   var range = dateRange(params);
+  var byMeal = params && (params.by_meal === true || params.by_meal === 'true');
   var byDate = {};
   getFoodLog(params).forEach(function (e) {
-    var day = byDate[e.date] = byDate[e.date] || {
-      date: e.date, entries: 0, unknown_entries: 0,
-      kcal: null, protein_g: null, carbs_g: null, fat_g: null, partial: false,
-    };
-    if (!day.unknown) {
-      EXTRA_NUTRIENTS.forEach(function (x) { day[x.key] = null; });
-      day.unknown = extraNutrientMap(0);
+    var day = byDate[e.date] = byDate[e.date] || newTotals('date', e.date);
+    addToTotals(day, e);
+    if (byMeal) {
+      var meals = day.meals = day.meals || [];
+      var meal = null;
+      meals.forEach(function (m) { if (m.slot === e.slot) meal = m; });
+      if (!meal) meals.push(meal = newTotals('slot', e.slot));
+      addToTotals(meal, e);
     }
-    day.entries++;
-    if (e.kcal === null) day.unknown_entries++;
-    ['kcal', 'protein_g', 'carbs_g', 'fat_g'].forEach(function (f) {
-      if (e[f] !== null) day[f] = (day[f] || 0) + e[f];
-    });
-    if (e.partial || e.kcal === null) day.partial = true;
-    EXTRA_NUTRIENTS.forEach(function (x) {
-      if (e[x.key] !== null) day[x.key] = (day[x.key] || 0) + e[x.key];
-      else if (e.kcal !== null) day.unknown[x.key]++;
-    });
   });
   var days = Object.keys(byDate).sort().map(function (d) {
     var day = byDate[d];
-    ['kcal', 'protein_g', 'carbs_g', 'fat_g'].forEach(function (f) { day[f] = round1(day[f]); });
-    EXTRA_NUTRIENTS.forEach(function (x) { day[x.key] = round1(day[x.key]); });
+    roundTotals(day);
+    if (day.meals) {
+      // SLOTS order; a slot from before a rename is kept, after the known ones, in first-seen order.
+      var seen = day.meals;
+      var known = SLOTS.map(function (s) { return seen.filter(function (m) { return m.slot === s; })[0]; })
+        .filter(function (m) { return m; });
+      var other = seen.filter(function (m) { return SLOTS.indexOf(m.slot) === -1; });
+      day.meals = known.concat(other);
+      day.meals.forEach(roundTotals);
+    }
     return day;
   });
   return { from: range.from || null, to: range.to || null, days: days };
+}
+
+/** An empty accumulator for a day (`date`) or one of its meals (`slot`); both share the rules below (#865). */
+function newTotals(keyName, keyValue) {
+  var t = {};
+  t[keyName] = keyValue;
+  t.entries = 0; t.unknown_entries = 0;
+  t.kcal = null; t.protein_g = null; t.carbs_g = null; t.fat_g = null; t.partial = false;
+  EXTRA_NUTRIENTS.forEach(function (x) { t[x.key] = null; });
+  t.unknown = extraNutrientMap(0);
+  return t;
+}
+
+/** Add one entry: the unknown, partial and sum rules, once, for a day and a meal alike. */
+function addToTotals(t, e) {
+  t.entries++;
+  if (e.kcal === null) t.unknown_entries++;
+  ['kcal', 'protein_g', 'carbs_g', 'fat_g'].forEach(function (f) {
+    if (e[f] !== null) t[f] = (t[f] || 0) + e[f];
+  });
+  if (e.partial || e.kcal === null) t.partial = true;
+  EXTRA_NUTRIENTS.forEach(function (x) {
+    if (e[x.key] !== null) t[x.key] = (t[x.key] || 0) + e[x.key];
+    else if (e.kcal !== null) t.unknown[x.key]++;
+  });
+}
+
+function roundTotals(t) {
+  ['kcal', 'protein_g', 'carbs_g', 'fat_g'].forEach(function (f) { t[f] = round1(t[f]); });
+  EXTRA_NUTRIENTS.forEach(function (x) { t[x.key] = round1(t[x.key]); });
 }
 
 /**

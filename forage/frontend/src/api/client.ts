@@ -86,7 +86,8 @@ export interface ForageApi {
   logFood(entry: RecipeLogEntry): Promise<void>;
   // #712: the food log. Every figure is the API's: entries carry their snapshot, the day its totals.
   getFoodLog(from: string, to: string): Promise<FoodLogEntry[]>;
-  getFoodLogTotals(from: string, to: string): Promise<FoodLogTotals>;
+  /** `byMeal` adds each day's `meals` (#865); without it the request, and the answer, are as before. */
+  getFoodLogTotals(from: string, to: string, byMeal?: boolean): Promise<FoodLogTotals>;
   /** logFood with the app's own id; `dryRun` answers the entry as it would be stored, writing nothing. */
   logEntry(entry: LogEntryInput, dryRun?: boolean): Promise<FoodLogEntry>;
   updateLogEntry(id: string, changes: LogEntryChange, dryRun?: boolean): Promise<FoodLogEntry>;
@@ -203,7 +204,13 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
       await call('logFood', entry);
     },
     getFoodLog: (from, to) => call<FoodLogEntry[]>('getFoodLog', undefined, undefined, { from, to }),
-    getFoodLogTotals: (from, to) => call<FoodLogTotals>('getFoodLogTotals', undefined, undefined, { from, to }),
+    getFoodLogTotals: (from, to, byMeal = false) =>
+      call<FoodLogTotals>(
+        'getFoodLogTotals',
+        undefined,
+        undefined,
+        byMeal ? { from, to, by_meal: 'true' } : { from, to },
+      ),
     logEntry: (entry, dryRun = false) => call<FoodLogEntry>('logFood', dryRun ? { ...entry, dry_run: true } : entry),
     updateLogEntry: (id, changes, dryRun = false) =>
       call<FoodLogEntry>('updateLogEntry', dryRun ? { id, changes, dry_run: true } : { id, changes }),

@@ -61,11 +61,13 @@ retried, carry the tool call's `call_id` so the API logs their rows for `forage_
 | `forage_log_group` | write | `logGroup` | `name` (at most 120 characters), `slot`, `date`, and 1 to 30 `items` (`food_id`, `qty`, `unit`) logged together under a new group with no usual. A dry run by default; `dry_run: false` logs them (#878) |
 | `forage_copy_meal` | write | `getFoodLog`, `copyMeal` | `from_date`, `from_slot`, optional `group_id`, `to_date` (default today), `to_slot` (default the same). Adds a copy of the meal (or one group) after the target meal's entries, nutrition worked out again from the food as it is now; each source group becomes a new group with the same name. Refused for a date after today or an empty meal. `forage_undo` removes exactly the copies (#878) |
 | `forage_group_log` | write | `setLogGroup` | `ids` (1 to 50 entries of one meal) and `group`: `null` ungroups (clears the four group fields, nothing else), `{ name, usual_id? }` groups them under a new group, linking each entry to the usual's line with its food (#878) |
+| `forage_list_combos` | read | `getCombos`, `getFoods` | Food sets the log keeps repeating (#879), none saved: optional `slot` (that meal's combos first), `days` (default 60, today excluded), `limit`. Each has `key`, `name`, `slot`, `meals`, `last_date`, `lines` (a fixed food at its median amount in its most-used unit, or a `pick_one` of foods each with its own amount and a `default`) and `meal_dates`; `stats` counts what each step left (`meals`, `sets`, `kept`, `after_inner`, `joined`, `covered`, `hidden`, `returned`). Combos a usual covers or the owner hid are left out. JSON |
+| `forage_hide_combo` | write | `hideCombo`, `unhideCombos` | `key` hides a combo (adds it to `Config.hidden_combos`). `unhide: true` shows combos again: the `keys` listed, or every hidden one when none are. In MCPChangeLog (`Config`), so `forage_undo` reverts it (#879) |
 | `forage_undo` | write | `getChangeLog`, `undoCall` | No arguments: the last 20 calls. `call_id`: a dry run listing every row it would restore, remove or recreate. `confirm: true`: reverts, all or nothing. Refused when a row changed since, or when a row it would remove is now used elsewhere. `destructiveHint` |
 
 ## Adding a tool
 
-A Forage feature issue (#707 foods, #708 recipes and cooks, #709 plan, #710 trips, #711 walkthroughs, #712 food log, #877 usuals, #878 groups)
+A Forage feature issue (#707 foods, #708 recipes and cooks, #709 plan, #710 trips, #711 walkthroughs, #712 food log, #877 usuals, #878 groups, #879 combos)
 that registers a tool, in the same PR:
 
 1. Registers it in `src/forage/tools.ts`, and adds it to `FORAGE_READ_TOOLS` if it only reads. Anything not in that set

@@ -74,7 +74,7 @@ fields gets the missing header names appended, and one that is not is left
 alone and named.
 Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`; the
 plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
-`apps-script/src/plan.js` (#709); a usual's starting nutrition only in `nutrition.js` (`usualNutrition`, #877); a trip's items, what the meals need, the default choices and the stale-line
+`apps-script/src/plan.js` (#709); a usual's starting nutrition only in `nutrition.js` (`usualNutrition`, #877); combo detection only in `apps-script/src/combos.js` (#879); a trip's items, what the meals need, the default choices and the stale-line
 prune only in `apps-script/src/trips.js` (#718, behind `startTrip`, `setTripItem`, `closeTrip`, `discardTrip`,
 `getTrip`; #719 adds `addToTrip`, `removeTripItem`, `buy`, late meals and the last-buy write on close); and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
@@ -196,6 +196,18 @@ What the columns mean:
   (`ids`, `group`) clears the four fields with `null` (touching nothing else, `updated` included) or puts entries of one meal
   under a new group, matching `usual_line_id` by food when `usual_id` is sent. `deleteLogEntry` takes `ids` (1 to 50, all or
   none). A swap is `updateLogEntry` with a new `food_id`, which keeps the group fields. `getFoodLogTotals` ignores groups.
+- **Combos** (#879, `apps-script/src/combos.js`; the app's token may call all three, Thrive's none). Derived on every read, never stored: `getCombos`
+  (`slot`, `days` = 60, `limit`) finds food sets the log repeats, so a usual can be started from one. It reads FoodLog for the
+  `days` before today (today out), groups food entries (recipes ignored) into meals by date and slot, counts every set of 2 to 5
+  foods (a meal over 12 foods uses its 12 most-logged) by distinct meals, keeps those in 3 or more, drops a set a larger kept set
+  contains in at least 80% as many meals, joins same-size sets of 3 or more foods that differ by one food into one combo with a
+  pick-one, then drops combos one usual covers (every food in one usual's lines or options) and combos whose key is in
+  `Config.hidden_combos`. A combo is `{ key, name, slot, meals, last_date, lines, meal_dates }`: `key` is the sorted fixed food ids
+  joined with `+`, then `|` and the sorted option ids joined with `/`; each food's amount is its median in the unit it was most
+  often logged in; a pick-one's `default` is its option in the most recent meal; `name` uses short names. `stats` counts the
+  meals read, the distinct sets, the sets kept, after dropping inner sets, the combos after joining (`joined`), those covered or
+  hidden, and the number returned (after `limit`). Sorted by meals, then latest, with `slot`'s combos first. `hideCombo` (`key`)
+  and `unhideCombos` (`keys`, or all) edit the JSON array in `Config.hidden_combos`; both are logged for undo (`Config`).
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
 - **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`, `5` since #877's Usuals and UsualLines, `6` since #878's FoodLog group columns), and `ingredient_aliases` (#706): a JSON

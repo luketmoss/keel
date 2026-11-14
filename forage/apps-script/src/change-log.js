@@ -69,6 +69,8 @@ var CHANGE_LOGGED_ACTIONS = {
   deleteCook: ['Cooks'],
   upsertUsual: ['Usuals', 'UsualLines'],
   deleteUsual: ['Usuals', 'UsualLines', 'FoodLog'],
+  hideCombo: ['Config'],
+  unhideCombos: ['Config'],
 };
 
 /** The write actions that are never logged, and why. */

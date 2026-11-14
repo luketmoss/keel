@@ -39,6 +39,10 @@ import {
   reopenRecipe,
 } from './recipes-store';
 import { StarterSheet, starterNotice } from './starter-sheet';
+import { UsualEditor } from './usual-editor';
+import { UsualsList } from './usuals-list';
+import { createUsual, loadUsuals, newUsualRequested, usuals, usualsState } from './usuals-store';
+import { showToast } from '../ui/toast';
 
 interface Props {
   api: ForageApi;
@@ -164,12 +168,25 @@ export function LibraryScreen({ api, empty, icon }: Props) {
   const [doomed, setDoomed] = useState<RecipeSummary | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  /** #887: the usual open in the editor, and whether it opens with the food search up (a new one). */
+  const [editing, setEditing] = useState<{ id: string; search: boolean } | null>(null);
   const section = librarySection.value;
 
   useEffect(() => {
     void loadRecipes(api);
     void loadFoods(api);
+    void loadUsuals(api);
   }, [api]);
+
+  // #887: the header's ＋ New usual.
+  useEffect(() => {
+    if (!newUsualRequested.value) return;
+    newUsualRequested.value = false;
+    createUsual(api).then(
+      (u) => setEditing({ id: u.id, search: true }),
+      () => showToast("Couldn't start a new usual. Try again."),
+    );
+  }, [newUsualRequested.value]);
 
   // #708: log mode's Leave and Close come back to the recipe's sheet.
   useEffect(() => {
@@ -234,111 +251,141 @@ export function LibraryScreen({ api, empty, icon }: Props) {
 
   return (
     <>
-      <div class="segmented" role="group" aria-label="Library">
-        <button
-          type="button"
-          class="segment"
-          aria-pressed={section === 'recipes'}
-          onClick={() => (librarySection.value = 'recipes')}
-        >
-          Recipes ({total})
-        </button>
-        <button
-          type="button"
-          class="segment"
-          aria-pressed={section === 'foods'}
-          onClick={() => (librarySection.value = 'foods')}
-          data-testid="foods-tab"
-        >
-          Foods ({libraryFoods.value.length})
-        </button>
-      </div>
-
-      {section === 'recipes' ? (
+      {editing && section === 'usuals' ? (
+        <UsualEditor
+          key={editing.id}
+          api={api}
+          id={editing.id}
+          openSearch={editing.search}
+          onBack={() => setEditing(null)}
+          onDeleted={() => setEditing(null)}
+        />
+      ) : (
         <>
-          {total >= SEARCH_FROM && (
-            <div class="list-search">
-              <label class="visually-hidden" for="recipe-search">
-                Search recipes
-              </label>
-              <input
-                id="recipe-search"
-                class="field"
-                type="search"
-                placeholder="Search recipes"
-                value={typed}
-                onInput={(e) => setTyped((e.target as HTMLInputElement).value)}
-                data-testid="recipe-search"
-              />
-              <span class="hint" role="status">
-                {recipesSearching.value ? 'Searching…' : ''}
-              </span>
-            </div>
-          )}
-          {total >= SORT_FROM && (
-            <div class="chip-row sort-chips" role="group" aria-label="Sort recipes">
-              {SORTS.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  class="chip"
-                  aria-pressed={recipeSort.value === o.id}
-                  onClick={() => chooseSort(o.id)}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          )}
-          {list.length > 0 ? (
-            <ul class="card recipe-list" aria-label="Recipes">
-              {list.map((r) => (
-                <RecipeRow
-                  key={r.id}
-                  recipe={r}
-                  onOpen={() => setOverlay({ kind: 'nutrition', recipeId: r.id })}
-                  onDelete={() => setDoomed(r)}
-                />
-              ))}
-            </ul>
-          ) : q && recipesState.value === 'ready' ? (
-            <div class="library-status" data-testid="no-match">
-              <p>No recipe matches "{q}".</p>
-              <button type="button" class="text-btn" onClick={clearSearch}>
-                Clear search
-              </button>
-            </div>
-          ) : recipesState.value === 'error' ? null : (
-            empty
-          )}
-          {notice && (
-            <p class="library-status" role="status">
-              {notice}
-            </p>
-          )}
-          {recipesState.value === 'error' && (
-            <div class="library-status danger-text" role="status">
-              <p>Couldn't load your recipes.</p>
-              <button type="button" class="text-btn" onClick={() => void loadRecipes(api)}>
-                Try again
-              </button>
-            </div>
+          <div class="segmented" role="group" aria-label="Library">
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={section === 'foods'}
+              onClick={() => (librarySection.value = 'foods')}
+              data-testid="foods-tab"
+            >
+              Foods ({libraryFoods.value.length})
+            </button>
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={section === 'usuals'}
+              onClick={() => (librarySection.value = 'usuals')}
+              data-testid="usuals-tab"
+            >
+              Usuals{usualsState.value === 'ready' ? ` (${usuals.value.length})` : ''}
+            </button>
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={section === 'recipes'}
+              onClick={() => (librarySection.value = 'recipes')}
+            >
+              Recipes ({total})
+            </button>
+          </div>
+
+          {section === 'recipes' ? (
+            <>
+              {total >= SEARCH_FROM && (
+                <div class="list-search">
+                  <label class="visually-hidden" for="recipe-search">
+                    Search recipes
+                  </label>
+                  <input
+                    id="recipe-search"
+                    class="field"
+                    type="search"
+                    placeholder="Search recipes"
+                    value={typed}
+                    onInput={(e) => setTyped((e.target as HTMLInputElement).value)}
+                    data-testid="recipe-search"
+                  />
+                  <span class="hint" role="status">
+                    {recipesSearching.value ? 'Searching…' : ''}
+                  </span>
+                </div>
+              )}
+              {total >= SORT_FROM && (
+                <div class="chip-row sort-chips" role="group" aria-label="Sort recipes">
+                  {SORTS.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      class="chip"
+                      aria-pressed={recipeSort.value === o.id}
+                      onClick={() => chooseSort(o.id)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {list.length > 0 ? (
+                <ul class="card recipe-list" aria-label="Recipes">
+                  {list.map((r) => (
+                    <RecipeRow
+                      key={r.id}
+                      recipe={r}
+                      onOpen={() => setOverlay({ kind: 'nutrition', recipeId: r.id })}
+                      onDelete={() => setDoomed(r)}
+                    />
+                  ))}
+                </ul>
+              ) : q && recipesState.value === 'ready' ? (
+                <div class="library-status" data-testid="no-match">
+                  <p>No recipe matches "{q}".</p>
+                  <button type="button" class="text-btn" onClick={clearSearch}>
+                    Clear search
+                  </button>
+                </div>
+              ) : recipesState.value === 'error' ? null : (
+                empty
+              )}
+              {notice && (
+                <p class="library-status" role="status">
+                  {notice}
+                </p>
+              )}
+              {recipesState.value === 'error' && (
+                <div class="library-status danger-text" role="status">
+                  <p>Couldn't load your recipes.</p>
+                  <button type="button" class="text-btn" onClick={() => void loadRecipes(api)}>
+                    Try again
+                  </button>
+                </div>
+              )}
+            </>
+          ) : section === 'usuals' ? (
+            <UsualsList
+              onOpen={(id) => setEditing({ id, search: false })}
+              onRetry={() => {
+                usualsState.value = 'loading';
+                void loadUsuals(api);
+              }}
+            />
+          ) : (
+            <FoodsList
+              icon={icon}
+              onOpen={(id) => setOverlay({ kind: 'food', id })}
+              onAddNamed={(name) =>
+                setOverlay({ kind: 'form', food: { kind: 'ingredient', name }, origin: { fromLabel: true } })
+              }
+              onAddStarter={() => setOverlay({ kind: 'starter', all: true })}
+              onAddFood={() => setOverlay({ kind: 'add' })}
+              onRetry={() => {
+                foodsState.value = 'loading';
+                void loadFoods(api);
+              }}
+            />
           )}
         </>
-      ) : (
-        <FoodsList
-          icon={icon}
-          onOpen={(id) => setOverlay({ kind: 'food', id })}
-          onAddNamed={(name) =>
-            setOverlay({ kind: 'form', food: { kind: 'ingredient', name }, origin: { fromLabel: true } })
-          }
-          onAddStarter={() => setOverlay({ kind: 'starter', all: true })}
-          onAddFood={() => setOverlay({ kind: 'add' })}
-          onRetry={() => {
-            foodsState.value = 'loading';
-            void loadFoods(api);
-          }}
-        />
       )}
 
       {doomed && (

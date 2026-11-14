@@ -8,6 +8,7 @@ import { ImportSheet } from '../import/import-sheet';
 import { ReviewScreen } from '../import/review-screen';
 import { review } from '../import/review-state';
 import { addFoodRequested, librarySection } from '../library/foods-store';
+import { newUsualRequested } from '../library/usuals-store';
 import { LibraryScreen } from '../library/library-screen';
 import { PlanScreen } from '../plan/plan-screen';
 import { planMealRequested } from '../plan/plan-store';
@@ -97,6 +98,16 @@ export function Shell() {
               data-testid="add-food-btn"
             >
               Add food
+            </button>
+          )}
+          {tab.id === 'library' && librarySection.value === 'usuals' && (
+            <button
+              type="button"
+              class="btn btn-primary"
+              onClick={() => (newUsualRequested.value = true)}
+              data-testid="new-usual-btn"
+            >
+              ＋ New usual
             </button>
           )}
           <AccountMenu />

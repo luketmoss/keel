@@ -1,8 +1,11 @@
+import { useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import type { Food, FoodLogEntry } from '../api/types';
 import { gramsPer, fractionQty, stepQty, switchUnit, unitOptions, maxQty, minQty } from './amount-edit';
 import { afterEditor, closeEditor, editing, openEditor, setDraft } from './eaten-store';
 import { amountLine, servings, wholeKcal } from './format';
+import { ServingPanel } from './serving-panel';
+import { vagueServing } from './serving-edit';
 
 /** What makes a row's amount editable in place (#882): the API, and the food (null for a recipe's entry). */
 export interface RowEditing {
@@ -126,6 +129,7 @@ function AmountEditor({
   food: Food | null;
 }) {
   const edit = editing.value!;
+  const [adding, setAdding] = useState(false);
   const options = unitOptions(entry, food);
   const per = gramsPer(options, edit.unit);
   const recipe = !food;
@@ -193,7 +197,34 @@ function AmountEditor({
               {o.label}
             </button>
           ))}
+          <button
+            type="button"
+            class="chip chip-add"
+            aria-expanded={adding}
+            disabled={edit.busy}
+            onClick={() => setAdding(!adding)}
+            data-testid="add-serving"
+          >
+            ＋ Serving
+          </button>
         </div>
+      )}
+      {food && !adding && vagueServing(food) && (
+        <p class="hint serving-vague" data-testid="vague-serving">
+          “serving” isn't a real amount.{' '}
+          <button type="button" class="text-btn" onClick={() => setAdding(true)} data-testid="say-what">
+            Say what it is
+          </button>
+        </p>
+      )}
+      {food && adding && (
+        <ServingPanel
+          api={api}
+          food={food}
+          foodName={food.name}
+          from={() => options.find((o) => o.unit === editing.value?.unit)}
+          onAdded={() => setAdding(false)}
+        />
       )}
       {edit.error && (
         <p class="danger-text field-error" role="status" data-testid="editor-error">

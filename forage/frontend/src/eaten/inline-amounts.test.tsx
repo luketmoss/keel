@@ -264,6 +264,7 @@ describe('the inline editor', () => {
       'tbsp (14 g)',
       'tsp (4.6 g)',
       'grams',
+      '＋ Serving',
     ]);
     expect(within(pills).getByRole('button', { name: 'tbsp (14 g)' }).getAttribute('aria-pressed')).toBe('true');
 
@@ -386,6 +387,7 @@ describe('the inline editor', () => {
       'serving (32 g)',
       'cup (245 g)',
       'grams',
+      '＋ Serving',
     ]);
     expect(within(pills).getByRole('button', { name: 'serving (32 g)' }).getAttribute('aria-pressed')).toBe('true');
     press(row, 'cup (245 g)');

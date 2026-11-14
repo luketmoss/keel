@@ -6,6 +6,7 @@ import { quietGate } from '../api/quiet-gate';
 import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSummary } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
+import { switchUnit, type UnitOption } from './amount-edit';
 
 export type DayState = 'loading' | 'ready' | 'error';
 
@@ -110,6 +111,47 @@ export function closeEditor(api: ForageApi): Promise<boolean> {
     try {
       upsertEntry(await api.updateLogEntry(e.id, changes));
       editing.value = null;
+      void refreshDay(api);
+      return true;
+    } catch {
+      const now = editing.value;
+      if (now) editing.value = { ...now, busy: false, error: true };
+      return false;
+    } finally {
+      saving = null;
+    }
+  })();
+  return saving;
+}
+
+/**
+ * Move the open editor to another unit at the same weight and save it (#883), after a serving was added to the food:
+ * the entry as the write answered it replaces the row's, and the editor stays open on it. Resolves false when the
+ * save failed, which leaves the editor open on the new unit with its error, so Done tries again.
+ */
+export function switchEditorTo(api: ForageApi, from: UnitOption | undefined, to: UnitOption): Promise<boolean> {
+  const e = editing.value;
+  if (!e) return Promise.resolve(true);
+  if (saving) return saving;
+  stopPreview();
+  const qty = switchUnit(e.qty, from, to);
+  editing.value = { ...e, qty, unit: to.unit, preview: null, busy: true, error: false };
+  saving = (async () => {
+    try {
+      const entry = await api.updateLogEntry(e.id, { qty, unit: to.unit });
+      upsertEntry(entry);
+      const now = editing.value;
+      if (now && now.id === e.id) {
+        editing.value = {
+          ...now,
+          base: { qty: entry.qty, unit: entry.unit },
+          qty: entry.qty,
+          unit: entry.unit,
+          preview: null,
+          busy: false,
+          error: false,
+        };
+      }
       void refreshDay(api);
       return true;
     } catch {

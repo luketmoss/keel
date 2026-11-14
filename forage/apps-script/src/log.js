@@ -158,7 +158,16 @@ var SNAPSHOT_FIELDS = [
   'satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g',
 ];
 
-function writeLogEntry(existing, fields, id, caller, dryRun) {
+var GROUP_FIELDS = ['group_id', 'group_name', 'usual_id', 'usual_line_id'];
+
+/**
+ * `opts` (#878, both optional): `group`, the four group fields a new entry
+ * starts with (an existing entry keeps its own, whatever an edit says), and
+ * `from`, an entry this one is a copy of, whose stored grams per unit stand in
+ * for a serving the food has since renamed (#880's rule, for copyMeal).
+ */
+function writeLogEntry(existing, fields, id, caller, dryRun, opts) {
+  opts = opts || {};
   var entry = {
     id: id,
     date: validateDate('date', fields.date),
@@ -178,7 +187,7 @@ function writeLogEntry(existing, fields, id, caller, dryRun) {
     if (!food) throw new Error('food_id "' + entry.food_id + '" is not a food');
     if (!entry.unit) throw new Error('unit is required: one of the food\'s servings, or g');
     snapshot = existing && sameAmount(existing, entry) ? existing
-      : foodEntryNutrition(food, entry.qty, entry.unit, keptGramsPerUnit(existing, entry));
+      : foodEntryNutrition(food, entry.qty, entry.unit, keptGramsPerUnit(existing || opts.from, entry));
   } else {
     var recipe = getRecord('Recipes', { id: entry.recipe_id });
     if (!recipe) throw new Error('recipe_id "' + entry.recipe_id + '" is not a recipe');
@@ -193,6 +202,7 @@ function writeLogEntry(existing, fields, id, caller, dryRun) {
   }
 
   SNAPSHOT_FIELDS.forEach(function (f) { entry[f] = snapshot[f]; });
+  GROUP_FIELDS.forEach(function (f) { entry[f] = existing ? cell(existing[f]) : cell(opts.group && opts.group[f]); });
   entry.source = existing ? existing.source : callerSource(caller);
   var now = isoNow();
   entry.logged_at = existing ? existing.logged_at : now;
@@ -202,10 +212,36 @@ function writeLogEntry(existing, fields, id, caller, dryRun) {
   return upsertRecord('FoodLog', entry);
 }
 
+/**
+ * Payload `{ id }`, or `{ ids: [...] }` (1 to 50, #878): all or none, so one
+ * that does not exist is refused, naming it, and nothing is deleted.
+ */
 function deleteLogEntry(payload) {
+  if (payload && has(payload, 'ids') && payload.ids !== undefined && payload.ids !== null) {
+    var ids = logEntryIds(payload.ids);
+    var found = {};
+    listRecords('FoodLog', function (e) { return ids.indexOf(e.id) !== -1; }).forEach(function (e) { found[e.id] = true; });
+    var missing = ids.filter(function (i) { return !found[i]; });
+    if (missing.length) {
+      throw new Error((missing.length === 1 ? 'Log entry "' + missing[0] + '" not found'
+        : 'Log entries not found: ' + missing.join(', ')) + '. Nothing was deleted');
+    }
+    deleteRecordsWhere('FoodLog', function (e) { return ids.indexOf(e.id) !== -1; });
+    return { ids: ids, deleted: true };
+  }
   var id = requireString('id', payload && payload.id);
   if (!deleteRecord('FoodLog', { id: id })) throw new Error('Log entry "' + id + '" not found');
   return { id: id, deleted: true };
+}
+
+var MAX_LOG_IDS = 50;
+
+/** `ids` checked: a list of 1 to 50 entry ids, repeats dropped. */
+function logEntryIds(raw) {
+  if (!Array.isArray(raw)) throw new Error('ids must be a list');
+  var ids = unique(raw.map(function (i) { return requireString('ids', cell(i).trim()); }));
+  if (ids.length < 1 || ids.length > MAX_LOG_IDS) throw new Error('ids must have 1 to ' + MAX_LOG_IDS + ' entries, not ' + ids.length);
+  return ids;
 }
 
 /** `app` for the app's token, `mcp` for the key. */

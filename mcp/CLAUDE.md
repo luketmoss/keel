@@ -81,7 +81,7 @@ disjoint and together are exactly the app's tools.
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 4 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 5 write tools | **off** |
 | `Forage` | `<PUBLIC_URL>/forage/mcp` | the 11 read tools | on |
-| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 26 write tools | **off** |
+| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 30 write tools | **off** |
 
 **The write connectors are off unless you are writing.** claude.ai remembers the
 toggle across chats, so turning `Thrive (write)` on to log a session leaves it on
@@ -335,9 +335,9 @@ and `forage_import_recipe`, `forage_add_food`, `forage_update_food`, `forage_del
 `forage_log_cook`, `forage_rate_cook`, `forage_delete_recipe`, `forage_plan_meal`, `forage_move_meal`,
 `forage_remove_meal`, `forage_plan_week`, `forage_start_trip`, `forage_set_trip_item`, `forage_close_trip`,
 `forage_discard_trip`, `forage_add_to_trip`, `forage_remove_from_trip`, `forage_set_walkthrough`,
-`forage_delete_walkthrough`, `forage_log_food`, `forage_update_log`, `forage_delete_log`, `forage_save_usual`, `forage_delete_usual` and `forage_undo` (write); the
+`forage_delete_walkthrough`, `forage_log_food`, `forage_update_log`, `forage_delete_log`, `forage_save_usual`, `forage_delete_usual`, `forage_log_usual`, `forage_log_group`, `forage_copy_meal`, `forage_group_log` and `forage_undo` (write); the
 food tools are #707's, the recipe and cook tools #708's, the plan tools #709's, the trip tools #718's and #719's, the
-walkthrough tools #711's, the food log tools #712's and the usual tools #877's. Every `main.js` action now has a tool or a `NO_TOOL` reason; the
+walkthrough tools #711's, the food log tools #712's, the usual tools #877's and the log group, usual-logging and meal-copy tools #878's (`forage_delete_log` also takes `ids`, 1 to 50, all or none). Every `main.js` action now has a tool or a `NO_TOOL` reason; the
 table of every tool, and how to add one, is `docs/forage-tools.md`. Wording:
 [`docs/design/713-forage-connectors.md`](docs/design/713-forage-connectors.md). Secrets: `FORAGE_API_URL` and
 `FORAGE_API_KEY`, the Forage Apps Script's `API_KEY` (#703); the app never holds it, only this Worker and the

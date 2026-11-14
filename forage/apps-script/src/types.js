@@ -14,7 +14,7 @@ var TIMEZONE = 'America/Denver';
 /** A `payload` longer than this is refused, which keeps a cell under Sheets' 50,000 limit. */
 var MAX_PAYLOAD_CHARS = 45000;
 
-var SCHEMA_VERSION = '5';
+var SCHEMA_VERSION = '6';
 
 var FOOD_FIELDS = [
   'id', 'name', 'kind', 'brand', 'category',
@@ -52,6 +52,9 @@ var FOOD_LOG_FIELDS = [
   'kcal', 'protein_g', 'carbs_g', 'fat_g', 'partial', 'source', 'logged_at', 'created', 'updated',
   // #755: the seven in the snapshot.
   'satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g',
+  // #878: entries added together share a group (`group_id`, with its heading `group_name`); `usual_id` and
+  // `usual_line_id` say which usual, and which of its lines, an entry came from. All four blank when ungrouped.
+  'group_id', 'group_name', 'usual_id', 'usual_line_id',
 ];
 
 /** #877: a usual, and its lines. A line is Always (food, qty, unit) or a pick-one (`options_json`). */
@@ -124,7 +127,7 @@ var TAB_ORDER = [
 ];
 
 /** The prefix an API-made id gets, by entity. */
-var ID_PREFIXES = { food: 'fd', recipe: 'rc', plan: 'pl', trip: 'tr', log: 'lg', cook: 'ck', usual: 'us' };
+var ID_PREFIXES = { food: 'fd', recipe: 'rc', plan: 'pl', trip: 'tr', log: 'lg', cook: 'ck', usual: 'us', group: 'gr' };
 
 var FOOD_KINDS = ['ingredient', 'packaged'];
 var STORES = ['ks', 'costco', 'other'];

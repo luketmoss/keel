@@ -11,9 +11,8 @@
 // `line_id` (L1, L2...) is stable for the life of the usual: a replace keeps
 // the ids sent and numbers new lines after the highest the usual has used.
 //
-// Logging a usual, groups and the log's `usual_id` columns are #878's. Until
-// they exist `used_count` is 0 and `last_used` null; deleting a usual then has
-// no FoodLog rows to unlink, and #878 adds that to `deleteUsual` with the columns.
+// Logging a usual and groups are in groups.js (#878). `used_count`, `last_used`
+// and each line's `swaps` are read from the FoodLog rows that carry its `usual_id`.
 
 var MAX_USUAL_NAME = 120;
 var MIN_USUAL_OPTIONS = 2;
@@ -49,7 +48,7 @@ function getUsual(id) {
   return usualShape(usual, lines, foodsById(), usualUses()[usual.id]);
 }
 
-/** A usual as the API answers it. `use` is `{ count, last }` or undefined. */
+/** A usual as the API answers it. `use` is `{ count, last, foods }` or undefined. */
 function usualShape(usual, lines, foods, use) {
   var out = {
     id: usual.id,
@@ -67,6 +66,7 @@ function usualShape(usual, lines, foods, use) {
         unit: l.unit,
         options: options,
         last_pick: l.last_pick,
+        swaps: swapsFor(usual.id, l, options, use),
       };
     }),
     used_count: use ? use.count : 0,
@@ -77,24 +77,45 @@ function usualShape(usual, lines, foods, use) {
 }
 
 /**
- * How often each usual was logged, from FoodLog rows with its `usual_id`: by
- * usual id, `{ count, last }`, count being the distinct date and meal pairs it
- * was logged to. The column arrives in #878; without it nothing was used.
+ * How each usual was used, from FoodLog rows with its `usual_id`: by usual id,
+ * `{ count, last, foods }`. `count` is the distinct groups it was logged as
+ * (an entry with no group counts by its date and meal), `last` the latest
+ * date, and `foods` the entries logged per line, `{ <line_id>: { <food_id>:
+ * n } }`, for the swaps.
  */
 function usualUses() {
   var out = {};
-  if (FOOD_LOG_FIELDS.indexOf('usual_id') === -1) return out;
   var seen = {};
   listRecords('FoodLog', function (l) { return !!l.usual_id; }).forEach(function (l) {
-    var use = out[l.usual_id] = out[l.usual_id] || { count: 0, last: null };
-    var key = l.usual_id + '|' + l.date + '|' + l.slot;
+    var use = out[l.usual_id] = out[l.usual_id] || { count: 0, last: null, foods: {} };
+    var key = l.usual_id + '|' + (l.group_id || l.date + '|' + l.slot);
     if (!seen[key]) {
       seen[key] = true;
       use.count++;
     }
     if (use.last === null || l.date > use.last) use.last = l.date;
+    if (l.usual_line_id && l.food_id) {
+      var line = use.foods[l.usual_line_id] = use.foods[l.usual_line_id] || {};
+      line[l.food_id] = (line[l.food_id] || 0) + 1;
+    }
   });
   return out;
+}
+
+/**
+ * The foods that replaced a line in the log, `[{ food_id, count }]`, most
+ * first: entries logged for it whose food is neither its food nor one of its
+ * options as they stand now.
+ */
+function swapsFor(usualId, line, options, use) {
+  var logged = use && use.foods[line.line_id];
+  if (!logged) return [];
+  var own = {};
+  if (line.food_id) own[line.food_id] = true;
+  (options || []).forEach(function (o) { own[o.food_id] = true; });
+  return Object.keys(logged).filter(function (f) { return !own[f]; })
+    .map(function (f) { return { food_id: f, count: logged[f] }; })
+    .sort(function (a, b) { return b.count - a.count || a.food_id.localeCompare(b.food_id); });
 }
 
 /** The usuals whose lines or options name the food, as `{ id, name }`, sorted by name. */
@@ -247,12 +268,16 @@ function numberUsualLines(lines, usualId) {
 
 /**
  * Delete a usual and its lines. Logged entries that came from it stay, with
- * their group (#878 clears their `usual_id` once the column exists).
+ * their group; their `usual_id` and `usual_line_id` are cleared (#878).
  */
 function deleteUsual(payload) {
   var id = requireString('id', payload && payload.id);
   if (!getRecord('Usuals', { id: id })) throw new Error('Usual "' + id + '" not found');
   return withScriptLock(function () {
+    updateRecordsWhere('FoodLog', function (e) { return e.usual_id === id; }, function (e) {
+      e.usual_id = '';
+      e.usual_line_id = '';
+    });
     deleteRecordsWhere('UsualLines', function (l) { return l.usual_id === id; });
     deleteRecord('Usuals', { id: id });
     return { id: id, deleted: true };

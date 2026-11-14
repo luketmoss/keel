@@ -160,6 +160,11 @@ function dispatch(action, params, caller) {
     case 'logFood': return write(function (p) { return logFood(p, caller); });
     case 'updateLogEntry': return write(function (p) { return updateLogEntry(p, caller); });
     case 'deleteLogEntry': return write(deleteLogEntry);
+    // Groups, usuals logged, meal copy (#878)
+    case 'logUsual': return write(function (p) { return logUsual(p, caller); });
+    case 'logGroup': return write(function (p) { return logGroup(p, caller); });
+    case 'copyMeal': return write(function (p) { return copyMeal(p, caller); });
+    case 'setLogGroup': return write(setLogGroup);
     // Usuals (#877)
     case 'getUsuals': return getUsuals(params);
     case 'getUsual': return getUsual(params.id);

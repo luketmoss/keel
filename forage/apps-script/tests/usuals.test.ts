@@ -49,7 +49,7 @@ function loaded() {
 }
 
 describe('ensureSchema (AC 1)', () => {
-  it('on a Sheet at version 4 creates Usuals and UsualLines, sets version 5, and a second run changes nothing', () => {
+  it('on a Sheet at version 4 creates Usuals and UsualLines, sets version 6, and a second run changes nothing', () => {
     const api = loadApi({ empty: true });
     api.ok('ensureSchema');
     api.ss.sheets.delete('Usuals');
@@ -57,7 +57,7 @@ describe('ensureSchema (AC 1)', () => {
     api.ok('setConfig', { payload: { key: 'schema_version', value: '4' } });
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(['Usuals', 'UsualLines']);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
     expect(api.ss.getSheetByName('Usuals')!.rows).toEqual([['id', 'name', 'slot', 'created', 'updated']]);
     expect(api.ss.getSheetByName('UsualLines')!.rows).toEqual([
       ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick'],
@@ -264,19 +264,15 @@ describe('getUsuals (AC 6, 7)', () => {
     expect(loaded().call('getUsual', { id: 'us_nope' }).error).toMatch(/Usual "us_nope" not found/);
   });
 
-  it('counts uses from FoodLog rows with a usual_id once the column exists, most recent first', () => {
+  it('counts uses from FoodLog rows with a usual_id, by group, most recent first', () => {
     const api = loaded();
     const a = api.ok('upsertUsual', { payload: { ...OATMEAL, name: 'A' } });
     const b = api.ok('upsertUsual', { payload: { ...OATMEAL, name: 'B' } });
-    api.sandbox.FOOD_LOG_FIELDS.push('usual_id');
-    api.sandbox.TABS.FoodLog.fields.push('usual_id');
-    const log = api.ss.getSheetByName('FoodLog')!;
-    log.rows[0].push('usual_id');
-    const cols = api.sandbox.TABS.FoodLog.fields as string[];
-    const row = (id: string, date: string, slot: string, usual: string) =>
-      cols.map((c) => ({ id, date, slot, food_id: 'fd_oats', usual_id: usual })[c as 'id'] ?? '');
-    log.rows.push(row('lg_1', '2026-11-01', 'Breakfast', b.id), row('lg_2', '2026-11-01', 'Breakfast', b.id));
-    log.rows.push(row('lg_3', '2026-11-03', 'Breakfast', b.id), row('lg_4', '2026-11-02', 'Breakfast', a.id));
+    const log = (usual: any, date: string) =>
+      api.ok('logUsual', { payload: { usual_id: usual.id, date, slot: 'Breakfast' } });
+    log(b, '2026-11-01');
+    log(b, '2026-11-03');
+    log(a, '2026-11-02');
     const list = api.ok('getUsuals');
     expect(list.map((u: any) => [u.name, u.used_count, u.last_used])).toEqual([
       ['B', 2, '2026-11-03'],
@@ -286,7 +282,7 @@ describe('getUsuals (AC 6, 7)', () => {
 });
 
 describe('deleteUsual (AC 8)', () => {
-  it('removes the usual and its lines and leaves every FoodLog row', () => {
+  it('removes the usual and its lines and leaves every FoodLog row it was not logged from', () => {
     const api = loaded();
     const usual = api.ok('upsertUsual', { payload: OATMEAL });
     api.ok('logFood', { payload: { date: '2026-11-01', slot: 'Breakfast', food_id: 'fd_oats', qty: 0.5, unit: 'cup', dry_run: false } });

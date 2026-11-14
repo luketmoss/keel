@@ -95,7 +95,7 @@ the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
 | **Plan** | `id` | id, date, slot, recipe_id, note, trip_id, created, updated |
 | **Trips** | `id` | id, status, through, created, closed_at |
 | **TripItems** | `trip_id` + `food_id` | trip_id, food_id, lines_json, mine, choice, suggested, buy, bought |
-| **FoodLog** | `id` | id, date, slot, food_id, recipe_id, qty, unit, grams, kcal, protein_g, carbs_g, fat_g, partial, source, logged_at, created, updated, satfat_g, transfat_g, cholesterol_mg, sodium_mg, fiber_g, sugars_g, added_sugars_g |
+| **FoodLog** | `id` | id, date, slot, food_id, recipe_id, qty, unit, grams, kcal, protein_g, carbs_g, fat_g, partial, source, logged_at, created, updated, satfat_g, transfat_g, cholesterol_mg, sodium_mg, fiber_g, sugars_g, added_sugars_g, group_id, group_name, usual_id, usual_line_id |
 | **Cooks** | `id` | id, recipe_id, date, rating, note, plan_id, created |
 | **Config** | `key` | key, value, updated |
 | **MCPChangeLog** | — | logged_at, call_id, action, tab, row_key, before, after |
@@ -184,9 +184,21 @@ What the columns mean:
   and a day's totals sum each over the lines or entries that have it (null when
   none does) and count the rest in `per_serving_unknown` / `unknown`; none of
   the seven makes anything partial.
+- **Groups** (#878, `apps-script/src/groups.js`; the app's token may call all four, Thrive's none). FoodLog's last four columns:
+  `group_id` (`gr_` + 8 hex, shared by entries added together), `group_name` (the heading), `usual_id` and `usual_line_id` (the
+  usual, and which of its lines, an entry came from). All four are blank on an ungrouped entry and on every row from before; there
+  is no Groups tab, a group is only its entries. `logUsual` (`usual_id`, `date`, `slot`, `picks`, `dry_run`) writes one entry per
+  line in position order under a new group named for the usual, a pick-one logging the pick, else `last_pick`, else the first
+  option, at that option's own amount, and setting `last_pick`; `logGroup` (`date`, `slot`, `name` up to 120, 1 to 30 `items`)
+  groups foods with no usual; both answer `{ entries, group_id }`. `copyMeal` copies a meal, or one group, after the target meal's
+  entries, computing nutrition again from the food or recipe as it is now (#880's rule for a renamed serving), each source group
+  becoming a new group with the same name, usual and line; refused for a `to_date` after today or an empty source. `setLogGroup`
+  (`ids`, `group`) clears the four fields with `null` (touching nothing else, `updated` included) or puts entries of one meal
+  under a new group, matching `usual_line_id` by food when `usual_id` is sent. `deleteLogEntry` takes `ids` (1 to 50, all or
+  none). A swap is `updateLogEntry` with a new `food_id`, which keeps the group fields. `getFoodLogTotals` ignores groups.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`, `5` since #877's Usuals and UsualLines), and `ingredient_aliases` (#706): a JSON
+- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`, `5` since #877's Usuals and UsualLines, `6` since #878's FoodLog group columns), and `ingredient_aliases` (#706): a JSON
   object from a normalised ingredient name to the `food_id` a saved import
   matched it to. Later issues add keys here, not tabs.
 - **Usuals** (#877). A meal eaten on repeat with a part that may vary, in `apps-script/src/usuals.js`
@@ -196,9 +208,10 @@ What the columns mean:
   `options_json`; a **pick-one** has those three blank and `options_json` set, `[{"food_id","qty","unit"}]` of 2 to 12 distinct
   foods, each with its own amount, and `last_pick` is the food id of the option picked last (blank is the first). A `unit` is
   one of the food's serving names exactly, or `g`; `qty` is over 0. Reads add `start` (nutrition as it starts, from
-  `usualNutrition`), `used_count` and `last_used` (0 and null until #878's FoodLog `usual_id`). A usual's foods cannot be
-  deleted (`deleteFood` names the usual). `deleteUsual` leaves FoodLog rows alone; #878 clears their `usual_id` and
-  `usual_line_id` when it adds the columns. Logged for undo (`Usuals`, `UsualLines`).
+  `usualNutrition`), `used_count` (distinct groups logged from it), `last_used` and, per line, `swaps` (#878: `[{food_id, count}]`, the foods logged
+  for that line that are neither its food nor one of its options, most first). A usual's foods cannot be
+  deleted (`deleteFood` names the usual). `deleteUsual` keeps logged entries and their group and clears their `usual_id` and
+  `usual_line_id` (#878). Logged for undo (`Usuals`, `UsualLines`, and `FoodLog` for that clearing).
 - **MCPChangeLog** (#713). One row per sheet row a key-caller write created,
   changed or deleted: `row_key` is its key fields as JSON, `before` and `after`
   the whole row (field to display text), blank for a row that did not exist.

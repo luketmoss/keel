@@ -208,7 +208,7 @@ describe('the food log: the seven', () => {
     for (const k of SEVEN) expect(dry[k], k).toEqual(entry[k]);
     // The sheet holds the blank as blank.
     const row = api.rows('FoodLog')[0];
-    expect(row.slice(17)).toEqual(['', '', '', '4.5', '6', '', '']);
+    expect(row.slice(17, 24)).toEqual(['', '', '', '4.5', '6', '', '']);
   });
 
   it('a food with no nutrition logs the seven blank', () => {

@@ -65,11 +65,11 @@ function parityProblems(actions: string[], called: string[]): string[] {
 describe('MCP parity: every action has a tool, or a reason, or an owner', () => {
   it('finds the Worker\'s Forage tools', () => {
     expect(workerActions()).toEqual([
-      'addStarterFoods', 'addToTrip', 'closeTrip', 'deleteFood', 'deleteLogEntry', 'deletePlanEntry', 'deleteRecipe', 'deleteUsual', 'deleteWalkthrough',
-      'discardTrip', 'getChangeLog', 'getConfig', 'getCooks', 'getFood', 'getFoodLog', 'getFoodLogTotals', 'getFoods', 'getPlan', 'getRecipe',
-      'getRecipes', 'getStarterFoods', 'getTrip', 'getTrips', 'getUsual', 'getUsuals', 'importRecipe', 'logFood', 'lookupBarcode', 'movePlanEntry', 'planWeek',
-      'removeTripItem', 'setFoodWeight', 'setTripItem', 'setWalkthrough', 'startTrip', 'undoCall', 'updateLogEntry', 'upsertCook', 'upsertFood',
-      'upsertPlanEntry', 'upsertRecipe', 'upsertUsual',
+      'addStarterFoods', 'addToTrip', 'closeTrip', 'copyMeal', 'deleteFood', 'deleteLogEntry', 'deletePlanEntry', 'deleteRecipe', 'deleteUsual',
+      'deleteWalkthrough', 'discardTrip', 'getChangeLog', 'getConfig', 'getCooks', 'getFood', 'getFoodLog', 'getFoodLogTotals', 'getFoods', 'getPlan',
+      'getRecipe', 'getRecipes', 'getStarterFoods', 'getTrip', 'getTrips', 'getUsual', 'getUsuals', 'importRecipe', 'logFood', 'logGroup', 'logUsual',
+      'lookupBarcode', 'movePlanEntry', 'planWeek', 'removeTripItem', 'setFoodWeight', 'setLogGroup', 'setTripItem', 'setWalkthrough', 'startTrip',
+      'undoCall', 'updateLogEntry', 'upsertCook', 'upsertFood', 'upsertPlanEntry', 'upsertRecipe', 'upsertUsual',
     ]);
   });
 

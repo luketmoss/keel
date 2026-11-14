@@ -1,0 +1,790 @@
+<title>Food Trends Split</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: notes column on the left, one live phone on the right (sticky); stacks at phone width.
+   Two apps in one phone: Forage tokens (green) and Thrive tokens (cobalt), each scoped to its frame.
+   Example data only: every figure is synthetic. */
+:root {
+  --page: #e7eae6; --ink: #24302a; --note: #4c5a52; --tag: #dfe9df; --rule: #cfd6cf;
+  --bg: #f0f2f5; --surface: #ffffff; --raised: #ffffff; --border: #dadce0; --hair: #e8eaed;
+  --text: #1f1f1f; --text2: #5f6368; --muted: #606b76; --track: rgba(0,0,0,.08); --shadow: rgba(0,0,0,.15);
+  --fo-primary: #357a38; --fo-primary-light: #e6f2e6; --fo-on: #fff;
+  --th-primary: #2f66f0; --th-primary-light: #e3ebff; --th-on: #fff;
+  --kcal: #357a38; --protein: #2b6cb0; --carbs: #b87400; --fat: #6b2e68;
+  --food: #b0473f; --hrv: #00796b; --load: #b54708; --weight: #5b5fc7; --shade: rgba(47,102,240,.09);
+  --m1: #c98500; --m2: #4c9a52; --m3: #2f6f8f; --m4: #7a4b9a; --m5: #b4544a;
+  --warn: #a05d00; --warn-light: #fff4dc;
+  --f-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-head: "Space Grotesk", var(--f-ui);
+  --f-body: "Inter", var(--f-ui);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #161917; --ink: #e3e8e4; --note: #a9b4ad; --tag: #233024; --rule: #2c332e;
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --hair: #25252b;
+  --text: #e8eaed; --text2: #9aa0a6; --muted: #868e98; --track: rgba(255,255,255,.1); --shadow: rgba(0,0,0,.4);
+  --fo-primary: #66bb6a; --fo-primary-light: #1e3320; --fo-on: #121212;
+  --th-primary: #6e97ff; --th-primary-light: #1b2540; --th-on: #121212;
+  --kcal: #66bb6a; --protein: #6fa8e8; --carbs: #f0b429; --fat: #c27cbe;
+  --food: #f08a7e; --hrv: #4fd1c5; --load: #ff9a5c; --weight: #a5a8ff; --shade: rgba(110,151,255,.13);
+  --m1: #f0b429; --m2: #7fc785; --m3: #6fb3d6; --m4: #b98be0; --m5: #f08a7e;
+  --warn: #ffb74d; --warn-light: #2d2210; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --page: #161917; --ink: #e3e8e4; --note: #a9b4ad; --tag: #233024; --rule: #2c332e;
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --hair: #25252b;
+  --text: #e8eaed; --text2: #9aa0a6; --muted: #868e98; --track: rgba(255,255,255,.1); --shadow: rgba(0,0,0,.4);
+  --fo-primary: #66bb6a; --fo-primary-light: #1e3320; --fo-on: #121212;
+  --th-primary: #6e97ff; --th-primary-light: #1b2540; --th-on: #121212;
+  --kcal: #66bb6a; --protein: #6fa8e8; --carbs: #f0b429; --fat: #c27cbe;
+  --food: #f08a7e; --hrv: #4fd1c5; --load: #ff9a5c; --weight: #a5a8ff; --shade: rgba(110,151,255,.13);
+  --m1: #f0b429; --m2: #7fc785; --m3: #6fb3d6; --m4: #b98be0; --m5: #f08a7e;
+  --warn: #ffb74d; --warn-light: #2d2210; color-scheme: dark; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+.wrap { max-width: 1140px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 40px; align-items: start; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0,1fr); } .phone-col { order: -1; } }
+.notes { min-width: 0; }
+h1 { font-family: var(--f-head); font-size: 34px; line-height: 1.1; margin: 0 0 10px; text-wrap: balance; letter-spacing: -.01em; }
+h2 { font-family: var(--f-head); font-size: 21px; margin: 0 0 8px; text-wrap: balance; }
+h3 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--note); margin: 20px 0 6px; }
+p, li { color: var(--note); max-width: 66ch; }
+p { margin: 0 0 10px; }
+ul, ol { margin: 0 0 10px; padding-left: 20px; } li { margin: 3px 0; }
+strong { color: var(--ink); }
+code { font-size: 12.5px; background: var(--tag); padding: 1px 5px; border-radius: 4px; }
+.lede { font-size: 16.5px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--note); margin-bottom: 6px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 22px; }
+.tab { font: 600 14px var(--f-body); border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+  padding: 9px 14px; border-radius: 999px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--th-primary); outline-offset: 2px; }
+.scene { display: none; } .scene.on { display: block; }
+.model { overflow-x: auto; margin: 6px 0 12px; }
+table { border-collapse: collapse; font-size: 13.5px; min-width: 520px; width: 100%; }
+th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--note); }
+th { color: var(--ink); font-weight: 600; }
+.who { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; padding: 1px 7px; border-radius: 5px; white-space: nowrap; }
+.who.fo { background: var(--fo-primary-light); color: var(--fo-primary); }
+.who.th { background: var(--th-primary-light); color: var(--th-primary); }
+.who.br { background: var(--tag); color: var(--ink); }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; margin: 8px 0 12px; }
+.flow span { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; color: var(--ink); }
+.flow i { font-style: normal; color: var(--note); }
+.flow .no { border-style: dashed; color: var(--note); text-decoration: line-through; }
+.try { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 16px; margin: 12px 0 16px; }
+.try ol { margin: 0; } .try b { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.q { border-left: 3px solid var(--rule); padding: 2px 0 2px 12px; margin: 10px 0; }
+.q b { color: var(--ink); }
+.issue { border-top: 1px solid var(--rule); padding: 10px 0; display: grid; grid-template-columns: 74px minmax(0,1fr) 30px; gap: 10px; align-items: start; }
+.issue .t { color: var(--ink); font-weight: 600; } .issue p { margin: 2px 0 0; font-size: 14px; }
+.issue .sz { font-weight: 700; color: var(--note); font-size: 13px; text-align: right; }
+
+/* ===== phone ===== */
+.phone-col { position: sticky; top: 16px; }
+@media (max-width: 900px) { .phone-col { position: static; } }
+.appswitch { display: flex; justify-content: center; gap: 6px; margin-bottom: 10px; }
+.appswitch button { font: 600 13px var(--f-body); border: 1px solid var(--rule); background: var(--surface); color: var(--ink); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.appswitch button[aria-pressed="true"].fo { background: var(--fo-primary); border-color: var(--fo-primary); color: var(--fo-on); }
+.appswitch button[aria-pressed="true"].th { background: var(--th-primary); border-color: var(--th-primary); color: var(--th-on); }
+.phone { width: 100%; max-width: 390px; height: 790px; margin: 0 auto; border-radius: 34px; border: 10px solid #0d0f0e;
+  background: var(--bg); color: var(--text); font-family: var(--f-ui); font-size: 15px; line-height: 1.35;
+  position: relative; overflow: hidden; box-shadow: 0 20px 50px var(--shadow); }
+.phone.forage { --primary: var(--fo-primary); --primary-light: var(--fo-primary-light); --on-primary: var(--fo-on); }
+.phone.thrive { --primary: var(--th-primary); --primary-light: var(--th-primary-light); --on-primary: var(--th-on); }
+.screen { position: absolute; inset: 0 0 62px; overflow-y: auto; padding: 14px 14px 24px; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+.navbar { position: absolute; left: 0; right: 0; bottom: 0; height: 62px; background: var(--surface); border-top: 1px solid var(--border); display: grid; }
+.navbar span { display: grid; place-items: center; align-content: center; gap: 2px; font-size: 11px; color: var(--text2); font-weight: 600; }
+.navbar span.cur { color: var(--primary); }
+.navbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ahead { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; flex-wrap: wrap; }
+.ahead h1 { font: 700 21px var(--f-ui); margin: 0; flex: 1; letter-spacing: 0; color: var(--text); }
+.seg { display: inline-flex; background: var(--track); border-radius: 10px; padding: 2px; }
+.seg button { border: 0; background: none; color: var(--text2); font: 600 13.5px var(--f-ui); padding: 0 12px; min-height: 36px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px var(--shadow); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chipbtn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 0 12px; min-height: 34px; font: 600 13px var(--f-ui); cursor: pointer; font-variant-numeric: tabular-nums; }
+.chipbtn[aria-pressed="true"] { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+.utabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); margin: 10px -14px 12px; padding: 0 10px; }
+.utabs::-webkit-scrollbar { display: none; }
+.utabs button { flex: none; border: 0; background: none; color: var(--text2); font: 600 13.5px var(--f-ui); min-height: 42px; padding: 0 9px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.utabs button[aria-pressed="true"] { color: var(--primary); font-weight: 700; border-bottom-color: var(--primary); }
+.utabs button.off { color: var(--muted); cursor: default; }
+.utabs button.new::after { content: "new"; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; margin-left: 4px; color: var(--on-primary); background: var(--primary); padding: 1px 4px; border-radius: 4px; vertical-align: 2px; }
+.card { background: var(--surface); border-radius: 14px; padding: 13px 14px; margin-bottom: 12px; }
+.ctitle { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.ctitle h4 { margin: 0; font-size: 15px; flex: 1; }
+.ctitle small { color: var(--text2); font-size: 12px; }
+.big { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; } .big b { font-size: 28px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; } .big span { color: var(--text2); font-size: 13px; }
+.sub { color: var(--text2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.readout { min-height: 20px; font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; margin: 4px 0 2px; }
+.readout b { font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--text2); margin-top: 4px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.legend .ln { height: 2px; width: 14px; vertical-align: 3px; border-radius: 1px; background: var(--text); }
+.legend .gp { border-bottom: 2px dashed var(--muted); height: 0; width: 12px; border-radius: 0; vertical-align: 3px; }
+.legend .ht { background: repeating-linear-gradient(45deg, var(--kcal) 0 2px, transparent 2px 4px); }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg.chart text { font: 10px var(--f-ui); fill: var(--text2); font-variant-numeric: tabular-nums; }
+svg.chart [data-i] { cursor: pointer; }
+.split { display: flex; height: 14px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 8px 0 6px; }
+.split i { display: block; height: 100%; }
+.mrow { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--hair); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.mrow:first-of-type { border-top: 0; }
+.mrow .dot { width: 10px; height: 10px; border-radius: 3px; }
+.mrow .v { font-weight: 700; } .mrow .s { color: var(--text2); font-size: 12px; min-width: 64px; text-align: right; }
+.nrow { display: grid; grid-template-columns: minmax(0,1fr) 92px auto; gap: 10px; align-items: center; width: 100%; padding: 9px 0; border: 0; border-top: 1px solid var(--hair); background: none; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.nrow:first-of-type { border-top: 0; }
+.nrow .nm { font-weight: 600; font-size: 14px; } .nrow .nm small { display: block; font-weight: 400; color: var(--text2); font-size: 12px; }
+.nrow .val { text-align: right; font-variant-numeric: tabular-nums; font-size: 14px; } .nrow .val b { font-weight: 700; }
+.lowchip { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--warn); background: var(--warn-light); padding: 1px 6px; border-radius: 5px; margin-left: 4px; vertical-align: 1px; }
+.nexp { padding: 4px 0 8px; }
+.frow { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--hair); }
+.frow:first-of-type { border-top: 0; }
+.frow .rk { color: var(--text2); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+.frow .nm { font-weight: 600; font-size: 14px; min-width: 0; }
+.frow .meter { height: 5px; border-radius: 3px; background: var(--track); margin-top: 4px; overflow: hidden; } .frow .meter i { display: block; height: 100%; border-radius: 3px; }
+.frow .vv { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; } .frow .vv small { display: block; color: var(--text2); font-size: 11.5px; }
+.stars { color: var(--m1); letter-spacing: 1px; font-size: 12px; }
+.link { color: var(--primary); font: 600 13px var(--f-ui); background: none; border: 0; padding: 8px 0 0; cursor: pointer; }
+.from { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--hair); margin-top: 8px; padding-top: 4px; font-size: 12px; color: var(--text2); }
+.opt { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--warn); background: var(--warn-light); padding: 2px 6px; border-radius: 5px; }
+.fuel { display: grid; gap: 8px; margin-top: 8px; }
+.fuel div { display: grid; grid-template-columns: 74px minmax(0,1fr) 64px; gap: 8px; align-items: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.fuel .track { height: 12px; background: var(--track); border-radius: 4px; overflow: hidden; } .fuel .track i { display: block; height: 100%; background: var(--food); border-radius: 4px; }
+.fuel b { text-align: right; }
+.picked { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.pk { font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px; }
+.pk i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.switchrow { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text2); margin: 0 0 10px; }
+.toggle { width: 44px; height: 26px; border-radius: 13px; border: 0; background: var(--track); position: relative; cursor: pointer; }
+.toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px var(--shadow); transition: left .15s; }
+.toggle[aria-pressed="true"] { background: var(--primary); } .toggle[aria-pressed="true"]::after { left: 21px; }
+.stackhead { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; margin-top: 6px; }
+.stackhead b { font-weight: 700; } .stackhead span { color: var(--text2); font-variant-numeric: tabular-nums; }
+.icon-btn { width: 40px; height: 44px; border: 0; background: none; color: var(--text); font-size: 26px; line-height: 1; cursor: pointer; border-radius: 8px; flex: none; }
+.icon-btn:disabled { color: var(--muted); opacity: .4; cursor: default; }
+.enav { display: flex; align-items: center; gap: 2px; margin: 0 0 10px; }
+.eday { min-width: 0; } .eday b { display: block; font-size: 19px; } .eday small { color: var(--text2); font-size: 12.5px; }
+.sp { flex: 1; }
+.trendbtn { width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--primary); background: var(--primary-light); color: var(--primary); display: grid; place-items: center; cursor: pointer; position: relative; margin-right: 6px; flex: none; }
+.trendbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.trendbtn::after { content: "new"; position: absolute; top: -9px; right: -11px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; background: var(--primary); color: var(--on-primary); padding: 1px 4px; border-radius: 4px; }
+.acct { width: 36px; height: 36px; border-radius: 50%; background: var(--track); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: var(--text); flex: none; }
+.meal .ctitle { margin-bottom: 4px; }
+.erow { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--hair); font-size: 14px; font-variant-numeric: tabular-nums; }
+.erow span:last-child { color: var(--text2); white-space: nowrap; }
+.addrow { width: 100%; text-align: left; border: 0; border-top: 1px solid var(--hair); background: none; color: var(--primary); font: 600 14px var(--f-ui); padding: 10px 0 2px; min-height: 40px; cursor: pointer; }
+.link.inl { padding: 0 0 0 4px; font-size: 12.5px; }
+.toast { position: absolute; left: 12px; right: 12px; bottom: 74px; background: var(--text); color: var(--bg); padding: 10px 12px; border-radius: 10px; font-size: 13px; z-index: 4; box-shadow: 0 6px 18px var(--shadow); }
+@media (prefers-reduced-motion: reduce) { .toggle::after { transition: none; } }
+</style>
+
+<div class="wrap">
+<div class="notes">
+  <div class="eyebrow">Forage × Thrive · prototype, before issues</div>
+  <h1>Forage goes deep on food; Thrive lines it up with everything else</h1>
+  <p class="lede">Exploring <strong>what you eat</strong> lives in Forage, on its own Trends screen opened from a button in
+  Eaten's header. <strong>Eaten itself doesn't change.</strong> Thrive gets
+  <strong>daily food totals</strong> as one more Trends group, so calories and protein sit on the same timeline as sleep,
+  HRV, weight and training. Thrive never sees individual foods, and Forage never reads Thrive.</p>
+
+  <div class="tabs" role="tablist" aria-label="Scenes">
+    <button class="tab" role="tab" data-scene="split" aria-selected="true">The split</button>
+    <button class="tab" role="tab" data-scene="forage">Forage: Trends</button>
+    <button class="tab" role="tab" data-scene="meals">Forage: Meals and foods</button>
+    <button class="tab" role="tab" data-scene="thrive">Thrive: Food group</button>
+    <button class="tab" role="tab" data-scene="custom">Thrive: side by side</button>
+    <button class="tab" role="tab" data-scene="issues">Issues (draft)</button>
+  </div>
+
+  <section class="scene on" id="scene-split">
+    <h2>One rule for where a chart goes</h2>
+    <p><strong>Forage answers "what and how do I eat?"</strong> Anything that needs a food, a meal or a recipe stays there.
+    <strong>Thrive answers "how does that line up with the rest of me?"</strong> Anything that needs a workout, sleep or
+    the scale goes there, and it only needs daily food totals for that.</p>
+    <div class="model"><table>
+      <thead><tr><th>Question</th><th>Where</th><th>Why there</th></tr></thead>
+      <tbody>
+        <tr><td>Calories and macros over time</td><td><span class="who fo">Forage</span> <span class="who th">Thrive</span></td><td>Both. Forage shows gaps, low days and weekdays. Thrive shows the line next to other metrics.</td></tr>
+        <tr><td>The seven label nutrients (fiber, sodium, sugars…)</td><td><span class="who fo">Forage</span></td><td>Label detail is food data. Thrive's Day card already shows a day's values; it doesn't need their trends.</td></tr>
+        <tr><td>Which meal carries the day</td><td><span class="who fo">Forage</span></td><td>Needs meal slots (<code>by_meal</code>, #865).</td></tr>
+        <tr><td>Which foods drive my sodium or protein</td><td><span class="who fo">Forage</span></td><td>Needs individual entries.</td></tr>
+        <tr><td>What I cook most, and how I rate it</td><td><span class="who fo">Forage</span></td><td>Cook history.</td></tr>
+        <tr><td>Protein next to HRV, weight, training load</td><td><span class="who th">Thrive</span></td><td>Those outcomes live in Thrive. The Custom group already stacks four metrics on one axis.</td></tr>
+        <tr><td>How I eat on ride days vs rest days</td><td><span class="who th">Thrive</span></td><td>Needs activities. Putting it in Forage would make Forage read Thrive.</td></tr>
+        <tr><td>Does X actually change Y?</td><td><span class="who br">Nightly brief</span></td><td>Already graded there against the wiki's tests (#830). The apps show the data; they don't draw conclusions.</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Data flows one way</h3>
+    <div class="flow"><span>Forage Sheet</span><i>→</i><span>Forage API</span><i>→</i><span><code>getFoodLogTotals</code>, days only</span><i>→</i><span>Thrive</span></div>
+    <div class="flow"><span>Thrive</span><i>→</i><span class="no">Forage</span></div>
+    <p>This connection already exists. Thrive's Day card (#714) uses it, through a token Forage accepts for
+    <code>getFoodLogTotals</code> only. Thrive's Food group reuses that call over a longer range, so there are
+    <strong>no new permissions and no Apps Script change</strong>. If Forage showed training days, it would need its
+    own way into Thrive, and the line would blur in both directions.</p>
+    <h3>Drinks stay where they are</h3>
+    <p>Water, coffee, alcohol and Unwind are logged by Thrive Sip and are habits Thrive tracks. They stay in Thrive's
+    Intake group, and Food becomes the tab next to it. Forage doesn't show drinks.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>Use the <strong>Forage / Thrive</strong> switch above the phone, or pick a scene.</li>
+      <li>In Forage, the phone opens on Eaten as it is today. Tap the outlined Trends button in its header.</li>
+      <li>Tap any bar to read that day. Change the range at the top.</li>
+    </ol></div>
+  </section>
+
+  <section class="scene" id="scene-forage">
+    <h2>Forage: Eaten stays as it is, and Trends opens from it</h2>
+    <p><strong>Eaten doesn't change.</strong> It still opens on today. The ‹ › arrows still step back through earlier
+    days, every meal card keeps its Add row, and adding to a past day works exactly as it does now. The only addition
+    is one <strong>Trends button</strong> in the header, next to your account button.</p>
+    <p><strong>Trends is its own screen</strong> (<code>#/eaten/trends</code>), with a back arrow. Back returns you to
+    Eaten on the same day you left from. Trends doesn't add or edit anything.</p>
+    <p><strong>From a chart back to a day:</strong> tap any bar and the readout offers <strong>Open day ›</strong>.
+    On a gap it says <strong>Log this day ›</strong>, which takes you to that date in Eaten, ready to add. So the
+    trends also show you which days you forgot to log.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>Tap ‹ to go back a few days, then tap <strong>+ Add</strong> on a meal.</li>
+      <li>Tap the Trends button, then Back: you're still on the same day.</li>
+      <li>In Trends, tap a dashed gap, then <strong>Log this day ›</strong>.</li>
+    </ol></div>
+    <p>It isn't a fifth tab: Trends reads the same log, and the bar keeps its four tabs. If cooking and shopping trends
+    grow later, a Trends tab is the fallback.</p>
+    <h3>Tabs inside Trends</h3>
+    <ul>
+      <li><strong>Energy</strong>: daily kcal with a 7-day average, plus averages by weekday. The Day card's rules
+      carry over: a day with nothing logged is a <strong>gap, never 0</strong>, a partial day is hatched, and kcal are
+      whole numbers.</li>
+      <li><strong>Macros</strong>: the share of calories from protein, carbs and fat (4/4/9), how that split changes
+      week to week, and grams per day for one macro at a time.</li>
+      <li><strong>Nutrients</strong>: the seven, each with an average and a sparkline. Tap a row for its chart. Values
+      read "at least" when some entries didn't report them.</li>
+      <li><strong>Meals</strong> and <strong>Foods</strong>: next scene.</li>
+    </ul>
+    <h3>No goals yet</h3>
+    <p>As in #714, there are no target lines, because nobody has chosen targets. The averages are relative to your own
+    history. Whether to add goals is a question for the end.</p>
+    <h3>Where the data comes from</h3>
+    <p>Energy, Macros, Nutrients and Meals all come from <code>getFoodLogTotals</code> with <code>by_meal</code>, which
+    the Forage app can already call. They need no API change.</p>
+  </section>
+
+  <section class="scene" id="scene-meals">
+    <h2>Meals and foods: depth only Forage has</h2>
+    <p>Two more tabs on the same Trends screen. Eaten is still untouched.</p>
+    <ul>
+      <li><strong>Meals</strong>: how a typical day splits across Breakfast, Lunch, Dinner, After dinner and Snacks.
+      Each slot shows its average on the days it was eaten and how often that was. "After dinner, 310 kcal on 14 of 27
+      days" is the kind of thing you'd want to know.</li>
+      <li><strong>Foods</strong>, in three parts:
+        <ul>
+          <li>The foods that contribute most to a metric (calories, protein, sodium, added sugars) over the range,
+          with their share and how often they were logged. A logged recipe ranks as itself.</li>
+          <li><strong>Your usuals</strong>: the usuals added most often in the range (#876), each counted once per
+          time it was added.</li>
+          <li><strong>Most cooked</strong>: from cook history, with ratings.</li>
+        </ul>
+      </li>
+    </ul>
+    <h3>The one new read</h3>
+    <p>Foods needs entries, not totals. <code>getFoodLog</code> over the range already returns them, with
+    <code>group_id</code> and <code>usual_id</code>, so the app can count foods, recipes and usuals itself. An API
+    action is only needed if a year of entries turns out to be slow. Cook history is <code>getCooks</code>.</p>
+  </section>
+
+  <section class="scene" id="scene-thrive">
+    <h2>Thrive: a Food group in Trends</h2>
+    <p>A new group, <strong>Food</strong>, after Intake: <strong>Calories, Protein, Carbs, Fat</strong>, drawn like
+    every other Trends card, with the same range and average controls. All four are added to the Custom picker under
+    a Food section.</p>
+    <ul>
+      <li><strong>Gaps, not zeros.</strong> Thrive's drink metrics fill a missing day with 0, which is right for
+      drinks. For food it would be wrong: not logging isn't the same as not eating. Food days break the line.</li>
+      <li>Each card ends with <strong>Explore in Forage</strong>, which opens Forage's Trends on the same metric and
+      range.</li>
+      <li>No fiber, sodium or other nutrients here. That depth stays in Forage.</li>
+    </ul>
+    <h3>Optional: fuel and training</h3>
+    <p>One card that only Thrive can draw: average calories on ride days, lift days and rest days, from Forage totals
+    and Thrive's activities. It's marked optional in the phone, so it's your call whether it belongs here or in the
+    weekly brief.</p>
+  </section>
+
+  <section class="scene" id="scene-custom">
+    <h2>Side by side is where correlation happens</h2>
+    <p>Custom already stacks up to four metrics on one time axis, and tapping a day reads all of them at once. With
+    Food in the picker, <strong>Protein, Training Load, HRV and Weight</strong> line up with no new screen. That's the
+    food-and-activity view you were after.</p>
+    <ul>
+      <li><strong>New, optional:</strong> a "Shade ride days" switch, which draws the days with a ride as bands behind
+      every chart. It helps the eye find patterns without the app claiming any.</li>
+      <li>The screen shows the data and doesn't conclude anything. Graded conclusions stay with the nightly brief and
+      the wiki's tests (#830), such as <code>test-calories-weight-trend</code> and
+      <code>test-protein-next-lift</code>.</li>
+    </ul>
+  </section>
+
+  <section class="scene" id="scene-issues">
+    <h2>What the issues would be</h2>
+    <p>Filed under epic #889. Sizes are rough.</p>
+    <div class="issue"><span class="who fo">Forage</span><div><div class="t">Trends screen, with Energy</div><p>A Trends button in Eaten's header, which otherwise doesn't change. The <code>#/eaten/trends</code> screen, with Back returning to the same day. Range and average controls, the Energy tab, gaps and partial days, and Open day / Log this day from a tapped bar. Sets up the chart that the other tabs reuse.</p></div><span class="sz">M</span></div>
+    <div class="issue"><span class="who fo">Forage</span><div><div class="t">Trends: Macros and Nutrients</div><p>Calorie split, the weekly split, grams per macro, and the seven nutrients with "at least".</p></div><span class="sz">M</span></div>
+    <div class="issue"><span class="who fo">Forage</span><div><div class="t">Trends: Meals</div><p>Slot split, and per-slot average and frequency from <code>by_meal</code>.</p></div><span class="sz">S</span></div>
+    <div class="issue"><span class="who fo">Forage</span><div><div class="t">Trends: Foods, usuals and most cooked</div><p>Top contributors by metric, and the most-added usuals, from <code>getFoodLog</code> counted in the app; cook counts with ratings from <code>getCooks</code>.</p></div><span class="sz">M</span></div>
+    <div class="issue"><span class="who th">Thrive</span><div><div class="t">Trends: Food group, and Food in Custom</div><p>Four metrics from <code>getFoodLogTotals</code>, drawn with gaps not zeros, plus the Explore in Forage link. No auth or API change.</p></div><span class="sz">M</span></div>
+    <div class="issue"><span class="who th">Thrive</span><div><div class="t">Custom: shade ride days</div><p>Optional switch that draws ride days as bands behind stacked charts.</p></div><span class="sz">S</span></div>
+    <div class="issue"><span class="who th">Thrive</span><div><div class="t">Food: fuel and training card</div><p>Optional. Average kcal on ride, lift and rest days.</p></div><span class="sz">S</span></div>
+    <h3>Decided (2026-11-14)</h3>
+    <div class="q"><b>Placement.</b> A Trends button in Eaten's header opens <code>#/eaten/trends</code>. Eaten is otherwise unchanged.</div>
+    <div class="q"><b>Chart.</b> Forage builds its own, following Thrive's look and rules. Thrive's chart is built around Thrive's metric model, so it isn't moved into <code>ui/</code>.</div>
+    <div class="q"><b>Foods tab.</b> Top foods by metric, then your usuals, then most cooked.</div>
+    <div class="q"><b>Goals.</b> No target lines for now.</div>
+    <div class="q"><b>Fuel and training.</b> Filed as an optional Thrive issue.</div>
+  </section>
+</div>
+
+<div class="phone-col">
+  <div class="appswitch" role="group" aria-label="App">
+    <button class="fo" data-app="forage" aria-pressed="true">Forage</button>
+    <button class="th" data-app="thrive" aria-pressed="false">Thrive</button>
+  </div>
+  <div class="phone forage" id="phone">
+    <div class="screen" id="screen"></div>
+    <nav class="navbar" id="navbar"></nav>
+  </div>
+</div>
+</div>
+
+<script>
+(function () {
+  // ---------- deterministic example data ----------
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var R = rng(870);
+  function n() { return (R() + R() + R() - 1.5) / 1.5; } // roughly -1..1, centred
+  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var TOTAL = 96, today = Date.UTC(2026, 10, 14);
+  var days = [];
+  var weight = 183.4;
+  for (var k = TOTAL - 1; k >= 0; k--) {
+    var t = new Date(today - k * 864e5), dow = t.getUTCDay();
+    var ride = ((dow === 6 || dow === 0) && R() < 0.8) || (dow === 3 && R() < 0.3);
+    var lift = !ride && (dow === 1 || dow === 4) && R() < 0.85;
+    var logged = k === 0 || R() > 0.1;
+    var kcal = 2060 + (ride ? 540 : 0) + (lift ? 110 : 0) + ((dow === 5 || dow === 6) ? 170 : 0) + n() * 240;
+    var protein = 124 + (lift ? 22 : 0) + (ride ? 8 : 0) + n() * 16;
+    var fat = 78 + n() * 12;
+    var carbs = (kcal - protein * 4 - fat * 9) / 4;
+    var after = R() < 0.52 ? 0.12 + R() * 0.06 : 0;
+    var snacks = 0.06 + R() * 0.08;
+    var rest = 1 - after - snacks;
+    var meals = [rest * 0.24, rest * 0.31, rest * 0.45, after, snacks].map(function (x) { return x * kcal; });
+    weight += -0.018 + n() * 0.35 - (weight - (183.4 - (TOTAL - k) * 0.016)) * 0.3;
+    var load = ride ? 130 + R() * 80 : lift ? 60 + R() * 25 : 10 + R() * 12;
+    var hrv = 55 + n() * 6 + (ride ? -2 : 1);
+    days.push({
+      ts: t.getTime(), dow: dow, ride: ride, lift: lift,
+      label: MON[t.getUTCMonth()] + ' ' + t.getUTCDate(), dlabel: DOW[dow] + ' ' + MON[t.getUTCMonth()] + ' ' + t.getUTCDate(),
+      kcal: logged ? Math.round(kcal) : null, partial: logged && k !== 0 && R() < 0.07,
+      protein: logged ? Math.round(protein) : null, carbs: logged ? Math.round(carbs) : null, fat: logged ? Math.round(fat) : null,
+      meals: logged ? meals.map(Math.round) : null,
+      fiber: logged ? Math.round(27 + n() * 8) : null, sodium: logged ? Math.round(2900 + n() * 600) : null,
+      sugars: logged ? Math.round(68 + n() * 18) : null, added: logged ? Math.round(31 + n() * 12) : null,
+      satfat: logged ? Math.round(25 + n() * 6) : null, transfat: logged ? Math.round((0.6 + n() * 0.4) * 10) / 10 : null,
+      chol: logged ? Math.round(320 + n() * 90) : null,
+      unknownSome: logged && R() < 0.12,
+      weight: R() < 0.85 ? Math.round(weight * 10) / 10 : null,
+      load: Math.round(load), hrv: k === 0 ? null : Math.round(hrv)
+    });
+  }
+
+  var FOODS = [
+    ['Olive oil', 5600, 0, 0, 0, 25], ['Chicken thighs', 5200, 520, 2100, 0, 12], ['Rolled oats', 4600, 160, 60, 0, 21],
+    ['Sourdough', 4400, 150, 7800, 6, 16], ['Greek yogurt', 3900, 360, 1300, 0, 22], ['Peanut butter', 3800, 150, 1400, 30, 15],
+    ['Eggs', 3300, 280, 3100, 0, 18], ['Cheddar', 2900, 170, 4300, 0, 14], ['Granola', 2700, 60, 400, 88, 11],
+    ['Salmon', 2600, 270, 900, 0, 6], ['Tortilla chips', 2400, 30, 3400, 0, 8], ['Banana', 1900, 25, 20, 0, 19],
+    ['Dark chocolate', 1900, 25, 30, 75, 13], ['Black beans', 1500, 100, 2300, 0, 9], ['Soy sauce', 120, 20, 5600, 0, 10],
+    ['Maple syrup', 900, 0, 10, 230, 9]
+  ];
+  var RECIPES = [['Sheet-pan chicken fajitas', 4, 4.5], ['Miso salmon bowls', 3, 5], ['Black bean soup', 3, 4], ['Turkey chili', 2, 4], ['Shakshuka', 2, 3.5]];
+  var SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'After dinner', 'Snacks'];
+  var USUALS = [['Oatmeal', 24, 'Breakfast'], ['Turkey sandwich', 9, 'Lunch'], ['Yogurt bowl', 7, 'Snacks'], ['After dinner cereal', 6, 'After dinner']];
+
+  // ---------- state ----------
+  var S = { app: 'forage', fday: 0, toast: null, fview: 'days', ftab: 'energy', range: 30, sel: null, macro: 'protein', nexp: null, fmetric: 0, ttab: 'food', shade: true };
+
+  function win() { return days.slice(TOTAL - S.range); }
+  function fmt(v) { return v == null ? '—' : Math.round(v).toLocaleString('en-US'); }
+  function avg(arr, key) { var s = 0, c = 0; arr.forEach(function (d) { if (d[key] != null) { s += d[key]; c++; } }); return c ? s / c : null; }
+  function count(arr, key) { return arr.filter(function (d) { return d[key] != null; }).length; }
+  function niceMax(v) { if (!v) return 1; var p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p; var s = m <= 1 ? 1 : m <= 1.5 ? 1.5 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 3 ? 3 : m <= 4 ? 4 : m <= 5 ? 5 : m <= 6 ? 6 : m <= 8 ? 8 : 10; return s * p; }
+  var uid = 0;
+
+  // ---------- charts ----------
+  // opts: key, color, kind ('bar'|'line'), avg, h, min (for line), unit, shade, fmtv
+  function chart(arr, o) {
+    var W = 330, H = o.h || 132, L = 34, Rr = 4, T = 8, B = 18, pw = W - L - Rr, ph = H - T - B;
+    var vals = arr.map(function (d) { return o.get ? o.get(d) : d[o.key]; });
+    var present = vals.filter(function (v) { return v != null; });
+    var hi = present.length ? Math.max.apply(null, present) : 1, lo = 0;
+    if (o.kind === 'line') { var mn = Math.min.apply(null, present); var pad = (hi - mn) * 0.15 || 1; lo = Math.floor(mn - pad); hi = Math.ceil(hi + pad); }
+    else hi = niceMax(hi);
+    var y = function (v) { return T + ph - (v - lo) / (hi - lo) * ph; };
+    var step = pw / arr.length, bw = Math.max(1.5, step * 0.68);
+    var id = 'h' + (++uid), out = [];
+    out.push('<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (o.aria || '') + '">');
+    out.push('<defs><pattern id="' + id + '" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="4" fill="' + o.color + '"></rect></pattern></defs>');
+    if (o.shade) arr.forEach(function (d, i) { if (d.ride) out.push('<rect x="' + (L + i * step) + '" y="' + T + '" width="' + step + '" height="' + ph + '" fill="var(--shade)"></rect>'); });
+    [lo, (lo + hi) / 2, hi].forEach(function (v) {
+      out.push('<line x1="' + L + '" x2="' + (W - Rr) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--hair)" stroke-width="1"></line>');
+      out.push('<text x="' + (L - 5) + '" y="' + (y(v) + 3) + '" text-anchor="end">' + (o.axis ? o.axis(v) : fmt(v)) + '</text>');
+    });
+    if (o.kind === 'line') {
+      var seg = [], segs = [];
+      vals.forEach(function (v, i) { if (v == null) { if (seg.length) segs.push(seg); seg = []; } else seg.push((L + i * step + step / 2).toFixed(1) + ',' + y(v).toFixed(1)); });
+      if (seg.length) segs.push(seg);
+      segs.forEach(function (s) { out.push('<polyline points="' + s.join(' ') + '" fill="none" stroke="' + o.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>'); });
+      if (arr.length <= 31) vals.forEach(function (v, i) { if (v != null) out.push('<circle cx="' + (L + i * step + step / 2) + '" cy="' + y(v) + '" r="2.2" fill="' + o.color + '"></circle>'); });
+    } else {
+      vals.forEach(function (v, i) {
+        var x = L + i * step + (step - bw) / 2;
+        if (v == null) out.push('<line x1="' + x + '" x2="' + (x + bw) + '" y1="' + (T + ph - 1) + '" y2="' + (T + ph - 1) + '" stroke="var(--muted)" stroke-width="2" stroke-dasharray="2 2"></line>');
+        else out.push('<rect x="' + x.toFixed(1) + '" y="' + y(v).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (T + ph - y(v)).toFixed(1) + '" rx="' + Math.min(2, bw / 3) + '" fill="' + (arr[i].partial && o.hatch ? 'url(#' + id + ')' : o.color) + '"' + (S.sel != null && S.sel !== i ? ' opacity=".45"' : '') + '></rect>');
+      });
+    }
+    if (o.avg) {
+      var pts = [];
+      arr.forEach(function (d, i) {
+        var gi = TOTAL - arr.length + i, s = 0, c = 0;
+        for (var j = gi - 6; j <= gi; j++) { var v = o.get ? o.get(days[j]) : days[j][o.key]; if (v != null) { s += v; c++; } }
+        if (c >= 4) pts.push((L + i * step + step / 2).toFixed(1) + ',' + y(s / c).toFixed(1));
+      });
+      out.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linejoin="round" opacity=".8"></polyline>');
+    }
+    if (S.sel != null && S.sel < arr.length) {
+      var sx = L + S.sel * step + step / 2;
+      out.push('<line x1="' + sx + '" x2="' + sx + '" y1="' + T + '" y2="' + (T + ph) + '" stroke="var(--text)" stroke-width="1" stroke-dasharray="3 2"></line>');
+    }
+    var xl = [0, Math.floor(arr.length / 2), arr.length - 1];
+    xl.forEach(function (i, j) { out.push('<text x="' + (L + i * step + step / 2) + '" y="' + (H - 4) + '" text-anchor="' + (j === 0 ? 'start' : j === 2 ? 'end' : 'middle') + '">' + arr[i].label + '</text>'); });
+    arr.forEach(function (d, i) { out.push('<rect data-i="' + i + '" x="' + (L + i * step) + '" y="' + T + '" width="' + step + '" height="' + ph + '" fill="transparent"></rect>'); });
+    out.push('</svg>');
+    return out.join('');
+  }
+
+  function readout(arr, parts) {
+    if (S.sel == null || S.sel >= arr.length) return '<div class="readout"><span class="sub">Tap a day to read it.</span></div>';
+    var d = arr[S.sel];
+    var open = S.app === 'forage' ? ' <button class="link inl" data-openday="' + (arr.length - 1 - S.sel) + '">' + (d.kcal == null ? 'Log this day ›' : 'Open day ›') + '</button>' : '';
+    return '<div class="readout"><b>' + d.dlabel + '</b> · ' + parts(d) + open + '</div>';
+  }
+
+  // ---------- icons ----------
+  var IC = {
+    cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    cart: '<svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg>',
+    list: '<svg viewBox="0 0 24 24"><path d="M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9"/></svg>',
+    book: '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M19 19v2H6"/></svg>',
+    sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    pulse: '<svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>',
+    trend: '<svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>',
+    gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+  };
+
+  function rangeChips() {
+    return '<div class="chips" role="group" aria-label="Range">' + [[7, '1W'], [30, '1M'], [90, '3M']].map(function (r) {
+      return '<button class="chipbtn" data-range="' + r[0] + '" aria-pressed="' + (S.range === r[0]) + '">' + r[1] + '</button>';
+    }).join('') + '</div>';
+  }
+  function rangeWords() { return S.range === 7 ? 'last 7 days' : S.range === 30 ? 'last 30 days' : 'last 3 months'; }
+
+  // ---------- Forage ----------
+  var POOLS = [
+    ['Rolled oats', 'Greek yogurt', 'Banana', 'Eggs', 'Sourdough toast', 'Coffee with milk'],
+    ['Turkey sandwich', 'Black bean soup', 'Apple', 'Tortilla chips', 'Chicken salad'],
+    ['Sheet-pan chicken fajitas', 'Miso salmon bowls', 'Turkey chili', 'Rice', 'Roasted broccoli'],
+    ['Dark chocolate', 'Peanut butter toast', 'Popcorn'],
+    ['Cheddar', 'Granola bar', 'Almonds', 'Banana']
+  ];
+  var LONG_DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function fEaten() {
+    var idx = TOTAL - 1 - S.fday, d = days[idx], h = [];
+    var title = S.fday === 0 ? 'Today' : S.fday === 1 ? 'Yesterday' : LONG_DOW[d.dow];
+    h.push('<div class="enav"><button class="icon-btn" data-fday="1" aria-label="Previous day"' + (S.fday >= TOTAL - 1 ? ' disabled' : '') + '>‹</button>' +
+      '<div class="eday"><b>' + title + '</b><small>' + d.dlabel.replace(' ', ', ') + '</small></div>' +
+      '<button class="icon-btn" data-fday="-1" aria-label="Next day"' + (S.fday === 0 ? ' disabled' : '') + '>›</button><span class="sp"></span>' +
+      '<button class="trendbtn" data-fview="trends" aria-label="Trends">' + IC.trend + '</button><span class="acct" aria-hidden="true">L</span></div>');
+    if (d.kcal == null) {
+      h.push('<div class="card"><div class="big"><b>—</b><span>kcal</span></div><div class="sub">Nothing logged ' + (S.fday === 0 ? 'today' : 'on ' + LONG_DOW[d.dow]) + '.</div></div>');
+    } else {
+      var tot = d.protein * 4 + d.carbs * 4 + d.fat * 9;
+      h.push('<div class="card"><div class="big"><b>' + fmt(d.kcal) + '</b><span>' + (S.fday === 0 ? 'kcal so far' : 'kcal') + '</span>' + (d.partial ? '<span class="lowchip">Low</span>' : '') + '</div>' +
+        '<div class="split" style="height:8px"><i style="width:' + (d.protein * 400 / tot) + '%;background:var(--protein)"></i><i style="width:' + (d.carbs * 400 / tot) + '%;background:var(--carbs)"></i><i style="width:' + (d.fat * 900 / tot) + '%;background:var(--fat)"></i></div>' +
+        '<div class="sub">Protein ' + d.protein + ' g · Carbs ' + d.carbs + ' g · Fat ' + d.fat + ' g</div></div>');
+    }
+    SLOTS.forEach(function (s, i) {
+      var m = d.meals ? d.meals[i] : 0, rows = '';
+      if (m) {
+        var c = i === 3 ? 1 : 1 + (idx + i) % 3, w = [];
+        for (var j = 0; j < c; j++) w.push(1 + ((idx + j * 5 + i) % 4));
+        var sw = w.reduce(function (x, y) { return x + y; }, 0);
+        for (j = 0; j < c; j++) {
+          var pool = POOLS[i], nm = pool[(idx * 7 + i * 3 + j * 2) % pool.length];
+          rows += '<div class="erow"><span>' + nm + '</span><span>' + fmt(m * w[j] / sw) + ' kcal</span></div>';
+        }
+      }
+      h.push('<div class="card meal"><div class="ctitle"><h4>' + s + '</h4>' + (m ? '<small>' + fmt(m) + ' kcal</small>' : '') + '</div>' + rows +
+        '<button class="addrow" data-add="' + s + '">+ Add</button></div>');
+    });
+    return h.join('');
+  }
+
+  function forage() {
+    if (S.fview !== 'trends') return fEaten();
+    var a = win(), h = [];
+    h.push('<div class="ahead"><button class="icon-btn" data-fview="days" aria-label="Back to Eaten">‹</button><h1>Trends</h1><span class="acct" aria-hidden="true">L</span></div>');
+    h.push(rangeChips());
+    h.push('<div class="utabs" role="group" aria-label="Trend">' + [['energy', 'Energy'], ['macros', 'Macros'], ['nutrients', 'Nutrients'], ['meals', 'Meals'], ['foods', 'Foods']].map(function (t) {
+      return '<button data-ftab="' + t[0] + '" aria-pressed="' + (S.ftab === t[0]) + '">' + t[1] + '</button>';
+    }).join('') + '</div>');
+    h.push(({ energy: fEnergy, macros: fMacros, nutrients: fNutrients, meals: fMeals, foods: fFoods })[S.ftab](a));
+    return h.join('');
+  }
+
+  function fEnergy(a) {
+    var lg = count(a, 'kcal'), low = a.filter(function (d) { return d.partial; }).length;
+    var h = '<div class="card"><div class="big"><b>' + fmt(avg(a, 'kcal')) + '</b><span>kcal a day, on average</span></div>' +
+      '<div class="sub">' + lg + ' of ' + a.length + ' days logged' + (low ? ' · ' + low + ' low (some items have no nutrition)' : '') + '</div></div>';
+    h += '<div class="card"><div class="ctitle"><h4>Calories</h4><small>' + rangeWords() + '</small></div>' +
+      readout(a, function (d) { return d.kcal == null ? 'nothing logged' : '<b>' + fmt(d.kcal) + '</b> kcal' + (d.partial ? ' <span class="lowchip">Low</span>' : ''); }) +
+      chart(a, { key: 'kcal', color: 'var(--kcal)', avg: true, hatch: true, aria: 'Calories per day' }) +
+      '<div class="legend"><span><i style="background:var(--kcal)"></i>Day</span><span><i class="ln"></i>7-day average</span><span><i class="gp"></i>Not logged</span><span><i class="ht"></i>Low</span></div></div>';
+    var wk = [1, 2, 3, 4, 5, 6, 0].map(function (dw) { var ds = a.filter(function (d) { return d.dow === dw; }); return { label: DOW[dw].slice(0, 1) + DOW[dw].slice(1, 2), v: avg(ds, 'kcal') }; });
+    var mx = niceMax(Math.max.apply(null, wk.map(function (w) { return w.v || 0; })));
+    h += '<div class="card"><div class="ctitle"><h4>By weekday</h4><small>average</small></div><svg class="chart" viewBox="0 0 330 112" role="img" aria-label="Average kcal by weekday">';
+    wk.forEach(function (w, i) {
+      var x = 10 + i * 45, bh = w.v ? (w.v / mx) * 74 : 0;
+      h += w.v ? '<rect x="' + x + '' + '" y="' + (84 - bh) + '" width="34" height="' + bh + '" rx="3" fill="var(--kcal)" opacity="' + (i >= 4 ? 1 : .7) + '"></rect><text x="' + (x + 17) + '" y="' + (80 - bh) + '" text-anchor="middle">' + fmt(w.v) + '</text>' : '';
+      h += '<text x="' + (x + 17) + '" y="102" text-anchor="middle">' + w.label + '</text>';
+    });
+    h += '</svg><div class="sub">Fridays and weekends run higher. Training days are compared in Thrive, not here.</div></div>';
+    return h;
+  }
+
+  function fMacros(a) {
+    var p = avg(a, 'protein'), c = avg(a, 'carbs'), f = avg(a, 'fat'), tot = p * 4 + c * 4 + f * 9;
+    var pp = Math.round(p * 4 / tot * 100), cp = Math.round(c * 4 / tot * 100), fp = 100 - pp - cp;
+    var h = '<div class="card"><div class="ctitle"><h4>Where calories come from</h4><small>' + rangeWords() + '</small></div>' +
+      '<div class="split"><i style="width:' + pp + '%;background:var(--protein)"></i><i style="width:' + cp + '%;background:var(--carbs)"></i><i style="width:' + fp + '%;background:var(--fat)"></i></div>' +
+      [['Protein', p, pp, 'var(--protein)'], ['Carbs', c, cp, 'var(--carbs)'], ['Fat', f, fp, 'var(--fat)']].map(function (m) {
+        return '<div class="mrow"><span class="dot" style="background:' + m[3] + '"></span><span>' + m[0] + '</span><span class="v">' + fmt(m[1]) + ' g</span><span class="s">' + m[2] + '% of kcal</span></div>';
+      }).join('') + '</div>';
+    // weekly split, 100% columns
+    var weeks = [];
+    for (var i = a.length; i > 0; i -= 7) weeks.unshift(a.slice(Math.max(0, i - 7), i));
+    if (weeks.length > 1) {
+      var cw = Math.min(30, 300 / weeks.length - 6), gap = (300 - cw * weeks.length) / Math.max(1, weeks.length);
+      h += '<div class="card"><div class="ctitle"><h4>Split by week</h4><small>% of kcal</small></div><svg class="chart" viewBox="0 0 330 120" role="img" aria-label="Macro split by week">';
+      weeks.forEach(function (w, j) {
+        var P = avg(w, 'protein') * 4, C = avg(w, 'carbs') * 4, F = avg(w, 'fat') * 9, T = P + C + F, x = 24 + j * (cw + gap), yy = 6;
+        [[P, 'var(--protein)'], [C, 'var(--carbs)'], [F, 'var(--fat)']].forEach(function (s) { var hh = s[0] / T * 92; h += '<rect x="' + x.toFixed(1) + '" y="' + yy.toFixed(1) + '" width="' + cw.toFixed(1) + '" height="' + Math.max(0, hh - 1).toFixed(1) + '" fill="' + s[1] + '"></rect>'; yy += hh; });
+      });
+      h += '<text x="20" y="10" text-anchor="end">100%</text><text x="20" y="100" text-anchor="end">0</text><text x="24" y="116">' + weeks[0][0].label + '</text><text x="324" y="116" text-anchor="end">' + a[a.length - 1].label + '</text></svg></div>';
+    }
+    var colors = { protein: 'var(--protein)', carbs: 'var(--carbs)', fat: 'var(--fat)' };
+    h += '<div class="card"><div class="ctitle"><h4>Grams per day</h4></div><div class="chips" role="group" aria-label="Macro" style="margin:6px 0 4px">' +
+      [['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat']].map(function (m) { return '<button class="chipbtn" data-macro="' + m[0] + '" aria-pressed="' + (S.macro === m[0]) + '">' + m[1] + '</button>'; }).join('') + '</div>' +
+      readout(a, function (d) { return d[S.macro] == null ? 'nothing logged' : '<b>' + fmt(d[S.macro]) + '</b> g'; }) +
+      chart(a, { key: S.macro, color: colors[S.macro], avg: true, hatch: true, aria: S.macro + ' grams per day' }) + '</div>';
+    return h;
+  }
+
+  var NUTS = [['fiber', 'Fiber', 'g'], ['sodium', 'Sodium', 'mg'], ['sugars', 'Sugars', 'g'], ['added', 'Added sugars', 'g'], ['satfat', 'Saturated fat', 'g'], ['transfat', 'Trans fat', 'g'], ['chol', 'Cholesterol', 'mg']];
+  function spark(a, key) {
+    var v = a.map(function (d) { return d[key]; }), mx = Math.max.apply(null, v.filter(function (x) { return x != null; })) || 1, w = 92 / v.length, s = '<svg viewBox="0 0 92 26" width="92" height="26" aria-hidden="true">';
+    v.forEach(function (x, i) { if (x != null) s += '<rect x="' + (i * w).toFixed(1) + '" y="' + (26 - x / mx * 24).toFixed(1) + '" width="' + Math.max(1, w * .7).toFixed(1) + '" height="' + (x / mx * 24).toFixed(1) + '" fill="var(--kcal)" opacity=".75"></rect>'; });
+    return s + '</svg>';
+  }
+  function fNutrients(a) {
+    var h = '<div class="card"><div class="ctitle"><h4>Label nutrients</h4><small>a day, on average</small></div>';
+    NUTS.forEach(function (nn, i) {
+      var v = avg(a, nn[0]), some = a.some(function (d) { return d.unknownSome; }) && (i % 3 === 1);
+      var shown = nn[0] === 'transfat' ? (Math.round(v * 10) / 10).toFixed(1) : fmt(v);
+      h += '<button class="nrow" data-nexp="' + nn[0] + '" aria-expanded="' + (S.nexp === nn[0]) + '"><span class="nm">' + nn[1] + (some ? '<small>at least: some items didn’t report it</small>' : '') + '</span>' + spark(a, nn[0]) + '<span class="val">' + (some ? '≥ ' : '') + '<b>' + shown + '</b> ' + nn[2] + '</span></button>';
+      if (S.nexp === nn[0]) h += '<div class="nexp">' + readout(a, function (d) { return d[nn[0]] == null ? 'nothing logged' : '<b>' + d[nn[0]].toLocaleString('en-US') + '</b> ' + nn[2]; }) + chart(a, { key: nn[0], color: 'var(--kcal)', avg: true, h: 112, aria: nn[1] + ' per day' }) + '</div>';
+    });
+    h += '<div class="sub" style="margin-top:6px">Tap a nutrient for its chart. No target lines until targets are chosen.</div></div>';
+    return h;
+  }
+
+  function fMeals(a) {
+    var lg = a.filter(function (d) { return d.meals; }), stats = SLOTS.map(function (s, i) {
+      var on = lg.filter(function (d) { return d.meals[i] > 0; });
+      var mean = on.length ? on.reduce(function (t, d) { return t + d.meals[i]; }, 0) / on.length : 0;
+      var share = lg.reduce(function (t, d) { return t + d.meals[i]; }, 0) / lg.reduce(function (t, d) { return t + d.kcal; }, 0);
+      return { s: s, n: on.length, mean: mean, share: share };
+    });
+    var h = '<div class="card"><div class="ctitle"><h4>A typical day, by meal</h4><small>' + rangeWords() + '</small></div><div class="split">' +
+      stats.map(function (st, i) { return '<i style="width:' + (st.share * 100).toFixed(1) + '%;background:var(--m' + (i + 1) + ')"></i>'; }).join('') + '</div>' +
+      stats.map(function (st, i) {
+        return '<div class="mrow"><span class="dot" style="background:var(--m' + (i + 1) + ')"></span><span>' + st.s + '<br><span class="sub">' + st.n + ' of ' + lg.length + ' days</span></span><span class="v">' + fmt(st.mean) + ' kcal</span><span class="s">' + Math.round(st.share * 100) + '% of all</span></div>';
+      }).join('') + '<div class="sub" style="margin-top:4px">kcal is the average on the days that meal was eaten.</div></div>';
+    // stacked per day
+    var W = 330, H = 132, L = 34, T = 8, B = 18, pw = W - L - 4, ph = H - T - B, step = pw / a.length, bw = Math.max(1.5, step * .68);
+    var mx = niceMax(Math.max.apply(null, a.map(function (d) { return d.kcal || 0; })));
+    var s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Calories per day by meal">';
+    [0, mx / 2, mx].forEach(function (v) { var yy = T + ph - v / mx * ph; s += '<line x1="' + L + '" x2="' + (W - 4) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--hair)"></line><text x="' + (L - 5) + '" y="' + (yy + 3) + '" text-anchor="end">' + fmt(v) + '</text>'; });
+    a.forEach(function (d, i) {
+      var x = L + i * step + (step - bw) / 2, yy = T + ph;
+      if (!d.meals) { s += '<line x1="' + x + '" x2="' + (x + bw) + '" y1="' + (yy - 1) + '" y2="' + (yy - 1) + '" stroke="var(--muted)" stroke-width="2" stroke-dasharray="2 2"></line>'; return; }
+      d.meals.forEach(function (m, j) { if (!m) return; var hh = m / mx * ph; yy -= hh; s += '<rect x="' + x.toFixed(1) + '" y="' + yy.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, hh - .6).toFixed(1) + '" fill="var(--m' + (j + 1) + ')"' + (S.sel != null && S.sel !== i ? ' opacity=".45"' : '') + '></rect>'; });
+    });
+    s += '<text x="' + L + '" y="' + (H - 4) + '">' + a[0].label + '</text><text x="' + (W - 4) + '" y="' + (H - 4) + '" text-anchor="end">' + a[a.length - 1].label + '</text>';
+    a.forEach(function (d, i) { s += '<rect data-i="' + i + '" x="' + (L + i * step) + '" y="' + T + '" width="' + step + '" height="' + ph + '" fill="transparent"></rect>'; });
+    s += '</svg>';
+    h += '<div class="card"><div class="ctitle"><h4>Each day, by meal</h4></div>' + readout(a, function (d) { return d.meals ? d.meals.map(function (m, j) { return m ? SLOTS[j] + ' ' + fmt(m) : null; }).filter(Boolean).join(' · ') : 'nothing logged'; }) + s + '</div>';
+    return h;
+  }
+
+  function fFoods(a) {
+    var M = [['Calories', 1, 'kcal', 60480], ['Protein', 2, 'g', 3834], ['Sodium', 3, 'mg', 78300], ['Added sugars', 4, 'g', 864]][S.fmetric];
+    var scale = S.range / 30;
+    var list = FOODS.filter(function (f) { return f[M[1]] > 0; }).sort(function (x, y) { return y[M[1]] - x[M[1]]; }).slice(0, 7);
+    var top = list[0][M[1]];
+    var h = '<div class="card"><div class="ctitle"><h4>What drives it</h4><small>' + rangeWords() + '</small></div><div class="chips" role="group" aria-label="Metric" style="margin:6px 0 8px">' +
+      ['Calories', 'Protein', 'Sodium', 'Added sugars'].map(function (l, i) { return '<button class="chipbtn" data-fmetric="' + i + '" aria-pressed="' + (S.fmetric === i) + '">' + l + '</button>'; }).join('') + '</div>';
+    list.forEach(function (f, i) {
+      var v = f[M[1]] * scale, share = f[M[1]] / M[3] * 100;
+      h += '<div class="frow"><span class="rk">' + (i + 1) + '</span><div class="nm">' + f[0] + '<div class="meter"><i style="width:' + (f[M[1]] / top * 100).toFixed(0) + '%;background:var(--kcal)"></i></div></div><div class="vv">' + Math.round(share) + '%<small>' + fmt(v) + ' ' + M[2] + ' · ' + Math.max(1, Math.round(f[5] * scale)) + '×</small></div></div>';
+    });
+    h += '<div class="sub" style="margin-top:6px">Share of all ' + M[0].toLowerCase() + ' logged in the range. A logged recipe ranks as itself.</div></div>';
+    var us = USUALS.map(function (u) { return [u[0], Math.round(u[1] * scale), u[2]]; }).filter(function (u) { return u[1] > 0; });
+    var utop = us.length ? us[0][1] : 1;
+    h += '<div class="card"><div class="ctitle"><h4>Your usuals</h4><small>times added</small></div>';
+    if (!us.length) h += '<div class="sub">No usuals added in this range.</div>';
+    us.forEach(function (u, i) {
+      h += '<div class="frow"><span class="rk">' + (i + 1) + '</span><div class="nm">' + u[0] + '<div class="meter"><i style="width:' + (u[1] / utop * 100).toFixed(0) + '%;background:var(--kcal)"></i></div></div><div class="vv">' + u[1] + '×<small>usually ' + u[2] + '</small></div></div>';
+    });
+    h += '</div>';
+    var rec = RECIPES.map(function (r) { return [r[0], Math.round(r[1] * scale), r[2]]; }).filter(function (r) { return r[1] > 0; });
+    h += '<div class="card"><div class="ctitle"><h4>Most cooked</h4><small>from cook history</small></div>';
+    if (!rec.length) h += '<div class="sub">Nothing cooked in this range.</div>';
+    rec.forEach(function (r, i) {
+      var full = Math.floor(r[2]), half = r[2] % 1 ? '½' : '';
+      h += '<div class="frow"><span class="rk">' + (i + 1) + '</span><div class="nm">' + r[0] + '</div><div class="vv">' + r[1] + '×<small><span class="stars" aria-label="rated ' + r[2] + ' of 5">' + '★'.repeat(full) + half + '</span></small></div></div>';
+    });
+    return h + '</div>';
+  }
+
+  // ---------- Thrive ----------
+  function thrive() {
+    var a = win(), h = [];
+    h.push('<div class="ahead"><h1>Trends</h1>' + rangeChips() + '</div>');
+    h.push('<div class="utabs" id="ttabs" role="group" aria-label="Metric group">' + ['Recovery', 'Sleep', 'Fitness', 'Body', 'Blood Pressure', 'Activity', 'Intake'].map(function (g) { return '<button class="off" tabindex="-1">' + g + '</button>'; }).join('') +
+      '<button class="new" data-ttab="food" aria-pressed="' + (S.ttab === 'food') + '">Food</button><button data-ttab="custom" aria-pressed="' + (S.ttab === 'custom') + '">Custom</button></div>');
+    h.push(S.ttab === 'food' ? tFood(a) : tCustom(a));
+    return h.join('');
+  }
+
+  function fromForage() { return '<div class="from"><span>From Forage</span><button class="link" style="padding:6px 0" data-go-forage>Explore in Forage ›</button></div>'; }
+  function tFood(a) {
+    var h = '<div class="sub" style="margin:-4px 0 10px">' + rangeWords().replace(/^./, function (c) { return c.toUpperCase(); }) + ' · 7-day average line · a day with nothing logged is a gap</div>';
+    [['kcal', 'Calories', 'kcal'], ['protein', 'Protein', 'g'], ['carbs', 'Carbs', 'g'], ['fat', 'Fat', 'g']].forEach(function (m) {
+      h += '<div class="card"><div class="ctitle"><h4>' + m[1] + '</h4><small>' + m[2] + '</small></div><div class="big"><b>' + fmt(avg(a, m[0])) + '</b><span>' + m[2] + ' a day, on average</span></div>' +
+        readout(a, function (d) { return d[m[0]] == null ? 'nothing logged' : '<b>' + fmt(d[m[0]]) + '</b> ' + m[2]; }) +
+        chart(a, { key: m[0], color: 'var(--food)', avg: true, hatch: true, h: 116, aria: m[1] + ' per day' }) + fromForage() + '</div>';
+    });
+    var groups = [['Ride days', function (d) { return d.ride; }], ['Lift days', function (d) { return d.lift; }], ['Rest days', function (d) { return !d.ride && !d.lift; }]].map(function (g) { var ds = a.filter(g[1]); return [g[0], avg(ds, 'kcal'), count(ds, 'kcal')]; });
+    var mx = Math.max.apply(null, groups.map(function (g) { return g[1] || 0; }));
+    h += '<div class="card"><div class="ctitle"><h4>Fuel and training</h4><span class="opt">Optional</span></div><div class="sub">Average kcal on days with each kind of training</div><div class="fuel">' +
+      groups.map(function (g) { return '<div><span>' + g[0] + '</span><span class="track"><i style="width:' + (g[1] ? g[1] / mx * 100 : 0).toFixed(0) + '%"></i></span><b>' + fmt(g[1]) + '</b></div>'; }).join('') +
+      '</div><div class="sub" style="margin-top:6px">' + groups.map(function (g) { return g[2] + ' ' + g[0].split(' ')[0].toLowerCase(); }).join(' · ') + ' days logged</div></div>';
+    return h;
+  }
+
+  function tCustom(a) {
+    var M = [
+      { key: 'protein', label: 'Protein', unit: 'g', color: 'var(--food)', kind: 'bar', tag: 'Food' },
+      { key: 'load', label: 'Training Load', unit: '', color: 'var(--load)', kind: 'bar', tag: 'Fitness' },
+      { key: 'hrv', label: 'HRV', unit: 'ms', color: 'var(--hrv)', kind: 'line', tag: 'Recovery' },
+      { key: 'weight', label: 'Weight', unit: 'lb', color: 'var(--weight)', kind: 'line', tag: 'Body' }
+    ];
+    var h = '<div class="picked">' + M.map(function (m) { return '<span class="pk"><i style="background:' + m.color + '"></i>' + m.label + '</span>'; }).join('') + '<button class="link" style="padding:4px 2px">Edit</button></div>';
+    h += '<div class="switchrow"><span>Shade ride days <span class="opt">New</span></span><button class="toggle" data-shade aria-pressed="' + S.shade + '" aria-label="Shade ride days"></button></div>';
+    h += '<div class="card">' + readout(a, function (d) { return M.map(function (m) { return m.label + ' ' + (d[m.key] == null ? '—' : (m.key === 'weight' ? d[m.key].toFixed(1) : fmt(d[m.key]))) + (m.unit && d[m.key] != null ? ' ' + m.unit : ''); }).join(' · ') + (d.ride ? ' · ride' : d.lift ? ' · lift' : ''); });
+    M.forEach(function (m) {
+      var av = avg(a, m.key);
+      h += '<div class="stackhead"><b style="color:' + m.color + '">' + m.label + '</b><span>avg ' + (m.key === 'weight' ? av.toFixed(1) : fmt(av)) + (m.unit ? ' ' + m.unit : '') + '</span></div>' +
+        chart(a, { key: m.key, color: m.color, kind: m.kind, shade: S.shade, hatch: m.key === 'protein', h: 96, axis: m.key === 'weight' ? function (v) { return v.toFixed(0); } : null, aria: m.label });
+    });
+    h += '<div class="sub" style="margin-top:6px">Tap a day to read every metric at once. Protein days with nothing logged are gaps.</div></div>';
+    return h;
+  }
+
+  // ---------- render ----------
+  var screen = document.getElementById('screen'), nav = document.getElementById('navbar'), phone = document.getElementById('phone');
+  function render(keepScroll) {
+    var top = screen.scrollTop;
+    phone.className = 'phone ' + S.app;
+    screen.innerHTML = S.app === 'forage' ? forage() : thrive();
+    var oldToast = phone.querySelector('.toast'); if (oldToast) oldToast.remove();
+    if (S.toast) { var tdiv = document.createElement('div'); tdiv.className = 'toast'; tdiv.setAttribute('role', 'status'); tdiv.textContent = S.toast; phone.appendChild(tdiv); }
+    if (S.app === 'forage') {
+      nav.style.gridTemplateColumns = 'repeat(4, 1fr)';
+      nav.innerHTML = [['list', 'Eaten'], ['book', 'Library'], ['cal', 'Plan'], ['cart', 'Shop']].map(function (t) { return '<span class="' + (t[1] === 'Eaten' ? 'cur' : '') + '">' + IC[t[0]] + t[1] + '</span>'; }).join('');
+    } else {
+      nav.style.gridTemplateColumns = 'repeat(5, 1fr)';
+      nav.innerHTML = [['sun', 'Day'], ['pulse', 'Activities'], ['trend', 'Trends'], ['book', 'Library'], ['gear', 'Settings']].map(function (t) { return '<span class="' + (t[1] === 'Trends' ? 'cur' : '') + '">' + IC[t[0]] + t[1] + '</span>'; }).join('');
+      var tt = document.getElementById('ttabs'); if (tt) tt.scrollLeft = tt.scrollWidth;
+    }
+    document.querySelectorAll('[data-app]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.app === S.app)); });
+    screen.scrollTop = keepScroll ? top : 0;
+  }
+
+  screen.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-i],[data-range],[data-ftab],[data-fview],[data-macro],[data-nexp],[data-fmetric],[data-ttab],[data-shade],[data-go-forage],[data-fday],[data-add],[data-openday]');
+    S.toast = null;
+    if (!el) { render(true); return; }
+    var keep = true;
+    if (el.dataset.fday) { S.fday = Math.max(0, Math.min(TOTAL - 1, S.fday + +el.dataset.fday)); keep = false; }
+    else if (el.dataset.add) { var dd = days[TOTAL - 1 - S.fday]; S.toast = 'The add sheet opens for ' + el.dataset.add + ', ' + dd.label + ', exactly as it does today.'; }
+    else if (el.dataset.openday != null) { S.fday = +el.dataset.openday; S.fview = 'days'; S.sel = null; keep = false; }
+    else if (el.dataset.i != null) { var i = +el.dataset.i; S.sel = S.sel === i ? null : i; }
+    else if (el.dataset.range) { S.range = +el.dataset.range; S.sel = null; }
+    else if (el.dataset.ftab) { S.ftab = el.dataset.ftab; S.sel = null; keep = false; }
+    else if (el.dataset.fview) { S.fview = el.dataset.fview; S.sel = null; keep = false; }
+    else if (el.dataset.macro) { S.macro = el.dataset.macro; }
+    else if (el.dataset.nexp) { S.nexp = S.nexp === el.dataset.nexp ? null : el.dataset.nexp; S.sel = null; }
+    else if (el.dataset.fmetric) { S.fmetric = +el.dataset.fmetric; }
+    else if (el.dataset.ttab) { S.ttab = el.dataset.ttab; S.sel = null; keep = false; }
+    else if (el.hasAttribute('data-shade')) { S.shade = !S.shade; }
+    else if (el.hasAttribute('data-go-forage')) { S.app = 'forage'; S.fview = 'trends'; S.ftab = 'energy'; S.sel = null; keep = false; }
+    render(keep);
+  });
+  document.querySelectorAll('[data-app]').forEach(function (b) { b.addEventListener('click', function () { S.app = b.dataset.app; S.sel = null; render(false); }); });
+
+  var SCENES = {
+    split: { app: 'forage', fview: 'days', fday: 0, ftab: 'energy' },
+    forage: { app: 'forage', fview: 'days', fday: 0, ftab: 'energy' },
+    meals: { app: 'forage', fview: 'trends', ftab: 'foods' },
+    thrive: { app: 'thrive', ttab: 'food' },
+    custom: { app: 'thrive', ttab: 'custom' },
+    issues: null
+  };
+  function scene(name) {
+    document.querySelectorAll('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.scene === name)); });
+    document.querySelectorAll('.scene').forEach(function (s) { s.classList.toggle('on', s.id === 'scene-' + name); });
+    var st = SCENES[name];
+    if (st) { Object.keys(st).forEach(function (k) { S[k] = st[k]; }); S.sel = null; render(false); }
+    try { history.replaceState(null, '', '#' + name); } catch (e) {}
+  }
+  document.querySelectorAll('.tab').forEach(function (t) { t.addEventListener('click', function () { scene(t.dataset.scene); }); });
+  var start = (location.hash || '').slice(1);
+  render(false);
+  if (SCENES.hasOwnProperty(start)) scene(start);
+})();
+</script>

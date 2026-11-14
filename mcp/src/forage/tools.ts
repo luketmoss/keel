@@ -46,6 +46,7 @@ export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set([
   'forage_food_log',
   'forage_list_usuals',
   'forage_get_usual',
+  'forage_list_combos',
 ])
 
 const NO_UNDO_YET = "Error: Forage's API doesn't have undo yet. Redeploy the Apps Script."
@@ -2563,6 +2564,91 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       }
       if (!result.success) return failed(`Nothing deleted. ${result.error}`)
       return text(`Deleted usual ${id} with its lines.\nUndo with forage_undo, call ${currentCallId()}`)
+    }),
+  )
+
+  // ---------------------------------------------------------------- combos found in the log (#879)
+
+  server.registerTool(
+    'forage_list_combos',
+    {
+      description:
+        "List the food combinations Forage finds the owner keeps eating together in the food log (the last 60 days " +
+        'by default, today excluded), none of them saved. Each combo has a key, a name, the meal it is usually for ' +
+        '(slot), how many meals it appeared in, the date of the latest, and lines: a fixed line is one food at its ' +
+        'typical amount (the median in the unit it was most often logged in), a pick-one line is the foods that varied ' +
+        "with each option's own amount and the default (the one in the most recent meal). Combos a usual already " +
+        "covers and combos the owner hid are left out. Most meals first; with slot, that meal's combos come first. " +
+        'stats counts what each step of the search left. Answers JSON.',
+      inputSchema: {
+        slot: z.enum(SLOTS).optional().describe("List this meal's combos first"),
+        days: z.number().int().min(1).optional().describe('How many days back to read, default 60'),
+        limit: z.number().int().min(1).optional().describe('At most this many combos'),
+      },
+      annotations: READ,
+    },
+    guarded(async (args: { slot?: string; days?: number; limit?: number }): Promise<ToolResult> => {
+      const result = await apiRead(cfg, 'getCombos', { slot: args.slot, days: args.days, limit: args.limit })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      const foods = await apiRead(cfg, 'getFoods')
+      if (!foods.success) return failed(`Error: ${foods.error}`)
+      const names = new Map(((foods.data ?? []) as any[]).map((f) => [f.id, foodName(f)]))
+      const named = (id: string) => ({ food_id: id, food_name: names.get(id) ?? '' })
+      const combos = ((result.data?.combos ?? []) as any[]).map((c) => ({
+        key: c.key,
+        name: c.name,
+        slot: c.slot,
+        meals: c.meals,
+        last_date: c.last_date,
+        lines: ((c.lines ?? []) as any[]).map((l) =>
+          l.options
+            ? {
+                pick_one: (l.options as any[]).map((o) => ({ ...named(o.food_id), qty: o.qty, unit: o.unit })),
+                default: named(l.default),
+              }
+            : { ...named(l.food_id), qty: l.qty, unit: l.unit },
+        ),
+        meal_dates: c.meal_dates,
+      }))
+      return text(JSON.stringify({ count: combos.length, stats: result.data?.stats, combos }, null, 2))
+    }),
+  )
+
+  server.registerTool(
+    'forage_hide_combo',
+    {
+      description:
+        "Hide a combo from forage_list_combos and the app's suggestions, by its key, so it is not offered again. " +
+        'With unhide: true it shows combos again instead: the keys listed, or every hidden combo when none are ' +
+        'listed. Only change what the user asked for. On the write connector; undo with forage_undo.',
+      inputSchema: {
+        key: z.string().optional().describe('The combo key, from forage_list_combos. Required to hide'),
+        unhide: z.boolean().optional().describe('true shows hidden combos again instead of hiding one'),
+        keys: z
+          .array(z.string())
+          .optional()
+          .describe('With unhide: the keys to show again. Leave out to show every hidden combo'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: { key?: string; unhide?: boolean; keys?: string[] }): Promise<ToolResult> => {
+      const unhide = args.unhide === true
+      if (!unhide && !args.key) return failed('Nothing changed. key is required to hide a combo.')
+      const keys = unhide ? (args.keys ?? (args.key ? [args.key] : undefined)) : undefined
+      let saved: ApiResult
+      try {
+        declareRows(1)
+        saved = unhide
+          ? await apiWrite(cfg, 'unhideCombos', keys ? { keys } : {}, 1)
+          : await apiWrite(cfg, 'hideCombo', { key: args.key }, 1)
+      } catch (err) {
+        inTransit(err, unhide ? 'show' : 'hide')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const hidden = (saved.data?.hidden ?? []) as string[]
+      const what = unhide ? (keys ? `Showed ${plural(keys.length, 'combo')} again` : 'Showed every hidden combo again') : `Hid combo ${args.key}`
+      return text(`${what}. ${hidden.length ? `Still hidden: ${hidden.join(', ')}.` : 'Nothing is hidden.'}
+Undo with forage_undo, call ${currentCallId()}`)
     }),
   )
 

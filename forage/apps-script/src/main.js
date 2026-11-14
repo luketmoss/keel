@@ -35,6 +35,8 @@
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
 //   action=getUsuals&key=...&slot=Breakfast   action=getUsual&key=...&id=us_1a2b3c4d   — usuals with `start` nutrition (#877)
 //   action=upsertUsual&key=...&payload={"name":"Oatmeal","slot":"Breakfast","lines":[...]}   action=deleteUsual&key=...&payload={"id":"us_1a2b3c4d"}
+//   action=getCombos&key=...&slot=Snacks&days=60&limit=10   — food sets the log repeats (#879)
+//   action=hideCombo&key=...&payload={"key":"fd_1+fd_2"}   action=unhideCombos&key=...&payload={"keys":["fd_1+fd_2"]}   — none: all
 //   action=ensureSchema&key=...              — key-only: the 703 migration
 //   action=getChangeLog&key=...&call_id=...&since=2026-11-01T00:00:00Z&limit=50   — key-only (#713)
 //   action=undoCall&key=...&payload={"call_id":"abc123"}               — key-only; dry run unless confirm: true
@@ -170,6 +172,10 @@ function dispatch(action, params, caller) {
     case 'getUsual': return getUsual(params.id);
     case 'upsertUsual': return write(upsertUsual);
     case 'deleteUsual': return write(deleteUsual);
+    // Combos found in the log (#879)
+    case 'getCombos': return getCombos(params);
+    case 'hideCombo': return write(hideCombo);
+    case 'unhideCombos': return write(unhideCombos);
     // Cooks
     case 'getCooks': return getCooks(params);
     case 'upsertCook': return write(upsertCook);

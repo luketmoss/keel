@@ -42,6 +42,7 @@ var TOKEN_ACTIONS = [
   'logUsual', 'logGroup', 'copyMeal', 'setLogGroup',
   'getCooks', 'upsertCook', 'deleteCook',
   'getUsuals', 'getUsual', 'upsertUsual', 'deleteUsual',
+  'getCombos', 'hideCombo', 'unhideCombos',
 ];
 
 /**

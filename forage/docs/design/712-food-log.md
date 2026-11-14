@@ -199,6 +199,28 @@ banner stays visible.
 that shows one of them says how many entries it leaves out when its `unknown` count is not 0. Thrive's Food card
 (#714) reads only the four; #757 is the one that shows the seven.
 
+### Per meal: `by_meal` (#865)
+
+`getFoodLogTotals({ from, to, by_meal: true })` (the boolean or the text `true`) adds `meals` to each day, last. Without
+it the answer is exactly the one above, with no `meals` key and no larger payload, so Thrive's reader is unchanged.
+
+```json
+{ "date": "2026-11-03", "entries": 4, ...,
+  "meals": [ { "slot": "Breakfast", "entries": 1, "unknown_entries": 0, "kcal": 150, "protein_g": 14.2,
+               "carbs_g": 9, "fat_g": 0.4, "partial": false, "sodium_mg": null, "fiber_g": null, ...,
+               "unknown": { "sodium_mg": 1, ... } } ] }
+```
+
+- A meal has a day's fields with `slot` where the day has `date`, and means the same: each value is summed over the
+  meal's entries that have it, to 0.1, `null` when none does; `unknown.sodium_mg > 0` means some entries lack it (a
+  reader says `300+ mg`); `partial` is the meal's own, so a complete meal is `false` when another meal is partial.
+- Only slots with at least one entry that date appear, in meal order (Breakfast, Lunch, Dinner, After dinner,
+  Snacks). A slot not in that list (data from before a rename) follows the known ones in first-seen order, so no entry
+  is dropped from `meals` while the day counts it.
+- The day's own figures stay the sum over its entries, rounded once: a day may differ from the sum of its rounded
+  meals by 0.1. Moving an entry to another slot moves its numbers between meals and leaves the day unchanged.
+- The day and each meal accumulate through one function in `log.js`. Per-meal totals are not on `forage_food_log`.
+
 A reader shows `—` for a date that is absent or whose figures are `null`, and says "so far" when the date is today
 (the API does not know what time the day ends). A reader that gets `partial: true` says the total is low. A day an
 agent logged with `forage_log_food` appears the same as one the app logged: `source` is not in this read.

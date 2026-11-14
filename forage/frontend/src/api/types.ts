@@ -420,6 +420,16 @@ export interface FoodLogDay extends Extras {
   carbs_g: number | null;
   fat_g: number | null;
   partial: boolean;
+  /**
+   * #865: one object per meal with an entry that date, in meal order; present only when asked (`by_meal`). A meal
+   * is summed by the same rules as the day, so the day may differ from the sum of its rounded meals by 0.1.
+   */
+  meals?: FoodLogMeal[];
+}
+
+/** A meal of a day in `getFoodLogTotals` with `by_meal` (#865): a day's fields without `date`, plus its slot. */
+export interface FoodLogMeal extends Omit<FoodLogDay, 'date' | 'meals'> {
+  slot: Slot;
 }
 
 /** `getFoodLogTotals`: a date with nothing logged is absent from `days`, never present with zeros. */

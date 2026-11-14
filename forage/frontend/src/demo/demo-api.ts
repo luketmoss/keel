@@ -12,6 +12,7 @@ import type {
   Food,
   FoodDetail,
   FoodLogDay,
+  FoodLogMeal,
   FoodLogEntry,
   ImportLine,
   LogEntryInput,
@@ -765,46 +766,47 @@ export function createDemoApi(): ForageApi {
               a.logged_at.localeCompare(b.logged_at),
           ),
       ),
-    getFoodLogTotals: async (from, to) => {
-      const by = new Map<string, FoodLogDay>();
-      for (const e of log.filter((x) => x.date >= from && x.date <= to)) {
-        const day = by.get(e.date) ?? {
-          date: e.date,
-          entries: 0,
-          unknown_entries: 0,
+    getFoodLogTotals: async (from, to, byMeal = false) => {
+      const r1 = (v: number | null) => (v === null ? null : round1(v));
+      // One set of rules for a day and for a meal (#865): the API's, mirrored once.
+      const totalsOf = (entries: FoodLogEntry[]) => {
+        const t: Omit<FoodLogMeal, 'slot'> = {
+          entries: entries.length,
+          unknown_entries: entries.filter((e) => e.kcal === null).length,
           kcal: null,
           protein_g: null,
           carbs_g: null,
           fat_g: null,
-          partial: false,
+          partial: entries.some((e) => e.partial || e.kcal === null),
           ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, null])),
           unknown: Object.fromEntries(EXTRA_KEYS.map((k) => [k, 0])) as Record<ExtraKey, number>,
         };
-        day.entries++;
-        if (e.kcal === null) day.unknown_entries++;
-        for (const f of ['kcal', 'protein_g', 'carbs_g', 'fat_g'] as const) {
-          const v = e[f];
-          if (v !== null) day[f] = (day[f] ?? 0) + v;
+        for (const e of entries) {
+          for (const f of ['kcal', 'protein_g', 'carbs_g', 'fat_g'] as const) {
+            const v = e[f];
+            if (v !== null) t[f] = (t[f] ?? 0) + v;
+          }
+          for (const k of EXTRA_KEYS) {
+            const v = e[k];
+            if (typeof v === 'number') t[k] = (t[k] ?? 0) + v;
+            else if (e.kcal !== null) t.unknown![k]!++;
+          }
         }
-        if (e.partial || e.kcal === null) day.partial = true;
-        for (const k of EXTRA_KEYS) {
-          const v = e[k];
-          if (typeof v === 'number') day[k] = (day[k] ?? 0) + v;
-          else if (e.kcal !== null) day.unknown![k]!++;
+        for (const f of ['kcal', 'protein_g', 'carbs_g', 'fat_g'] as const) t[f] = r1(t[f]);
+        for (const k of EXTRA_KEYS) t[k] = r1(t[k] ?? null);
+        return t;
+      };
+      const inRange = log.filter((x) => x.date >= from && x.date <= to);
+      const dates = [...new Set(inRange.map((e) => e.date))].sort();
+      const days: FoodLogDay[] = dates.map((date) => {
+        const mine = inRange.filter((e) => e.date === date);
+        const day: FoodLogDay = { date, ...totalsOf(mine) };
+        if (byMeal) {
+          const slots = [...new Set(mine.map((e) => e.slot))].sort((a, b) => SLOTS.indexOf(a) - SLOTS.indexOf(b));
+          day.meals = slots.map((slot) => ({ slot, ...totalsOf(mine.filter((e) => e.slot === slot)) }));
         }
-        by.set(e.date, day);
-      }
-      const r1 = (v: number | null) => (v === null ? null : round1(v));
-      const days = [...by.values()]
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .map((d) => ({
-          ...d,
-          kcal: r1(d.kcal),
-          protein_g: r1(d.protein_g),
-          carbs_g: r1(d.carbs_g),
-          fat_g: r1(d.fat_g),
-          ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, r1(d[k] ?? null)])),
-        }));
+        return day;
+      });
       return { from, to, days };
     },
     logEntry: async (entry, dryRun = false) => writeLog(entry, dryRun),

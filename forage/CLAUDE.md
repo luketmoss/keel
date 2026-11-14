@@ -172,7 +172,8 @@ What the columns mean:
   preview. `getFoodLogTotals` is the one read Thrive (#714) relies on, shaped in
   `forage/docs/design/712-food-log.md`: a date with nothing logged is absent, a
   sum is null only when every entry that day is blank, and `unknown_entries`
-  counts the blank ones. `source` is `app` (token) or `mcp` (key), set by
+  counts the blank ones; with `by_meal: true` (#865) each day also carries `meals`, one object per slot
+  with an entry, summed by the same rules (default off, so Thrive's read is unchanged). `source` is `app` (token) or `mcp` (key), set by
   the API. `logged_at` is ISO UTC. The seven after `updated` (#755) are part of
   the snapshot by the same rule, each blank where the food or recipe lacks it
   (never 0); entries from before #755 keep them blank. A recipe's per serving

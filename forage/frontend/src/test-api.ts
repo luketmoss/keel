@@ -2,7 +2,7 @@
 // real client. It records every request and answers each action from a small
 // in-memory store; a test overrides one action with `answer`.
 import { vi } from 'vitest';
-import { EXTRA_COLUMN, EXTRA_KEYS, type ExtraKey } from './api/types';
+import { EXTRA_COLUMN, EXTRA_KEYS, SLOTS, type ExtraKey } from './api/types';
 import type {
   Cook,
   Food,
@@ -342,10 +342,10 @@ export function fakeApi() {
       case 'getFoodLogTotals': {
         const from = params?.get('from') ?? '';
         const to = params?.get('to') ?? '9999';
+        const byMeal = params?.get('by_meal') === 'true';
         const dates = [...new Set(log.filter((e) => e.date >= from && e.date <= to).map((e) => e.date))].sort();
         const r1 = (n: number) => Math.round(n * 10) / 10;
-        const days = dates.map((date) => {
-          const mine = log.filter((e) => e.date === date);
+        const totalsOf = (mine: typeof log) => {
           const sum = (f: 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g') =>
             mine.some((e) => e[f] !== null) ? r1(mine.reduce((t, e) => t + (e[f] ?? 0), 0)) : null;
           // #755: a sum covers the entries that have the value; `unknown` counts those with calories that lack it.
@@ -358,7 +358,6 @@ export function fakeApi() {
           return {
             ...extras,
             unknown,
-            date,
             entries: mine.length,
             unknown_entries: mine.filter((e) => e.kcal === null).length,
             kcal: sum('kcal'),
@@ -367,6 +366,13 @@ export function fakeApi() {
             fat_g: sum('fat_g'),
             partial: mine.some((e) => e.partial || e.kcal === null),
           };
+        };
+        const days = dates.map((date) => {
+          const mine = log.filter((e) => e.date === date);
+          const day = { date, ...totalsOf(mine) };
+          if (!byMeal) return day;
+          const slots = [...new Set(mine.map((e) => e.slot))].sort((a, b) => SLOTS.indexOf(a) - SLOTS.indexOf(b));
+          return { ...day, meals: slots.map((slot) => ({ slot, ...totalsOf(mine.filter((e) => e.slot === slot)) })) };
         });
         return { success: true, data: { from, to, days } };
       }

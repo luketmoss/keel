@@ -209,7 +209,7 @@ describe('the day view', () => {
     expect(api.calls('getFoodLogTotals')[0].params.get('from')).toBe(TODAY);
     expect(kcal()).toBe('—');
     expect(screen.getByTestId('day-note').textContent).toBe('Nothing logged today.');
-    expect(screen.getByTestId('day-macros').textContent).toBe('Protein —Carbs —Fat —');
+    expect(screen.getByTestId('day-macros').textContent).toBe('Protein—Carbs—Fat—');
     expect(screen.getByTestId('day-card').textContent).not.toMatch(/\b0 kcal/);
     // Five meal cards, each a region with only its Add row.
     expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby'))).toEqual([
@@ -232,7 +232,9 @@ describe('the day view', () => {
     await open();
     expect(kcal()).toBe('150');
     expect(screen.getByTestId('day-card').textContent).toContain('kcal so far');
-    expect(screen.getByTestId('day-macros').textContent).toBe('Protein 6 gCarbs 9 gFat 0 g');
+    expect(screen.getByTestId('day-macros').textContent).toBe(
+      'Protein6 g38% of kcalCarbs9 g56% of kcalFat0 g6% of kcal',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await settle();
@@ -1065,7 +1067,8 @@ describe('the stylesheet', () => {
 
   it('nothing scrolls sideways at 375px: the day card and macros wrap, names wrap', () => {
     expect(rule(css, '.day-card')).toContain('flex-wrap: wrap');
-    expect(rule(css, '.day-macros')).toContain('flex-wrap: wrap');
+    expect(rule(css, '.macro-cols')).toContain('repeat(3, minmax(0, 1fr))');
+    expect(rule(css, '.macro-name')).toContain('overflow-wrap: anywhere');
     expect(rule(css, '.eaten-nav')).toContain('min-width: 0');
     expect(rule(css, '.recipe-name')).toContain('overflow-wrap: anywhere');
     expect(rule(css, '.recipe-text')).toContain('min-width: 0');

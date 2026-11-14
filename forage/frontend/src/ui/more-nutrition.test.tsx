@@ -438,7 +438,7 @@ describe('demo mode', () => {
     await open('eaten');
     const card = screen.getByTestId('day-card');
     fireEvent.click(within(card).getByRole('button', { name: /More nutrition/ }));
-    expect(card.textContent).toMatch(/Trans fatat least [\d.]+ g/);
+    expect(within(screen.getByTestId('more-transfat_g')).getByText(/^at least [\d.]+ g$/)).toBeDefined();
     expect(card.textContent).toContain("At least: some entries don't have this one.");
     fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await settle();

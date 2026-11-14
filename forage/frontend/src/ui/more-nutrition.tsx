@@ -1,8 +1,11 @@
 // #756: the "More nutrition" block, one component on the food sheet, the recipe Nutrition sheet, the amount sheet and
 // the Eaten day card. It shows the seven values #755 added, as the API gave them: nothing here adds anything up.
 import { signal } from '@preact/signals';
+import type { JSX } from 'preact';
 import { useRef } from 'preact/hooks';
 import { EXTRA_KEYS, type ExtraCounts, type ExtraKey, type Extras } from '../api/types';
+import { PartsBar, type PartTone } from './macro-bar';
+import { partShare } from './macro-math';
 
 export const MORE_KEY = 'forage_more_nutrition';
 
@@ -88,6 +91,8 @@ interface Props {
   /** `Per 1 bar (40 g)`, above the list (the food sheet). */
   caption?: string;
   testId?: string;
+  /** #864: the day card's parts-of-the-whole groups (carbs and fat as bars) in place of the indented list. */
+  parts?: boolean;
 }
 
 /** The More nutrition button and, open, the seven in label order with fat's and carbs' parts indented. */
@@ -101,6 +106,7 @@ export function MoreNutrition({
   noneText,
   caption,
   testId,
+  parts,
 }: Props) {
   const id = useRef(`more-${++seq}`).current;
   const open = moreOpen.value;
@@ -123,6 +129,57 @@ export function MoreNutrition({
       <dd>
         <Value value={v} render={g} />
       </dd>
+    </div>
+  );
+
+  /** #864: a part row with its swatch, its figure, and its share of its parent (`34% of carbs`). */
+  const partRow = (
+    key: ExtraKey,
+    tone: PartTone,
+    parentName: string,
+    parent: number | null | undefined,
+    indent = false,
+  ) => {
+    const v = values[key];
+    const al = atLeast(key);
+    const share = partShare(v, parent);
+    return (
+      <div class={`mn-row mn-part${indent ? ' mn-indent' : ''}`} data-testid={`more-${key}`}>
+        <dt>
+          <span class={`mn-swatch part-${tone}`} aria-hidden="true" />
+          <span class="mn-name">
+            {NAMES[key]}
+            {share !== null && (
+              <span class="mn-share" data-testid={`share-${key}`}>
+                {al ? 'at least ' : ''}
+                {share} of {parentName}
+              </span>
+            )}
+            {share === null && key === 'added_sugars_g' && known(v) && !known(parent) && (
+              <span class="mn-share" data-testid={`share-${key}`}>
+                <span class="mn-unknown" role="img" aria-label="share of sugars not known">
+                  —
+                </span>
+              </span>
+            )}
+          </span>
+        </dt>
+        <dd>
+          <Value value={v} render={(n) => amountText(key, n, rounding)} atLeast={al} />
+        </dd>
+      </div>
+    );
+  };
+  const group = (
+    name: string,
+    parent: number | null | undefined,
+    barParts: { key: string; grams: number | null | undefined; tone: PartTone; inside?: boolean }[],
+    rows: JSX.Element[],
+  ) => (
+    <div class="mn-group" data-testid={`group-${name.toLowerCase()}`}>
+      <dl class="mn-list tabular">{head(name, parent)}</dl>
+      <PartsBar parent={parent} parts={barParts} />
+      <dl class="mn-list tabular">{rows}</dl>
     </div>
   );
 
@@ -149,17 +206,50 @@ export function MoreNutrition({
             </p>
           ) : (
             <>
-              <dl class="mn-list tabular">
-                {head('Fat', fat)}
-                {row('satfat_g', 2)}
-                {row('transfat_g', 2)}
-                {row('cholesterol_mg', 1)}
-                {row('sodium_mg', 1)}
-                {head('Carbs', carbs)}
-                {row('fiber_g', 2)}
-                {row('sugars_g', 2)}
-                {row('added_sugars_g', 3)}
-              </dl>
+              {parts && (
+                <>
+                  {group(
+                    'Carbs',
+                    carbs,
+                    [
+                      { key: 'sugars_g', grams: values.sugars_g, tone: 'sugars' },
+                      { key: 'added_sugars_g', grams: values.added_sugars_g, tone: 'added', inside: true },
+                      { key: 'fiber_g', grams: values.fiber_g, tone: 'fiber' },
+                    ],
+                    [
+                      partRow('sugars_g', 'sugars', 'carbs', carbs),
+                      partRow('added_sugars_g', 'added', 'sugars', values.sugars_g, true),
+                      partRow('fiber_g', 'fiber', 'carbs', carbs),
+                    ],
+                  )}
+                  {group(
+                    'Fat',
+                    fat,
+                    [
+                      { key: 'satfat_g', grams: values.satfat_g, tone: 'satfat' },
+                      { key: 'transfat_g', grams: values.transfat_g, tone: 'trans' },
+                    ],
+                    [partRow('satfat_g', 'satfat', 'fat', fat), partRow('transfat_g', 'trans', 'fat', fat)],
+                  )}
+                  <dl class="mn-list mn-plain tabular">
+                    {row('cholesterol_mg', 1)}
+                    {row('sodium_mg', 1)}
+                  </dl>
+                </>
+              )}
+              {!parts && (
+                <dl class="mn-list tabular">
+                  {head('Fat', fat)}
+                  {row('satfat_g', 2)}
+                  {row('transfat_g', 2)}
+                  {row('cholesterol_mg', 1)}
+                  {row('sodium_mg', 1)}
+                  {head('Carbs', carbs)}
+                  {row('fiber_g', 2)}
+                  {row('sugars_g', 2)}
+                  {row('added_sugars_g', 3)}
+                </dl>
+              )}
               {anyAtLeast && atLeastNote && (
                 <p class="hint" data-testid="more-at-least">
                   {atLeastNote}

@@ -13,6 +13,11 @@
   /* Forage's own layout: the prototype's column, and the 44px floor. */
   --column-width: 440px;
   --touch-target: 44px;
+
+  /* #864: the macro bars' shape, the same in both themes. */
+  --macro-track: var(--overlay-md);
+  --macro-gap: 2px;
+  --macro-stripe: 3px;
 }
 
 [data-theme='light'] {
@@ -21,6 +26,14 @@
   --color-primary-hover: #2a632d;
   --color-primary-light: #e6f2e6;
   --color-on-primary: #ffffff;
+
+  /* #864: Forage's data colours. On --color-surface: protein 5.42, carbs 3.79, fat 9.48 (each over 3:1); the three
+     differ in lightness (carbs lightest, fat darkest). Added sugars and trans fat are shades of their parent. */
+  --color-macro-protein: #2b6cb0;
+  --color-macro-carbs: #b87400;
+  --color-macro-fat: #6b2e68;
+  --color-macro-carbs-added: #5e3b00;
+  --color-macro-fat-trans: #a35da0;
 }
 
 [data-theme='dark'] {
@@ -29,6 +42,13 @@
   --color-primary-hover: #81c784;
   --color-primary-light: #1e3320;
   --color-on-primary: #121212;
+
+  /* #864: on --color-surface: protein 6.97, carbs 9.31, fat 3.85. Dark to light: fat, protein, carbs. */
+  --color-macro-protein: #6fa8e8;
+  --color-macro-carbs: #f0b429;
+  --color-macro-fat: #a85aa4;
+  --color-macro-carbs-added: #8f6508;
+  --color-macro-fat-trans: #d79ad3;
 }
 
 /* === Base === */
@@ -2244,11 +2264,126 @@ a.text-btn {
 }
 
 .day-macros {
+  flex-basis: 100%;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+/* #864: the split bar (shared with #866's meal cards) and the parts bars. */
+.macro-bar,
+.parts-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs) var(--space-md);
+  gap: var(--macro-gap);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.macro-bar-day {
+  height: var(--space-md);
+}
+
+.macro-bar-meal {
+  height: var(--space-sm);
+}
+
+.parts-bar {
+  height: var(--space-sm);
+  margin: var(--space-xs) 0;
+}
+
+.macro-seg {
+  flex-basis: 0;
+  flex-shrink: 1;
+  min-width: var(--space-xs);
+}
+
+.macro-track {
+  background: var(--macro-track);
+}
+
+.macro-protein {
+  background: var(--color-macro-protein);
+}
+
+.macro-carbs,
+.part-sugars {
+  background: var(--color-macro-carbs);
+}
+
+.macro-fat,
+.part-satfat {
+  background: var(--color-macro-fat);
+}
+
+.part-trans {
+  background: var(--color-macro-fat-trans);
+}
+
+.part-fiber {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-macro-carbs) 0 var(--macro-stripe),
+    var(--color-surface) var(--macro-stripe) calc(var(--macro-stripe) * 2)
+  );
+}
+
+.part-added,
+.part-inner {
+  background: var(--color-macro-carbs-added);
+}
+
+.parts-bar .macro-seg {
+  position: relative;
+}
+
+.part-inner {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.macro-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.macro-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.macro-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.macro-swatch,
+.mn-swatch {
+  flex: none;
+  width: var(--text-sm);
+  height: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+
+.macro-grams {
+  color: var(--color-text);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.macro-share {
+  min-height: 1.4em;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 
 .day-note {
@@ -2489,6 +2624,40 @@ a.text-btn {
 
 .mn-l0 {
   font-weight: 600;
+}
+
+.mn-group {
+  margin-bottom: var(--space-sm);
+}
+
+.mn-indent dt {
+  padding-left: var(--space-md);
+}
+
+.mn-part dt {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.mn-part dt .mn-swatch {
+  margin-top: 0.2em;
+}
+
+.mn-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mn-share {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.mn-plain {
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-light);
 }
 
 .mn-l2 dt {

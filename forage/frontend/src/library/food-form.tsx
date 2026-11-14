@@ -33,7 +33,7 @@ export interface FoodFormOrigin {
   fromLabel?: boolean;
   /** Focus the first nutrition field ("Add nutrition"). */
   focusNutrition?: boolean;
-  /** #756: open More from the label and focus Saturated fat ("Add them"). */
+  /** #756: focus Saturated fat ("Add them"). */
   focusExtras?: boolean;
 }
 
@@ -57,6 +57,22 @@ const EXTRA_LABELS: Record<ExtraKey, string> = {
   sugars_g: 'Sugars g',
   added_sugars_g: 'Added sugars g',
 };
+
+/** A US Nutrition Facts panel's order: the four core fields and the seven extras, with each part's indent level. */
+type LabelItem = { kind: 'core'; key: Nutrient } | { kind: 'extra'; key: ExtraKey; level: 0 | 1 | 2; bold?: boolean };
+const LABEL_ORDER: LabelItem[] = [
+  { kind: 'core', key: 'kcal' },
+  { kind: 'core', key: 'fat' },
+  { kind: 'extra', key: 'satfat_g', level: 1 },
+  { kind: 'extra', key: 'transfat_g', level: 1 },
+  { kind: 'extra', key: 'cholesterol_mg', level: 0, bold: true },
+  { kind: 'extra', key: 'sodium_mg', level: 0, bold: true },
+  { kind: 'core', key: 'carbs' },
+  { kind: 'extra', key: 'fiber_g', level: 1 },
+  { kind: 'extra', key: 'sugars_g', level: 1 },
+  { kind: 'extra', key: 'added_sugars_g', level: 2 },
+  { kind: 'core', key: 'protein' },
+];
 
 const MAX_MG_100G = 100000;
 
@@ -107,9 +123,6 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
   const [servingG, setServingG] = useState(start.servingG);
   const [n, setN] = useState(start.n);
   const [x, setX] = useState(start.x);
-  const [moreOpen, setMoreOpen] = useState(
-    !!origin.focusExtras || EXTRA_KEYS.some((k) => typeof food[EXTRA_COLUMN[k]] === 'number'),
-  );
   const [weights, setWeights] = useState<WeightRow[]>(start.weights);
   const [buyUnit, setBuyUnit] = useState(food.buy_unit ?? '');
   const [buyPlural, setBuyPlural] = useState(food.buy_unit_plural ?? '');
@@ -364,22 +377,57 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
           </div>
         )}
         <p class="hint">{packaged ? 'Per serving' : 'Per 100 g'}</p>
-        <div class="nutrient-grid">
-          {NUTRIENTS.map((k, i) => (
-            <label key={k}>
-              <span class="hint">{LABELS[k]}</span>
-              <input
-                class="field"
-                inputMode="decimal"
-                value={n[k]}
-                data-autofocus={origin.focusNutrition && i === 0 ? true : undefined}
-                onInput={(e) => setNutrient(k, e.currentTarget.value)}
-                data-testid={`n-${k}`}
-              />
-              {partly && values[i] === null && <span class="field-error">Needed if you enter any</span>}
-            </label>
-          ))}
+        <div class="nf-list">
+          {LABEL_ORDER.map((item) => {
+            if (item.kind === 'core') {
+              const k = item.key;
+              const i = NUTRIENTS.indexOf(k);
+              return (
+                <div key={k} class="nf-row nf-core">
+                  <label class="nf-label" for={`nf-${k}`}>
+                    {LABELS[k]}
+                  </label>
+                  <input
+                    id={`nf-${k}`}
+                    class="field nf-input"
+                    inputMode="decimal"
+                    value={n[k]}
+                    data-autofocus={origin.focusNutrition && i === 0 ? true : undefined}
+                    onInput={(e) => setNutrient(k, e.currentTarget.value)}
+                    data-testid={`n-${k}`}
+                  />
+                  {partly && values[i] === null && <span class="field-error nf-error">Needed if you enter any</span>}
+                </div>
+              );
+            }
+            const k = item.key;
+            const err = extraErrors[k];
+            return (
+              <div key={k} class={`nf-row nf-level-${item.level}${item.bold ? ' nf-core' : ''}`}>
+                <label class="nf-label" for={`nf-${k}`}>
+                  {EXTRA_LABELS[k]}
+                </label>
+                <input
+                  id={`nf-${k}`}
+                  class="field nf-input"
+                  inputMode="decimal"
+                  value={x[k]}
+                  data-autofocus={origin.focusExtras && k === 'satfat_g' ? true : undefined}
+                  aria-invalid={err ? true : undefined}
+                  aria-describedby={err ? `x-${k}-error` : undefined}
+                  onInput={(e) => setExtra(k, e.currentTarget.value)}
+                  data-testid={`x-${k}`}
+                />
+                {err && (
+                  <span class="field-error nf-error" id={`x-${k}-error`}>
+                    {err}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
+        <p class="hint">kcal, fat, carbs and protein are needed. Leave any other blank that the label doesn't list.</p>
         {needsServing && <span class="field-error">Needed if you enter any: the serving weight</span>}
         {packaged && per100g && (
           <p class="hint" data-testid="per-100">
@@ -387,51 +435,6 @@ export function FoodForm({ api, food, origin = {}, onSaved, onCancel }: Props) {
           </p>
         )}
       </fieldset>
-
-      <div class="form-group">
-        <button
-          type="button"
-          class="text-btn more-toggle"
-          aria-expanded={moreOpen}
-          aria-controls={moreOpen ? 'more-from-label' : undefined}
-          onClick={() => setMoreOpen(!moreOpen)}
-          data-testid="more-label-toggle"
-        >
-          More from the label
-          <span class="more-chevron" aria-hidden="true">
-            {moreOpen ? '▴' : '▾'}
-          </span>
-        </button>
-        {moreOpen && (
-          <div id="more-from-label" class="extra-fields">
-            <p class="hint">Leave any blank that the label doesn't list.</p>
-            <p class="hint">{packaged ? 'Per serving' : 'Per 100 g'}</p>
-            {EXTRA_KEYS.map((k) => {
-              const err = extraErrors[k];
-              return (
-                <label key={k} class="extra-field">
-                  <span class="hint">{EXTRA_LABELS[k]}</span>
-                  <input
-                    class="field"
-                    inputMode="decimal"
-                    value={x[k]}
-                    data-autofocus={origin.focusExtras && k === 'satfat_g' ? true : undefined}
-                    aria-invalid={err ? true : undefined}
-                    aria-describedby={err ? `x-${k}-error` : undefined}
-                    onInput={(e) => setExtra(k, e.currentTarget.value)}
-                    data-testid={`x-${k}`}
-                  />
-                  {err && (
-                    <span class="field-error" id={`x-${k}-error`}>
-                      {err}
-                    </span>
-                  )}
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       <fieldset class="form-group">
         <legend class="field-label">Weights</legend>

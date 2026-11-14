@@ -1070,7 +1070,6 @@ textarea.field {
   min-width: 0;
 }
 
-.nutrient-grid,
 .unit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2777,13 +2776,46 @@ a.text-btn {
   color: var(--color-text-muted);
 }
 
-.extra-field {
-  display: block;
+/* #875: the food form's nutrition in Nutrition Facts order, parts indented under their parent. */
+.nf-list {
+  display: grid;
+  gap: var(--space-xs);
 }
 
-.extra-fields {
+.nf-row {
   display: grid;
+  grid-template-columns: 1fr minmax(0, 40%);
+  align-items: center;
   gap: var(--space-sm);
+}
+
+.nf-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.nf-core .nf-label {
+  font-weight: 600;
+}
+
+.nf-level-1 .nf-label {
+  padding-left: var(--space-md);
+}
+
+.nf-level-2 .nf-label {
+  padding-left: calc(var(--space-md) * 2);
+}
+
+.nf-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nf-error {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 /* === Inline amounts (#882): the chip on line two of an entry, and the editor under the row === */

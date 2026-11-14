@@ -981,6 +981,6 @@ describe('the stylesheet', () => {
     expect(rule(css, '.food-text')).toContain('min-width: 0');
     expect(rule(css, '.food-meta')).toContain('overflow-wrap: anywhere');
     expect(rule(css, '.table-scroll')).toContain('overflow-x: auto');
-    expect(rule(css, '.nutrient-grid,\n.unit-grid')).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
+    expect(rule(css, '.unit-grid')).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
   });
 });

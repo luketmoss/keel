@@ -1,4 +1,4 @@
-// #756: the More nutrition block on every surface, the food form's More from the label section, and the demo data
+// #756: the More nutrition block on every surface, the food form's Nutrition Facts list (#875), and the demo data
 // that shows each state. The API's rules (#755) are in apps-script/tests; here they are checked on the field.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/preact';
@@ -189,7 +189,7 @@ describe('the More nutrition block', () => {
   });
 });
 
-describe('the food form: More from the label', () => {
+describe('the food form: nutrition in label order', () => {
   const noop = () => {};
   const apiWith = (saveFood = vi.fn((f: Partial<Food>) => Promise.resolve(food({ ...f })))) =>
     ({ saveFood }) as unknown as ForageApi;
@@ -208,55 +208,84 @@ describe('the food form: More from the label', () => {
   const form = (f: Partial<Food>, origin = {}) =>
     render(<FoodForm api={apiWith()} food={f} origin={origin} onSaved={noop} onCancel={noop} />);
 
-  it('is closed when the food has none of the seven, open when it has any', () => {
+  const ORDER = [
+    'kcal',
+    'Fat g',
+    'Saturated fat g',
+    'Trans fat g',
+    'Cholesterol mg',
+    'Sodium mg',
+    'Carbs g',
+    'Fiber g',
+    'Sugars g',
+    'Added sugars g',
+    'Protein g',
+  ];
+
+  it('shows all eleven fields at once in Nutrition Facts order, with no toggle, even for a food with only the core four', () => {
     const { unmount } = form(bar);
-    expect(screen.getByTestId('more-label-toggle').getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByTestId('x-sodium_mg')).toBeNull();
+    expect(screen.queryByTestId('more-label-toggle')).toBeNull();
+    expect(screen.queryByText('More from the label')).toBeNull();
+    const rows = [...document.querySelectorAll('.nf-list .nf-row')];
+    expect(rows.map((r) => r.querySelector('label')!.textContent)).toEqual(ORDER);
+    expect(rows.map((r) => r.querySelector('input')!.getAttribute('data-testid'))).toEqual([
+      'n-kcal',
+      'n-fat',
+      'x-satfat_g',
+      'x-transfat_g',
+      'x-cholesterol_mg',
+      'x-sodium_mg',
+      'n-carbs',
+      'x-fiber_g',
+      'x-sugars_g',
+      'x-added_sugars_g',
+      'n-protein',
+    ]);
+    // Each visible label names its input.
+    for (const r of rows) {
+      const input = r.querySelector('input')!;
+      expect(r.querySelector('label')!.getAttribute('for')).toBe(input.id);
+    }
+    expect(document.body.textContent).toContain(
+      "kcal, fat, carbs and protein are needed. Leave any other blank that the label doesn't list.",
+    );
     unmount();
     form({ ...bar, sodium_mg_100g: 500 });
-    expect(screen.getByTestId('more-label-toggle').getAttribute('aria-expanded')).toBe('true');
     expect((screen.getByTestId('x-sodium_mg') as HTMLInputElement).value).toBe('200');
   });
 
-  it('has the seven fields with the label names, per serving for a packaged food and per 100 g otherwise', () => {
-    const { unmount } = form({ ...bar, fiber_100g: 1 });
-    const section = screen.getByTestId('more-label-toggle').parentElement!;
-    expect(section.textContent).toContain("Leave any blank that the label doesn't list.");
-    expect(section.textContent).toContain('Per serving');
-    for (const label of [
-      'Saturated fat g',
-      'Trans fat g',
-      'Cholesterol mg',
-      'Sodium mg',
-      'Fiber g',
-      'Sugars g',
-      'Added sugars g',
-    ]) {
-      expect(within(section).getByText(label)).toBeDefined();
-    }
-    // #776: one flat column in label order, with no indent and no heading rows.
-    expect(
-      [...section.querySelectorAll('label.extra-field')].map((l) => l.querySelector('.hint')!.textContent),
-    ).toEqual([
-      'Saturated fat g',
-      'Trans fat g',
-      'Cholesterol mg',
-      'Sodium mg',
-      'Fiber g',
-      'Sugars g',
-      'Added sugars g',
+  it('indents the parts by one level and Added sugars by two, and the basis hint follows the kind', () => {
+    const { unmount } = form(bar);
+    const levels = [...document.querySelectorAll('.nf-list .nf-row')].map((r) => [
+      r.querySelector('label')!.textContent,
+      /nf-level-(\d)/.exec(r.className)?.[1] ?? '0',
     ]);
-    expect(section.querySelectorAll('.is-indented, .is-indented-2').length).toBe(0);
-    expect(readGlobalCss()).not.toMatch(/is-indented/);
+    expect(Object.fromEntries(levels)).toEqual({
+      kcal: '0',
+      'Fat g': '0',
+      'Saturated fat g': '1',
+      'Trans fat g': '1',
+      'Cholesterol mg': '0',
+      'Sodium mg': '0',
+      'Carbs g': '0',
+      'Fiber g': '1',
+      'Sugars g': '1',
+      'Added sugars g': '2',
+      'Protein g': '0',
+    });
+    const css = readGlobalCss();
+    expect(rule(css, '.nf-level-1 .nf-label')).toContain('padding-left: var(--space-md)');
+    expect(rule(css, '.nf-level-2 .nf-label')).toContain('padding-left: calc(var(--space-md) * 2)');
+    expect(rule(css, '.nf-row')).toContain('grid-template-columns: 1fr minmax(0, 40%)');
+    expect(document.body.textContent).toContain('Per serving');
     unmount();
     form(food({ name: 'Rice', fiber_100g: 1 }));
-    expect(screen.getByTestId('more-label-toggle').parentElement!.textContent).toContain('Per 100 g');
+    expect(document.body.textContent).toContain('Per 100 g');
   });
 
   it('saves 200 mg in a 40 g serving as sodium_mg_100g 500, and reopening shows 200', async () => {
     const saveFood = vi.fn((f: Partial<Food>) => Promise.resolve(food({ ...f })));
     const { unmount } = render(<FoodForm api={apiWith(saveFood)} food={bar} onSaved={noop} onCancel={noop} />);
-    fireEvent.click(screen.getByTestId('more-label-toggle'));
     type('x-sodium_mg', '200');
     expect(saveDisabled()).toBe(false);
     fireEvent.click(screen.getByTestId('food-save'));
@@ -327,7 +356,6 @@ describe('the food form: More from the label', () => {
 
   it('refuses the seven without the core four, on the first one set', () => {
     form(food({ name: 'Rice' }));
-    fireEvent.click(screen.getByTestId('more-label-toggle'));
     type('x-sodium_mg', '5');
     type('x-fiber_g', '1');
     expect(saveDisabled()).toBe(true);
@@ -339,15 +367,13 @@ describe('the food form: More from the label', () => {
     form({ ...bar, id: 'fd_off', source: 'off', verified: true });
     const check = () => within(screen.getByTestId('off-check')).getByRole('checkbox') as HTMLInputElement;
     expect(check().checked).toBe(true);
-    fireEvent.click(screen.getByTestId('more-label-toggle'));
     type('x-sodium_mg', '200');
     expect(check().checked).toBe(false);
   });
 
-  it('opens with More from the label open and focus in Saturated fat for Add them', async () => {
+  it('opens with focus in Saturated fat for Add them', async () => {
     form(bar, { focusExtras: true });
     await settle();
-    expect(screen.getByTestId('more-label-toggle').getAttribute('aria-expanded')).toBe('true');
     expect(document.activeElement).toBe(screen.getByTestId('x-satfat_g'));
   });
 });

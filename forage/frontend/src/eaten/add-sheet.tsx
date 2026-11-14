@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
-import type { Food, FoodLogEntry, RecipeSummary, Slot } from '../api/types';
+import type { Food, FoodLogEntry, RecipeSummary, Slot, Usual } from '../api/types';
 import { FoodName } from '../library/food-name';
 import { displayName, hasNutrition } from '../library/food-math';
+import { foodsInShort, startKcalText } from '../library/usuals-store';
 import { addDays } from '../plan/dates';
 import { Sheet } from '../ui/sheet';
 import type { LogTarget } from './amount-sheet';
 import { EntryRow } from './entry-row';
 import { foodRowLine, recipeLoggable, recipeRowLine } from './format';
+import { usualsFor } from './usual-group';
 
 /** How far back the recents look, how many they list, and how many rows a search shows. */
 const RECENT_DAYS = 60;
@@ -47,6 +49,12 @@ interface Props {
   status?: string | null;
   /** The pass has logged something: the header's close is Done. */
   done?: boolean;
+  /** The usuals (#885), most recently used first; empty until they load, or when there are none. */
+  usuals?: Usual[];
+  /** The usual being logged, whose row is disabled. */
+  loggingUsual?: string | null;
+  /** A usual row tapped: the screen logs it with `logUsual`. */
+  onLogUsual?: (usual: Usual) => void;
   /** A food or recipe that can be logged: the amount sheet opens for it. */
   onPick: (target: LogTarget) => void;
   /** One with no nutrition: #707's food form, or the recipe's Nutrition sheet. */
@@ -90,6 +98,59 @@ export function searchRows(q: string, foods: Food[], recipes: RecipeSummary[]): 
 }
 
 const loggable = (t: LogTarget) => (t.kind === 'food' ? hasNutrition(t.food) : recipeLoggable(t.recipe));
+
+/** The Usuals section (#885): one row per usual, those usually for this meal first. Renders nothing when none match. */
+function UsualRows({
+  usuals,
+  slot,
+  q,
+  foods,
+  logging,
+  onLog,
+}: {
+  usuals: Usual[];
+  slot: Slot;
+  q: string;
+  foods: Food[];
+  logging: string | null;
+  onLog: (u: Usual) => void;
+}) {
+  const rows = usualsFor(usuals, slot, q);
+  if (!rows.length) return null;
+  const byId = new Map(foods.map((f) => [f.id, f]));
+  return (
+    <>
+      <p class="card-label" id="usuals-label">
+        Usuals
+      </p>
+      <ul class="plain-list" aria-labelledby="usuals-label" data-testid="usuals-list">
+        {rows.map((u) => {
+          const short = foodsInShort(u, byId);
+          const kcal = startKcalText(u);
+          return (
+            <li key={u.id}>
+              <button
+                type="button"
+                class="log-row"
+                onClick={() => onLog(u)}
+                disabled={!!logging}
+                aria-busy={logging === u.id}
+                aria-label={`${u.name}, ${short}${kcal ? `, ${kcal}` : ''}`}
+                data-testid="usual-result"
+              >
+                <span class="recipe-text">
+                  <span class="recipe-name">{u.name}</span>
+                  <span class="recipe-meta">{short}</span>
+                </span>
+                {kcal ? <span class="log-row-kcal tabular">{kcal}</span> : <span class="chip-flag">—</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
 
 function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => void; onAddNutrition: () => void }) {
   const t = row.target;
@@ -141,6 +202,9 @@ export function AddSheet({
   fresh,
   status,
   done,
+  usuals = [],
+  loggingUsual = null,
+  onLogUsual,
   onPick,
   onAddNutrition,
   onAddFood,
@@ -188,22 +252,38 @@ export function AddSheet({
     body = <p class="library-status">No foods in your library yet.</p>;
   } else if (text) {
     const rows = searchRows(text, foods, recipes);
-    body = rows.length ? (
-      <ul class="plain-list" aria-label="Results">
-        {rows.map((r) => (
-          <ResultRow
-            key={r.key}
-            row={r}
-            onPick={() => onPick(r.target)}
-            onAddNutrition={() => onAddNutrition(r.target)}
-          />
-        ))}
-      </ul>
-    ) : (
-      <p class="library-status" data-testid="add-no-match">
-        Nothing matches "{text}".
-      </p>
+    const usualRows = (
+      <UsualRows
+        usuals={usuals}
+        slot={slot}
+        q={text}
+        foods={foods}
+        logging={loggingUsual}
+        onLog={(u) => onLogUsual?.(u)}
+      />
     );
+    body =
+      rows.length || usualsFor(usuals, slot, text).length ? (
+        <>
+          {usualRows}
+          {rows.length > 0 && (
+            <ul class="plain-list" aria-label="Results">
+              {rows.map((r) => (
+                <ResultRow
+                  key={r.key}
+                  row={r}
+                  onPick={() => onPick(r.target)}
+                  onAddNutrition={() => onAddNutrition(r.target)}
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <p class="library-status" data-testid="add-no-match">
+          Nothing matches "{text}".
+        </p>
+      );
   } else {
     const recents = recentRows(log, foods, recipes);
     const rows: Row[] = recents.length
@@ -211,6 +291,14 @@ export function AddSheet({
       : recipes.slice(0, FALLBACK_RECIPES).map((r) => ({ key: r.id, target: { kind: 'recipe', recipe: r } }));
     body = (
       <>
+        <UsualRows
+          usuals={usuals}
+          slot={slot}
+          q=""
+          foods={foods}
+          logging={loggingUsual}
+          onLog={(u) => onLogUsual?.(u)}
+        />
         {added.length > 0 && (
           <>
             <p class="card-label" id="added-label">

@@ -2816,3 +2816,75 @@ a.text-btn {
   display: flex;
   justify-content: flex-end;
 }
+
+/* #883: the ＋ Serving pill and panel under the inline amount editor. */
+.chip-add {
+  border-style: dashed;
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+
+.serving-vague {
+  margin: 0;
+}
+
+.serving-vague .text-btn {
+  min-height: var(--touch-target);
+  padding: 0 var(--space-xs);
+  font-size: inherit;
+}
+
+.serving-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.serving-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.serving-heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.serving-fields {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.serving-fields .field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.serving-fields .serving-qty {
+  flex: 0 0 auto;
+  width: calc(4ch + 2 * var(--space-md));
+}
+
+.serving-fields .serving-grams {
+  flex: 0 0 40%;
+}
+
+.serving-block .hint,
+.serving-block .field-error {
+  margin: 0;
+}
+
+.serving-note {
+  font-size: var(--text-xs);
+}
+
+.serving-divider {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}

@@ -191,6 +191,13 @@ export function fakeApi() {
         };
       }
       case 'upsertFood': {
+        // #883: an id that exists merges the fields sent into that food, as the API does.
+        const was = payload.id ? foods.find((f) => f.id === payload.id) : undefined;
+        if (was) {
+          const merged = { ...was, ...payload } as Food;
+          foods[foods.indexOf(was)] = merged;
+          return { success: true, data: { ...merged } };
+        }
         const food = { id: `fd_${++seq}`, ...payload } as Food;
         foods.push(food);
         return { success: true, data: food };

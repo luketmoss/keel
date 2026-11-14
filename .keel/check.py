@@ -14,6 +14,7 @@ by reading:
   - pr.py's path-filter matcher, report and Results editor behave on fixtures
   - worktrees.py keeps or removes each kind of worktree correctly on fixtures
   - board.py's epic grouping and promotion decisions behave on fixtures
+  - board.py, worktrees.py and check.py decode child output as UTF-8
 
 Run it locally exactly as CI runs it:
 
@@ -79,7 +80,8 @@ def tracked(pattern, others=True):
     result = subprocess.run(
         argv + [pattern],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
         sys.exit("git ls-files failed:\n" + result.stderr.strip())
@@ -596,8 +598,69 @@ def check_worktrees():
     return "worktrees.py", "{} cases".format(count[0]), problems
 
 
+def check_utf8_decode():
+    """Child-process output is decoded as UTF-8, not the locale codepage.
+
+    On Windows a bare text mode decodes with cp1252, and an issue body holding
+    U+FF0B made gh() return None (#894). A child that prints those bytes is run
+    through each helper with the codepage forced to cp1252, so the check fails
+    on any machine if a helper stops naming its encoding.
+    """
+    sys.path.insert(0, os.path.join(ROOT, ".keel"))
+    try:
+        import board
+        import worktrees
+    finally:
+        sys.path.pop(0)
+
+    problems = []
+    count = [0]
+
+    def expect(label, got, want):
+        count[0] += 1
+        if got != want:
+            problems.append("{}: got {}, want {}".format(label, ascii(got), ascii(want)))
+
+    wide = "plus ＋, dash —, ship 🚢"
+    payload = wide.encode("utf-8") + b" bad \xff"
+    argv = [sys.executable, "-c",
+            "import sys; sys.stdout.buffer.write(bytes.fromhex({!r}))".format(
+                payload.hex())]
+    want = wide + " bad \ufffd"
+
+    # board.gh() prepends "gh"; swap in the child for that one program.
+    real_run = subprocess.run
+
+    def fake(args, **kwargs):
+        if args and args[0] == "gh":
+            args = argv
+        return real_run(args, **kwargs)
+
+    saved = os.environ.copy()
+    os.environ.update({"PYTHONUTF8": "0", "PYTHONIOENCODING": "cp1252"})
+    try:
+        board.subprocess.run = fake
+        expect("board.gh", board.gh([]), want)
+        board.subprocess.run = real_run
+        expect("worktrees.run", worktrees.run(argv).stdout, want)
+    finally:
+        board.subprocess.run = real_run
+        os.environ.clear()
+        os.environ.update(saved)
+
+    for name in ("board.py", "worktrees.py", "check.py"):
+        for number, line in enumerate(
+                read(os.path.join(ROOT, ".keel", name)).splitlines(), start=1):
+            if "text" "=True" in line:
+                problems.append("{}:{}: text mode without an encoding".format(
+                    name, number))
+
+    return "utf-8 decoding", "{} cases".format(count[0]), problems
+
+
 CHECKS = [check_python, check_frontmatter, check_links, check_design_notes,
-          check_pr_script, check_board_group, check_worktrees]
+          check_pr_script, check_board_group, check_worktrees,
+          check_utf8_decode]
 
 
 def main():

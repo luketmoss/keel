@@ -80,7 +80,8 @@ def classify(wt, base, merged, remote, dirty):
 
 
 def run(args, cwd=REPO_ROOT):
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+    return subprocess.run(args, cwd=cwd, capture_output=True,
+                          encoding="utf-8", errors="replace")
 
 
 def list_worktrees():

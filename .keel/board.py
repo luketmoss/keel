@@ -66,7 +66,8 @@ FIELDS = {
 
 
 def gh(args):
-    result = subprocess.run(["gh"] + args, capture_output=True, text=True)
+    result = subprocess.run(["gh"] + args, capture_output=True,
+                            encoding="utf-8", errors="replace")
     if result.returncode != 0:
         sys.exit("gh failed: gh {}\n{}".format(" ".join(args), result.stderr.strip()))
     return result.stdout
@@ -241,7 +242,8 @@ def rest(method, path, body=None):
     ]
     if body is not None:
         cmd += ["-H", "Content-Type: application/json", "--data", json.dumps(body)]
-    raw = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    raw = subprocess.run(cmd, capture_output=True, encoding="utf-8",
+                         errors="replace", check=True).stdout
     text, _, status = raw.rpartition("\n")
     if int(status) >= 300:
         sys.exit("GitHub {} {} -> {}\n{}".format(method, path, status, text))

@@ -75,6 +75,8 @@ export function MealMenuSheet({ slot, count, selectable, onCopyTo, onSelect, onC
 
 interface CopyProps {
   slot: Slot;
+  /** The sheet's title; the meal's by default, a group's name when it copies only a group (#885). */
+  title?: string;
   today: string;
   entries: FoodLogEntry[];
   foods: Food[];
@@ -86,7 +88,7 @@ interface CopyProps {
 }
 
 /** The Copy sheet (#884): the meal as it is, a day, a meal and one button. Adds; nothing is replaced. */
-export function CopySheet({ slot, today, entries, foods, recipes, busy, failed, onCopy, onClose }: CopyProps) {
+export function CopySheet({ slot, title, today, entries, foods, recipes, busy, failed, onCopy, onClose }: CopyProps) {
   const [day, setDay] = useState(today);
   const [to, setTo] = useState<Slot>(slot);
   const [picking, setPicking] = useState(false);
@@ -104,7 +106,7 @@ export function CopySheet({ slot, today, entries, foods, recipes, busy, failed, 
   const pickLabel = onChip || !picking ? 'Pick a date…' : listDay(day, today);
 
   return (
-    <Sheet title={`Copy ${slot.toLowerCase()}`} onClose={onClose} testId="copy-sheet">
+    <Sheet title={title ?? `Copy ${slot.toLowerCase()}`} onClose={onClose} testId="copy-sheet">
       <p class="hint" data-testid="copy-summary">
         {summary}
       </p>

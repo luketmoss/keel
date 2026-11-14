@@ -3,7 +3,7 @@
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
-import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSummary } from '../api/types';
+import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSummary, Usual } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 import { switchUnit, type UnitOption } from './amount-edit';
@@ -25,6 +25,22 @@ export const dayPlan = signal<PlanEntry[]>([]);
 /** The library, for the entries' names and the Add sheet. */
 export const logFoods = signal<Food[]>([]);
 export const logRecipes = signal<RecipeSummary[]>([]);
+/** The usuals (#885), for the Add sheet and for a group's pick-ones and changes; empty until they load or if that fails. */
+export const dayUsuals = signal<Usual[]>([]);
+
+/** Read the usuals. A failure leaves what is held, and the Add sheet simply has no Usuals section (#885). */
+export async function loadDayUsuals(api: ForageApi): Promise<void> {
+  try {
+    dayUsuals.value = await api.getUsuals();
+  } catch {
+    // Nothing to say: the foods work without them.
+  }
+}
+
+/** Put a saved usual into the held list, replacing the old copy. */
+export function keepDayUsual(usual: Usual): void {
+  dayUsuals.value = [...dayUsuals.value.filter((u) => u.id !== usual.id), usual];
+}
 
 /**
  * The one inline amount editor open in the day (#882): the entry, the amount being set, the dry-run preview of it, and
@@ -309,4 +325,5 @@ export function _resetEaten(): void {
   dayPlan.value = [];
   logFoods.value = [];
   logRecipes.value = [];
+  dayUsuals.value = [];
 }

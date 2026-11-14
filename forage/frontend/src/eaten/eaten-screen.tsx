@@ -13,6 +13,8 @@ import {
   type FoodLogMeal,
   type PlanEntry,
   type Slot,
+  type Usual,
+  type UsualOption,
 } from '../api/types';
 import { BarcodeSheet } from '../library/barcode-sheet';
 import { FoodForm, type FoodFormOrigin } from '../library/food-form';
@@ -27,6 +29,7 @@ import { showToast } from '../ui/toast';
 import { AddSheet, type AddLists } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
+import { GroupHeading, GroupMenuSheet, PickOne } from './group-view';
 import { SaveRecipeSheet } from './save-recipe-sheet';
 import {
   copiedToast,
@@ -43,15 +46,19 @@ import { CopyFromSheet, CopySheet, MealMenuSheet } from './meal-sheets';
 import {
   afterEditor,
   closeEditor,
+  editing,
   dayEntries,
   dayMeals,
+  dayUsuals,
   dayPlan,
   dayState,
   dayTotals,
   eatenDate,
   eatenToday,
+  keepDayUsual,
   knowFood,
   loadDay,
+  loadDayUsuals,
   loadedDate,
   logFoods,
   logRecipes,
@@ -74,6 +81,19 @@ import {
   wholeGrams,
   wholeKcal,
 } from './format';
+import {
+  addedToast,
+  dayItems,
+  fromUsual,
+  groupChanges,
+  groupKcal,
+  lineOf,
+  updatedUsual,
+  usualOf,
+  type DayItem,
+} from './usual-group';
+
+type Group = Extract<DayItem, { kind: 'group' }>;
 
 /** The Eaten header (#712): previous day, the day, next day (disabled on today). The day is the page's h1. */
 export function EatenHeader({ api }: { api: ForageApi }) {
@@ -329,7 +349,10 @@ type Overlay =
   // #884: a meal's ⋯ menu, and the two sheets it opens.
   | { kind: 'menu'; slot: Slot }
   | { kind: 'copyTo'; slot: Slot }
-  | { kind: 'copyFrom'; slot: Slot };
+  | { kind: 'copyFrom'; slot: Slot }
+  // #885: a group's ⋯ menu, and its Copy to… sheet.
+  | { kind: 'groupMenu'; slot: Slot; groupId: string }
+  | { kind: 'groupCopy'; slot: Slot; groupId: string };
 
 /**
  * A pass (#786): from an Add row's tap until the Add sheet closes, one meal's adding. The screen holds it because the
@@ -368,6 +391,12 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const [copyBusy, setCopyBusy] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
+  // #885: the usual being logged, the pick-one list open (an entry id), a pick or a menu action saving.
+  const [loggingUsual, setLoggingUsual] = useState<string | null>(null);
+  const [openPick, setOpenPick] = useState<string | null>(null);
+  const [pickBusy, setPickBusy] = useState<string | null>(null);
+  const [groupBusy, setGroupBusy] = useState(false);
+
   function leaveSelect() {
     setSelecting(null);
     setTicked([]);
@@ -375,6 +404,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   useEffect(() => {
     void loadDay(api);
+    void loadDayUsuals(api);
     const onVisible = () => {
       // #882: the app going to the background saves an editor's pending change.
       if (document.visibilityState !== 'visible') {
@@ -383,6 +413,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       }
       leaveSelect();
       void loadDay(api);
+      void loadDayUsuals(api);
       void loadLookback(api, eatenDate.value);
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -417,11 +448,18 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   useEffect(() => {
     void loadLookback(api, date);
   }, [date, api]);
+  // #885: opening an amount editor closes an open pick-one list.
+  const editingId = editing.value?.id ?? null;
+  useEffect(() => {
+    if (editingId) setOpenPick(null);
+  }, [editingId]);
   const state = dayState.value;
   const entries = dayEntries.value;
   const planned = unloggedPlan(dayPlan.value, entries);
   const foods = logFoods.value;
   const recipes = logRecipes.value;
+  const usuals = dayUsuals.value;
+  const foodMap = new Map(foods.map((f) => [f.id, f]));
 
   // The write's own answer goes into the day, then the sheet closes and the toast shows, in one update; the totals
   // catch up quietly behind it (#785).
@@ -597,6 +635,149 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     );
   }
 
+  /** Tap a usual in the Add sheet (#885): its entries go in as one group, the sheet closes, and the toast offers Undo. */
+  async function logUsual(u: Usual, slot: Slot) {
+    if (loggingUsual) return;
+    setLoggingUsual(u.id);
+    try {
+      const { entries: made } = await api.logUsual({ usual_id: u.id, date, slot });
+      for (const e of made) upsertEntry(e);
+      void refreshDay(api);
+      void loadDayUsuals(api);
+      setOverlay(null);
+      setPass(null);
+      const ids = made.map((e) => e.id);
+      showToast(addedToast(u.name, made.length), { label: 'Undo', run: () => void undoLogged(ids) });
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${slot}"]`)?.focus(),
+      );
+    } catch {
+      setPass((p) => p && { ...p, status: `Couldn't add ${u.name}. Try again.` });
+    } finally {
+      setLoggingUsual(null);
+    }
+  }
+
+  /** Undo of a logged usual: delete exactly its entries. */
+  async function undoLogged(ids: string[]) {
+    try {
+      await api.deleteLogEntries(ids);
+      for (const id of ids) removeEntry(id);
+      void refreshDay(api);
+      void loadDayUsuals(api);
+    } catch {
+      showToast("Couldn't undo. The items are still there.");
+    }
+  }
+
+  /** A pick-one's choice (#885): the entry becomes that option at the option's own amount, in place. */
+  function pick(entry: FoodLogEntry, opt: UsualOption) {
+    if (pickBusy) return;
+    afterEditor(api, () => {
+      setPickBusy(entry.id);
+      api
+        .updateLogEntry(entry.id, { food_id: opt.food_id, qty: opt.qty, unit: opt.unit })
+        .then(
+          (saved) => {
+            upsertEntry(saved);
+            void refreshDay(api);
+            setOpenPick(null);
+          },
+          () => showToast("Couldn't save. Try again."),
+        )
+        .finally(() => setPickBusy(null));
+    });
+  }
+
+  function openGroupMenu(slot: Slot, groupId: string) {
+    afterEditor(api, () => setOverlay({ kind: 'groupMenu', slot, groupId }));
+  }
+
+  /** Update the usual (#885): the group's entries become its lines, and the entries are linked to them again. */
+  async function updateUsual(group: Group, usual: Usual) {
+    if (groupBusy) return;
+    setGroupBusy(true);
+    try {
+      const saved = await api.upsertUsual(updatedUsual(group.entries, usual));
+      keepDayUsual(saved);
+      try {
+        const linked = await api.setLogGroup(
+          group.entries.map((e) => e.id),
+          { name: group.name, usual_id: usual.id },
+        );
+        for (const e of linked) upsertEntry(e);
+      } catch {
+        void refreshDay(api);
+        showToast("Couldn't save. Try again.");
+        return;
+      }
+      setOverlay(null);
+      showToast(`Updated ${usual.name}. Next time it starts like this.`);
+    } catch {
+      showToast("Couldn't save. Try again.");
+    } finally {
+      setGroupBusy(false);
+    }
+  }
+
+  async function ungroup(group: Group) {
+    if (groupBusy) return;
+    setGroupBusy(true);
+    try {
+      const freed = await api.setLogGroup(
+        group.entries.map((e) => e.id),
+        null,
+      );
+      for (const e of freed) upsertEntry(e);
+      setOverlay(null);
+      showToast('Ungrouped');
+    } catch {
+      showToast("Couldn't save. Try again.");
+    } finally {
+      setGroupBusy(false);
+    }
+  }
+
+  async function removeGroup(group: Group) {
+    if (groupBusy) return;
+    setGroupBusy(true);
+    try {
+      const ids = group.entries.map((e) => e.id);
+      await api.deleteLogEntries(ids);
+      for (const id of ids) removeEntry(id);
+      void refreshDay(api);
+      setOverlay(null);
+      const first = group.entries[0];
+      const items = group.entries
+        .filter((e) => e.food_id)
+        .map((e) => ({ food_id: e.food_id, qty: e.qty, unit: e.unit }));
+      showToast(`Removed ${group.name}`, {
+        label: 'Undo',
+        run: () => void relogGroup(first.date, first.slot, group.name, items),
+      });
+    } catch {
+      showToast("Couldn't save. Try again.");
+    } finally {
+      setGroupBusy(false);
+    }
+  }
+
+  /** Undo of Remove all: the same foods again under the same name; a new group with no usual link. */
+  async function relogGroup(
+    day: string,
+    slot: Slot,
+    name: string,
+    items: { food_id: string; qty: number; unit: string }[],
+  ) {
+    try {
+      const { entries: made } = await api.logGroup({ date: day, slot, name, items });
+      for (const e of made) upsertEntry(e);
+      void refreshDay(api);
+    } catch {
+      showToast("Couldn't undo. Try again from your log.");
+    }
+  }
+
   function savedRecipe(recipe: RecipeDetail) {
     // The reply goes into the Add sheet's and the Library's lists, then the sheet closes and the toast shows together.
     const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = recipe;
@@ -616,6 +797,37 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     } catch {
       setOverlay({ kind: 'add', slot });
     }
+  }
+
+  /** An entry's row; one on a pick-one line of its usual shows the choice under it (#885). */
+  function renderEntry(e: FoodLogEntry, usual: Usual | null) {
+    const amount = rowEditing(e);
+    const line = amount ? lineOf(e, usual) : null;
+    return (
+      <EntryRow
+        key={e.id}
+        entry={e}
+        name={entryName(e, foods, recipes)}
+        onOpen={() => openEntry(e)}
+        amount={amount}
+        below={
+          line?.options ? (
+            <PickOne
+              entry={e}
+              line={line}
+              foods={foodMap}
+              open={openPick === e.id}
+              busy={pickBusy === e.id}
+              onToggle={() => {
+                if (openPick === e.id) setOpenPick(null);
+                else afterEditor(api, () => setOpenPick(e.id));
+              }}
+              onPick={(o) => pick(e, o)}
+            />
+          ) : undefined
+        }
+      />
+    );
   }
 
   return (
@@ -706,26 +918,34 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                 </p>
               )}
               <ul class="plain-list">
-                {mine.map((e) =>
-                  selectingHere ? (
-                    <SelectRow
-                      key={e.id}
-                      entry={e}
-                      name={entryName(e, foods, recipes)}
-                      ticked={ticked.includes(e.id)}
-                      blocked={blockedReason(e)}
-                      onToggle={() => toggle(e.id)}
-                    />
-                  ) : (
-                    <EntryRow
-                      key={e.id}
-                      entry={e}
-                      name={entryName(e, foods, recipes)}
-                      onOpen={() => openEntry(e)}
-                      amount={rowEditing(e)}
-                    />
-                  ),
-                )}
+                {selectingHere
+                  ? mine.map((e) => (
+                      <SelectRow
+                        key={e.id}
+                        entry={e}
+                        name={entryName(e, foods, recipes)}
+                        ticked={ticked.includes(e.id)}
+                        blocked={blockedReason(e)}
+                        onToggle={() => toggle(e.id)}
+                      />
+                    ))
+                  : dayItems(mine).map((item) => {
+                      if (item.kind === 'entry') return renderEntry(item.entry, null);
+                      const usual = usualOf(item.entries, usuals);
+                      const changed = !!usual && groupChanges(item.entries, usual, foodMap).length > 0;
+                      return (
+                        <li key={item.id} class="group-li" data-testid="group">
+                          <GroupHeading
+                            name={item.name}
+                            usual={fromUsual(item.entries)}
+                            changed={changed}
+                            kcal={groupKcal(item.entries)}
+                            onMenu={() => openGroupMenu(slot, item.id)}
+                          />
+                          <ul class="plain-list group-entries">{item.entries.map((e) => renderEntry(e, usual))}</ul>
+                        </li>
+                      );
+                    })}
                 {!selectingHere &&
                   plans.map((p) => (
                     <PlannedRow
@@ -813,6 +1033,57 @@ export function EatenScreen({ api }: { api: ForageApi }) {
             />
           );
         })()}
+      {overlay?.kind === 'groupMenu' &&
+        (() => {
+          const group = dayItems(entries.filter((e) => e.slot === overlay.slot)).find(
+            (i): i is Group => i.kind === 'group' && i.id === overlay.groupId,
+          );
+          if (!group) return null;
+          const usual = usualOf(group.entries, usuals);
+          return (
+            <GroupMenuSheet
+              name={group.name}
+              count={group.entries.length}
+              update={usual ? { usual: usual.name, changes: groupChanges(group.entries, usual, foodMap) } : null}
+              busy={groupBusy}
+              onUpdate={() => usual && void updateUsual(group, usual)}
+              onCopy={() => {
+                setCopyFailed(false);
+                setOverlay({ kind: 'groupCopy', slot: overlay.slot, groupId: group.id });
+              }}
+              onUngroup={() => void ungroup(group)}
+              onRemove={() => void removeGroup(group)}
+              onClose={() => !groupBusy && setOverlay(null)}
+            />
+          );
+        })()}
+      {overlay?.kind === 'groupCopy' &&
+        (() => {
+          const group = dayItems(entries.filter((e) => e.slot === overlay.slot)).find(
+            (i): i is Group => i.kind === 'group' && i.id === overlay.groupId,
+          );
+          if (!group) return null;
+          return (
+            <CopySheet
+              slot={overlay.slot}
+              title={`Copy ${group.name}`}
+              today={today}
+              entries={group.entries}
+              foods={foods}
+              recipes={recipes}
+              busy={copyBusy}
+              failed={copyFailed}
+              onCopy={(toDate, toSlot) =>
+                void copy(
+                  { from_date: date, from_slot: overlay.slot, group_id: group.id, to_date: toDate, to_slot: toSlot },
+                  (n) => copiedToast(toDate, today, toSlot, n),
+                  null,
+                )
+              }
+              onClose={() => !copyBusy && setOverlay(null)}
+            />
+          );
+        })()}
       {overlay?.kind === 'copyTo' && (
         <CopySheet
           slot={overlay.slot}
@@ -879,6 +1150,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           fresh={pass?.fresh}
           status={pass?.status}
           done={!!pass?.ids.length}
+          usuals={usuals}
+          loggingUsual={loggingUsual}
+          onLogUsual={(u) => void logUsual(u, overlay.slot)}
           onPick={(target) => setOverlay({ kind: 'amount', slot: overlay.slot, target })}
           onAddNutrition={(target) => addNutrition(target, overlay.slot)}
           onAddFood={() => setOverlay({ kind: 'addFood', slot: overlay.slot })}

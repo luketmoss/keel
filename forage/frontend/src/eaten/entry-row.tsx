@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import type { Food, FoodLogEntry } from '../api/types';
@@ -34,6 +35,7 @@ export function EntryRow({
   onOpen,
   fresh,
   amount,
+  below,
 }: {
   entry: FoodLogEntry;
   name: string;
@@ -41,6 +43,8 @@ export function EntryRow({
   fresh?: boolean;
   /** Given on the day's own rows, so line two is the amount chip (#882); the Added list and a removed food's row leave it out. */
   amount?: RowEditing;
+  /** What sits under line two, before the editor: a usual's pick-one choice (#885). */
+  below?: ComponentChildren;
 }) {
   const edit = editing.value?.id === entry.id ? editing.value : null;
   // While the editor is open the row shows the amount being set and the preview's calories (the stored ones until it answers).
@@ -111,6 +115,7 @@ export function EntryRow({
         </button>
         {suffix}
       </div>
+      {below}
       {edit && <AmountEditor api={amount.api} entry={entry} name={name} food={amount.food} />}
     </li>
   );

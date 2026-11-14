@@ -105,6 +105,11 @@ function withMeals(entries: Partial<FoodLogEntry>[], meals: FoodLogMeal[] | unde
   return api;
 }
 
+/** #884: Select is in the meal's ⋯ menu. */
+function startSelect(slot: string) {
+  fireEvent.click(within(card(slot)).getByTestId('meal-menu'));
+  fireEvent.click(screen.getByTestId('menu-select'));
+}
 const card = (slot: string) =>
   screen.getAllByTestId('meal-card').find((c) => c.querySelector('h2')!.textContent === slot)!;
 
@@ -230,7 +235,7 @@ describe('meal card totals', () => {
   it('keeps the bar and line in select mode', async () => {
     withMeals([{}], [meal('Breakfast')]);
     await open();
-    fireEvent.click(within(card('Breakfast')).getByTestId('select-meal'));
+    startSelect('Breakfast');
     await settle();
     expect(within(card('Breakfast')).getByTestId('meal-totals')).toBeTruthy();
     expect(within(card('Breakfast')).getByTestId('meal-kcal').textContent).toBe('412 kcal');

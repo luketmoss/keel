@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import {
   SLOTS,
+  type CopyMealInput,
   type Food,
   type RecipeDetail,
   type FoodLogDay,
@@ -27,6 +28,18 @@ import { AddSheet, type AddLists } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
 import { SaveRecipeSheet } from './save-recipe-sheet';
+import {
+  copiedToast,
+  dayWord,
+  loadLookback,
+  lookback,
+  mealsBefore,
+  mealSummary,
+  pulledToast,
+  sameAsLabel,
+  type DayMeal,
+} from './copy-meal';
+import { CopyFromSheet, CopySheet, MealMenuSheet } from './meal-sheets';
 import {
   afterEditor,
   closeEditor,
@@ -312,7 +325,11 @@ type Overlay =
   | { kind: 'amount'; slot: Slot; target: LogTarget; entry?: FoodLogEntry }
   | { kind: 'nutrition'; recipeId: string; back?: Slot }
   // #788: the New recipe sheet, over the meal in select mode.
-  | { kind: 'saveRecipe'; slot: Slot };
+  | { kind: 'saveRecipe'; slot: Slot }
+  // #884: a meal's ⋯ menu, and the two sheets it opens.
+  | { kind: 'menu'; slot: Slot }
+  | { kind: 'copyTo'; slot: Slot }
+  | { kind: 'copyFrom'; slot: Slot };
 
 /**
  * A pass (#786): from an Add row's tap until the Add sheet closes, one meal's adding. The screen holds it because the
@@ -346,6 +363,11 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const [selecting, setSelecting] = useState<Slot | null>(null);
   const [ticked, setTicked] = useState<string[]>([]);
 
+  // #884: one copy at a time; a second tap while one is out does nothing.
+  const copying = useRef(false);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+
   function leaveSelect() {
     setSelecting(null);
     setTicked([]);
@@ -361,6 +383,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       }
       leaveSelect();
       void loadDay(api);
+      void loadLookback(api, eatenDate.value);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -390,6 +413,10 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       void loadDay(api, date);
     }
   }, [date, today, api]);
+  // #884: the 7 days before the one shown, read once per day for the "Same as…" suggestion and Copy from another day….
+  useEffect(() => {
+    void loadLookback(api, date);
+  }, [date, api]);
   const state = dayState.value;
   const entries = dayEntries.value;
   const planned = unloggedPlan(dayPlan.value, entries);
@@ -518,6 +545,58 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     });
   }
 
+  function openMenu(slot: Slot) {
+    afterEditor(api, () => setOverlay({ kind: 'menu', slot }));
+  }
+
+  /**
+   * One copy (#884): the entries the write answered go into the day when it is the day on screen, the sheet closes
+   * and the toast shows with Undo, in one update. `fail` is the toast for a failure with no sheet to hold it.
+   */
+  async function copy(input: CopyMealInput, ok: (n: number) => string, fail: string | null) {
+    if (copying.current) return;
+    copying.current = true;
+    setCopyBusy(true);
+    setCopyFailed(false);
+    try {
+      const made = await api.copyMeal(input);
+      for (const e of made) upsertEntry(e);
+      if (input.to_date === eatenDate.value) void refreshDay(api);
+      else void loadLookback(api, eatenDate.value);
+      setOverlay(null);
+      const ids = made.map((e) => e.id);
+      showToast(ok(made.length), { label: 'Undo', run: () => void undoCopy(ids) });
+    } catch {
+      if (fail) showToast(fail);
+      else setCopyFailed(true);
+    } finally {
+      copying.current = false;
+      setCopyBusy(false);
+    }
+  }
+
+  /** Undo deletes exactly the copied entries, then the day patches. */
+  async function undoCopy(ids: string[]) {
+    try {
+      await api.deleteLogEntries(ids);
+      for (const id of ids) removeEntry(id);
+      void refreshDay(api);
+      void loadLookback(api, eatenDate.value);
+    } catch {
+      showToast("Couldn't undo. The copied items are still there.");
+    }
+  }
+
+  /** Bring an earlier day's meal into the one shown, on the same slot. */
+  function pull(from: DayMeal, slot: Slot, sheet: boolean) {
+    const word = dayWord(from.date, today);
+    void copy(
+      { from_date: from.date, from_slot: slot, to_date: date, to_slot: slot },
+      (n) => pulledToast(from.date, today, slot, n),
+      sheet ? null : `Couldn't copy ${word}'s ${slot.toLowerCase()}. Try again.`,
+    );
+  }
+
   function savedRecipe(recipe: RecipeDetail) {
     // The reply goes into the Add sheet's and the Library's lists, then the sheet closes and the toast shows together.
     const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = recipe;
@@ -569,7 +648,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           const plans = state === 'ready' ? planned.filter((p) => p.slot === slot) : [];
           const headId = `meal-${slot.toLowerCase().replace(/ /g, '-')}`;
           const selectingHere = selecting === slot;
-          const canSelect = mine.some((e) => !blockedReason(e));
           const meal = mine.length ? dayMeals.value.find((m) => m.slot === slot) : undefined;
           const mealUnknown = !!meal && meal.kcal === null;
           const count = selectingHere ? mine.filter((e) => ticked.includes(e.id) && !blockedReason(e)).length : 0;
@@ -603,16 +681,23 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                     )}
                   </span>
                 )}
-                {state === 'ready' && (canSelect || selectingHere) && (
-                  <button
-                    type="button"
-                    class="text-btn"
-                    onClick={() => (selectingHere ? leaveSelect() : startSelect(slot))}
-                    data-testid={selectingHere ? 'select-cancel' : 'select-meal'}
-                  >
-                    {selectingHere ? 'Cancel' : 'Select'}
-                  </button>
-                )}
+                {state === 'ready' &&
+                  (selectingHere ? (
+                    <button type="button" class="text-btn" onClick={leaveSelect} data-testid="select-cancel">
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      aria-label={`More for ${slot.toLowerCase()}`}
+                      aria-haspopup="dialog"
+                      onClick={() => openMenu(slot)}
+                      data-testid="meal-menu"
+                    >
+                      <span aria-hidden="true">⋯</span>
+                    </button>
+                  ))}
               </div>
               {meal && !mealUnknown && <MealTotals meal={meal} />}
               {meal && mealUnknown && (
@@ -669,20 +754,102 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                   {count === 0 && <p class="hint select-helper">Tick the items that go together.</p>}
                 </>
               ) : (
-                <button
-                  type="button"
-                  class="meal-add"
-                  onClick={() => startPass(slot)}
-                  data-testid="add-to-meal"
-                  data-slot={slot}
-                >
-                  <span aria-hidden="true">+</span> Add to {slot.toLowerCase()}
-                </button>
+                <>
+                  {state === 'ready' &&
+                    mine.length === 0 &&
+                    (() => {
+                      const from = mealsBefore(date, slot)[0];
+                      return from ? (
+                        <button
+                          type="button"
+                          class="meal-suggest"
+                          onClick={() => pull(from, slot, false)}
+                          aria-busy={copyBusy}
+                          data-testid="same-as"
+                        >
+                          <span class="meal-suggest-title">
+                            <span aria-hidden="true">↻</span> {sameAsLabel(from.date, today)}
+                          </span>
+                          <span class="meal-suggest-names" data-testid="same-as-names">
+                            {mealSummary(from.entries, foods, recipes)}
+                          </span>
+                        </button>
+                      ) : null;
+                    })()}
+                  <button
+                    type="button"
+                    class="meal-add"
+                    onClick={() => startPass(slot)}
+                    data-testid="add-to-meal"
+                    data-slot={slot}
+                  >
+                    <span aria-hidden="true">+</span> Add to {slot.toLowerCase()}
+                  </button>
+                </>
               )}
             </section>
           );
         })}
 
+      {overlay?.kind === 'menu' &&
+        (() => {
+          const slot = overlay.slot;
+          const mine = entries.filter((e) => e.slot === slot);
+          return (
+            <MealMenuSheet
+              slot={slot}
+              count={mine.length}
+              selectable={mine.filter((e) => !blockedReason(e)).length}
+              onCopyTo={() => setOverlay({ kind: 'copyTo', slot })}
+              onSelect={() => {
+                setOverlay(null);
+                startSelect(slot);
+              }}
+              onCopyFrom={() => {
+                setCopyFailed(false);
+                setOverlay({ kind: 'copyFrom', slot });
+              }}
+              onClose={() => setOverlay(null)}
+            />
+          );
+        })()}
+      {overlay?.kind === 'copyTo' && (
+        <CopySheet
+          slot={overlay.slot}
+          today={today}
+          entries={entries.filter((e) => e.slot === overlay.slot)}
+          foods={foods}
+          recipes={recipes}
+          busy={copyBusy}
+          failed={copyFailed}
+          onCopy={(toDate, toSlot) => {
+            const slot = overlay.slot;
+            void copy(
+              { from_date: date, from_slot: slot, to_date: toDate, to_slot: toSlot },
+              (n) => copiedToast(toDate, today, toSlot, n),
+              null,
+            );
+          }}
+          onClose={() => !copyBusy && setOverlay(null)}
+        />
+      )}
+      {overlay?.kind === 'copyFrom' && (
+        <CopyFromSheet
+          slot={overlay.slot}
+          today={today}
+          days={mealsBefore(date, overlay.slot)}
+          ready={lookback.value?.date === date}
+          foods={foods}
+          recipes={recipes}
+          busy={copyBusy}
+          failed={copyFailed}
+          onPick={(from) => {
+            const day = mealsBefore(date, overlay.slot).find((d) => d.date === from);
+            if (day) pull(day, overlay.slot, true);
+          }}
+          onClose={() => !copyBusy && setOverlay(null)}
+        />
+      )}
       {overlay?.kind === 'saveRecipe' && (
         <SaveRecipeSheet
           api={api}

@@ -335,7 +335,30 @@ export function fakeApi() {
         if (!payload.dry_run) log[log.indexOf(was)] = out;
         return { success: true, data: out };
       }
+      case 'copyMeal': {
+        // #884: the entries of one meal added after the target's, ids new, numbers kept (the real API works them out again).
+        const source = log.filter((e) => e.date === payload.from_date && e.slot === payload.from_slot);
+        if (!source.length) return { success: false, error: 'There is nothing in that meal to copy' };
+        const made = source.map((e) => ({
+          ...e,
+          id: `lg_c${++seq}`,
+          date: payload.to_date,
+          slot: payload.to_slot,
+          logged_at: new Date(2026, 10, 2, 11, seq).toISOString(),
+        }));
+        log.push(...made);
+        return { success: true, data: made };
+      }
       case 'deleteLogEntry': {
+        if (Array.isArray(payload.ids)) {
+          const gone = payload.ids as string[];
+          for (const id of gone)
+            log.splice(
+              log.findIndex((e) => e.id === id),
+              1,
+            );
+          return { success: true, data: { ids: gone, deleted: true } };
+        }
         const i = log.findIndex((e) => e.id === payload.id);
         if (i === -1) return { success: false, error: `Log entry "${payload.id}" not found` };
         log.splice(i, 1);

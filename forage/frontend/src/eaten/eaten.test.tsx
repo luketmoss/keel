@@ -162,6 +162,11 @@ afterEach(() => {
 const kcal = () => screen.getByTestId('day-kcal').textContent;
 const card = (slot: string) =>
   screen.getAllByTestId('meal-card').find((c) => c.querySelector('h2')!.textContent === slot)!;
+/** #884: Select is in the meal's ⋯ menu. */
+function startSelect(slot: string) {
+  fireEvent.click(within(card(slot)).getByTestId('meal-menu'));
+  fireEvent.click(screen.getByTestId('menu-select'));
+}
 const openOf = (row: HTMLElement) => within(row).getByTestId('entry-open');
 const entriesIn = (slot: string) => within(card(slot)).queryAllByTestId('entry-row');
 
@@ -340,7 +345,7 @@ describe('the day view', () => {
     expect(api.log[0]).toMatchObject({ slot: 'After dinner', ...stored });
 
     // Select mode and the delete confirmation work in the card.
-    fireEvent.click(within(card('After dinner')).getByTestId('select-meal'));
+    startSelect('After dinner');
     expect(within(card('After dinner')).getByTestId('select-cancel').textContent).toBe('Cancel');
     fireEvent.click(within(card('After dinner')).getByTestId('select-cancel'));
     fireEvent.click(openOf(entriesIn('After dinner')[0]));
@@ -957,12 +962,18 @@ describe('saving a meal as a recipe (#788)', () => {
   it('Select shows only on a meal with a food entry, and select mode is one meal at a time', async () => {
     seed();
     await open();
-    expect(within(card('Dinner')).getByTestId('select-meal').textContent).toBe('Select');
+    // #884: every meal has a ⋯ menu, and Select in it is live only on a meal with a food entry.
+    fireEvent.click(within(card('Dinner')).getByTestId('meal-menu'));
+    expect(screen.getByTestId('menu-select').getAttribute('aria-disabled')).toBeNull();
+    fireEvent.keyDown(screen.getByTestId('meal-menu-sheet'), { key: 'Escape' });
     // Breakfast holds only a recipe entry, Lunch nothing.
-    expect(within(card('Breakfast')).queryByTestId('select-meal')).toBeNull();
-    expect(within(card('Lunch')).queryByTestId('select-meal')).toBeNull();
+    for (const slot of ['Breakfast', 'Lunch']) {
+      fireEvent.click(within(card(slot)).getByTestId('meal-menu'));
+      expect(screen.getByTestId('menu-select').getAttribute('aria-disabled')).toBe('true');
+      fireEvent.keyDown(screen.getByTestId('meal-menu-sheet'), { key: 'Escape' });
+    }
 
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    startSelect('Dinner');
     expect(within(card('Dinner')).getByTestId('select-cancel').textContent).toBe('Cancel');
     expect(rows().map((r) => r.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', null, null]);
     expect(within(card('Dinner')).queryByTestId('add-to-meal')).toBeNull();
@@ -981,8 +992,8 @@ describe('saving a meal as a recipe (#788)', () => {
     const api = seed();
     api.log.push(salad('lg_l', 'fd_spring', { slot: 'Lunch' }));
     await open();
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
-    fireEvent.click(within(card('Lunch')).getByTestId('select-meal'));
+    startSelect('Dinner');
+    startSelect('Lunch');
     expect(within(card('Dinner')).queryByTestId('select-cancel')).toBeNull();
     expect(within(card('Lunch')).getByTestId('select-cancel')).toBeDefined();
   });
@@ -990,7 +1001,7 @@ describe('saving a meal as a recipe (#788)', () => {
   it('a row toggles without opening the Amount sheet, and the foot counts the ticked', async () => {
     seed();
     await open();
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    startSelect('Dinner');
     fireEvent.click(rows()[0]);
     fireEvent.click(rows()[2]);
     expect(screen.queryByTestId('amount-sheet')).toBeNull();
@@ -1006,7 +1017,7 @@ describe('saving a meal as a recipe (#788)', () => {
   it('the sheet previews per serving, follows Serves, and flags a partial recipe', async () => {
     const api = seed();
     await open();
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    startSelect('Dinner');
     fireEvent.click(rows()[0]);
     fireEvent.click(rows()[2]);
     fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
@@ -1030,7 +1041,7 @@ describe('saving a meal as a recipe (#788)', () => {
     const api = seed();
     await open();
     const before = kcal();
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    startSelect('Dinner');
     fireEvent.click(rows()[0]);
     fireEvent.click(rows()[1]);
     fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
@@ -1072,7 +1083,7 @@ describe('saving a meal as a recipe (#788)', () => {
     const api = seed();
     api.answer('upsertRecipe', () => ({ success: false, error: 'offline', code: 'network' }));
     await open();
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    startSelect('Dinner');
     fireEvent.click(rows()[0]);
     fireEvent.click(within(card('Dinner')).getByTestId('save-as-recipe'));
     await settle();
@@ -1095,13 +1106,13 @@ describe('saving a meal as a recipe (#788)', () => {
   it('changing the day leaves select mode with nothing saved', async () => {
     const api = seed();
     await open();
-    fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+    startSelect('Dinner');
     fireEvent.click(rows()[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
     await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Next day' }));
     await settle();
-    expect(within(card('Dinner')).getByTestId('select-meal')).toBeDefined();
+    expect(within(card('Dinner')).getByTestId('meal-menu')).toBeDefined();
     expect(api.calls('upsertRecipe')).toHaveLength(0);
   });
 
@@ -1113,7 +1124,7 @@ describe('saving a meal as a recipe (#788)', () => {
     vi.stubGlobal('fetch', fetchSpy);
     try {
       await open(true);
-      fireEvent.click(within(card('Dinner')).getByTestId('select-meal'));
+      startSelect('Dinner');
       const items = within(card('Dinner')).getAllByTestId('select-row');
       expect(items).toHaveLength(6);
       items.slice(0, 5).forEach((r) => fireEvent.click(r));

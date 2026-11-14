@@ -981,7 +981,7 @@ describe('saving a meal as a recipe (#788)', () => {
     expect(card('Dinner').textContent).toContain('Tick the items that go together.');
     // Recipes and removed foods are dimmed and say why.
     expect(rows()[3].getAttribute('aria-disabled')).toBe('true');
-    expect(rows()[3].textContent).toContain("Recipes can't go in a recipe");
+    expect(rows()[3].textContent).toContain("Recipes can't go in a usual or a recipe");
     expect(rows()[4].textContent).toContain('This food was deleted');
 
     fireEvent.click(within(card('Dinner')).getByTestId('select-cancel'));

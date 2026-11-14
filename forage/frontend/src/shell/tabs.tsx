@@ -10,8 +10,27 @@ export interface TabDef {
   empty: { heading: string; sentence: string };
 }
 
-/** In tab-bar order. Copy from forage/docs/design/704-app-shell.md. */
+/** In tab-bar order, by use (#872). Copy from forage/docs/design/704-app-shell.md. */
 export const TABS: TabDef[] = [
+  {
+    id: 'eaten',
+    label: 'Eaten',
+    icon: EatenIcon,
+    // #712: Eaten is always the day view, with its own "Nothing logged" day card; this copy is no longer shown.
+    empty: {
+      heading: 'Nothing logged',
+      sentence: 'What you eat will show here by day, with its calories and macros.',
+    },
+  },
+  {
+    id: 'library',
+    label: 'Library',
+    icon: LibraryIcon,
+    empty: {
+      heading: 'No foods yet',
+      sentence: 'Foods you use in recipes and logs will be kept here, with their nutrition.',
+    },
+  },
   {
     id: 'plan',
     label: 'Plan',
@@ -30,25 +49,6 @@ export const TABS: TabDef[] = [
       heading: 'No trip in progress',
       sentence:
         'A trip gathers what your planned meals need, so you can mark what you have and split the rest by store.',
-    },
-  },
-  {
-    id: 'eaten',
-    label: 'Eaten',
-    icon: EatenIcon,
-    // #712: Eaten is always the day view, with its own "Nothing logged" day card; this copy is no longer shown.
-    empty: {
-      heading: 'Nothing logged',
-      sentence: 'What you eat will show here by day, with its calories and macros.',
-    },
-  },
-  {
-    id: 'library',
-    label: 'Library',
-    icon: LibraryIcon,
-    empty: {
-      heading: 'No foods yet',
-      sentence: 'Foods you use in recipes and logs will be kept here, with their nutrition.',
     },
   },
 ];

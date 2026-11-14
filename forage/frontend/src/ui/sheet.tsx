@@ -59,9 +59,13 @@ export function Sheet({
       if (!items.length) return;
       const firstItem = items[0];
       const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === firstItem) {
+      // #870: with the panel itself focused (focusPanel), Shift+Tab goes to the last control and Tab to the first.
+      if (e.shiftKey && (document.activeElement === firstItem || document.activeElement === root)) {
         e.preventDefault();
         last.focus();
+      } else if (!e.shiftKey && document.activeElement === root) {
+        e.preventDefault();
+        firstItem.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
         e.preventDefault();
         firstItem.focus();

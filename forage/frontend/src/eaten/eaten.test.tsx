@@ -375,7 +375,13 @@ describe('logging', () => {
     expect(dry).toHaveLength(1);
     expect(dry[0].payload).toMatchObject({ food_id: 'fd_yog', qty: 1, unit: 'cup', slot: 'Dinner', date: TODAY });
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('150');
-    expect(within(amount).getByTestId('amount-macros').textContent).toBe('Protein 6 g · Carbs 9 g · Fat 0.4 g');
+    expect(within(amount).queryByTestId('amount-macros')).toBeNull();
+    expect(within(amount).getByTestId('macro-bar').getAttribute('aria-label')).toBe(
+      'Calories by macro: protein 38%, carbs 56%, fat 6%.',
+    );
+    expect(within(amount).getByTestId('macro-col-protein').textContent).toBe('Protein6 g38% of kcal');
+    expect(within(amount).getByTestId('macro-col-carbs').textContent).toBe('Carbs9 g56% of kcal');
+    expect(within(amount).getByTestId('macro-col-fat').textContent).toBe('Fat0.4 g6% of kcal');
     expect(api.log).toHaveLength(0);
 
     fireEvent.click(within(amount).getByTestId('log-it'));
@@ -552,6 +558,98 @@ describe('editing and deleting', () => {
     expect(api.log).toHaveLength(0);
     expect(kcal()).toBe('—');
     expect(screen.getByTestId('toast').textContent).toBe('Deleted Greek yogurt');
+  });
+});
+
+describe('the amount sheet: focus and the macro visual (#870)', () => {
+  async function openYogurt() {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    const sheet = await addTo('Dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    return api;
+  }
+
+  it('opens with focus on the dialog panel, not the amount field', async () => {
+    await openYogurt();
+    const amount = screen.getByTestId('amount-sheet');
+    expect(amount.getAttribute('role')).toBe('dialog');
+    expect(document.activeElement).toBe(amount);
+    expect(document.activeElement).not.toBe(within(amount).getByTestId('log-amount'));
+    expect(amount.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(within(amount).getByRole('heading').textContent).toBe('Greek yogurt');
+  });
+
+  it('opens an entry for editing on the panel too, and returns there after cancelling Delete', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    api.log.push(
+      entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9, protein_g: 6, carbs_g: 9, fat_g: 0.4 }),
+    );
+    await open();
+    fireEvent.click(entriesIn('Breakfast')[0]);
+    await settle();
+    let amount = screen.getByTestId('amount-sheet');
+    expect(document.activeElement).toBe(amount);
+    fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: '2' } });
+    fireEvent.click(within(amount).getByTestId('delete-entry'));
+    fireEvent.click(within(screen.getByTestId('confirm')).getByRole('button', { name: 'Cancel' }));
+    await settle();
+    amount = screen.getByTestId('amount-sheet');
+    expect(document.activeElement).toBe(amount);
+    expect((within(amount).getByTestId('log-amount') as HTMLInputElement).value).toBe('2');
+  });
+
+  it('Tab from the panel goes to the first control and Shift+Tab to the last', async () => {
+    await openYogurt();
+    const amount = screen.getByTestId('amount-sheet');
+    fireEvent.keyDown(amount, { key: 'Tab' });
+    expect(document.activeElement).toBe(within(amount).getByRole('button', { name: 'Close' }));
+    amount.focus();
+    fireEvent.keyDown(amount, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(within(amount).getByTestId('log-it'));
+  });
+
+  it('Less at the minimum is aria-disabled, stays focusable and does nothing', async () => {
+    await openYogurt();
+    const amount = screen.getByTestId('amount-sheet');
+    const less = within(amount).getByRole('button', { name: 'Less' });
+    expect(less.getAttribute('aria-disabled')).toBeNull();
+    fireEvent.click(less);
+    expect((within(amount).getByTestId('log-amount') as HTMLInputElement).value).toBe('0.5');
+    fireEvent.click(less);
+    expect((within(amount).getByTestId('log-amount') as HTMLInputElement).value).toBe('0.5');
+    expect(less.getAttribute('aria-disabled')).toBe('true');
+    expect((less as HTMLButtonElement).disabled).toBe(false);
+    less.focus();
+    expect(document.activeElement).toBe(less);
+  });
+
+  it('shows the empty bar and unknown columns before the first preview, at the same structure as filled', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    api.answer('logFood', () => ({ success: false, error: 'nope' }));
+    const sheet = await addTo('Dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    await previewed();
+    const amount = screen.getByTestId('amount-sheet');
+    expect(within(amount).getByTestId('macro-empty')).toBeDefined();
+    expect(within(amount).getAllByRole('img', { name: 'not known' })).toHaveLength(3);
+    expect(amount.textContent).toContain("Couldn't work out the calories.");
+  });
+
+  it('More nutrition opens as the parts groups', async () => {
+    await openYogurt();
+    await previewed();
+    const amount = screen.getByTestId('amount-sheet');
+    fireEvent.click(within(amount).getByRole('button', { name: /More nutrition/ }));
+    expect(amount.textContent).toContain("This food doesn't have sodium, fiber or the rest yet.");
   });
 });
 

@@ -1,5 +1,5 @@
 import { MacroBar } from '../ui/macro-bar';
-import { MACRO_KEYS, MACRO_NAMES, macroShares } from '../ui/macro-math';
+import { MacroCols } from '../ui/macro-cols';
 import { MoreNutrition } from '../ui/more-nutrition';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
@@ -94,7 +94,6 @@ function DayCard({ day, date, today }: { day: FoodLogDay | null; date: string; t
   const low = !!day && day.partial && !allUnknown;
   const label = date === today ? 'kcal so far' : 'kcal';
   const macros = { protein: day?.protein_g ?? null, carbs: day?.carbs_g ?? null, fat: day?.fat_g ?? null };
-  const shares = macroShares(macros);
   return (
     <section class="card day-card" role="group" aria-label={`Totals for ${fullDate(date)}`} data-testid="day-card">
       <div class="day-main">
@@ -105,26 +104,7 @@ function DayCard({ day, date, today }: { day: FoodLogDay | null; date: string; t
       </div>
       <div class="day-macros" data-testid="day-macros">
         <MacroBar protein={macros.protein} carbs={macros.carbs} fat={macros.fat} size="day" />
-        <div class="macro-cols tabular">
-          {MACRO_KEYS.map((k) => (
-            <div class="macro-col" key={k} data-testid={`macro-col-${k}`}>
-              <span class="macro-name">
-                <span class={`macro-swatch macro-${k}`} aria-hidden="true" />
-                {MACRO_NAMES[k]}
-              </span>
-              <span class="macro-grams">
-                {macros[k] === null ? (
-                  <span class="mn-unknown" role="img" aria-label="not known">
-                    —
-                  </span>
-                ) : (
-                  wholeGrams(macros[k])
-                )}
-              </span>
-              <span class="macro-share">{shares.state === 'shares' ? `${shares.text[k]} of kcal` : ''}</span>
-            </div>
-          ))}
-        </div>
+        <MacroCols protein={macros.protein} carbs={macros.carbs} fat={macros.fat} format={wholeGrams} />
       </div>
       {day && !allUnknown && (
         <MoreNutrition

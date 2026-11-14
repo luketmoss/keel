@@ -75,6 +75,15 @@ export function mealMg(n: number): string {
 /** `0.4`, `6`: a stored figure to 0.1, as the amount sheet shows it. */
 export const tenth = (n: number) => String(Math.round(n * 10) / 10);
 
+/**
+ * The amount sheet's grams (#870): to a tenth with no trailing `.0` (`23 g`, `23.4 g`, `0.4 g`); a value above 0 that
+ * would round to 0.0 reads `<0.1 g`, so a real value is never shown as a zero.
+ */
+export function sheetGrams(n: number): string {
+  const r = Math.round(n * 10) / 10;
+  return n > 0 && r === 0 ? '<0.1 g' : `${r} g`;
+}
+
 /** `Protein 6 g · Carbs 9 g · Fat 0.4 g`. */
 export function macrosLine(m: { protein_g: number | null; carbs_g: number | null; fat_g: number | null }): string {
   const f = (v: number | null) => (v === null ? '—' : `${tenth(v)} g`);

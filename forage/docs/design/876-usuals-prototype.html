@@ -1,0 +1,961 @@
+<title>Forage Usuals Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: notes column on the left, one live phone on the right (sticky); stacks at phone width.
+   Colours are Forage's own tokens (ui/tokens/suite.css + forage global.css), light and dark. */
+:root {
+  --bg: #f0f2f5; --surface: #ffffff; --raised: #ffffff; --border: #dadce0; --hair: #e8eaed;
+  --text: #1f1f1f; --text2: #5f6368; --muted: #606b76;
+  --primary: #357a38; --primary-light: #e6f2e6; --on-primary: #fff;
+  --danger: #b71c1c; --warn: #a05d00; --warn-light: #fff8e1;
+  --protein: #2b6cb0; --carbs: #b87400; --fat: #6b2e68;
+  --overlay: rgba(0,0,0,.4); --track: rgba(0,0,0,.08); --shadow: rgba(0,0,0,.15);
+  --page: #e7eae6; --ink: #24302a; --note: #4c5a52; --tag: #dfe9df;
+  --f-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-head: "Space Grotesk", var(--f-ui);
+  --f-body: "Inter", var(--f-ui);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --hair: #25252b;
+  --text: #e8eaed; --text2: #9aa0a6; --muted: #868e98;
+  --primary: #66bb6a; --primary-light: #1e3320; --on-primary: #121212;
+  --danger: #f26b68; --warn: #ffb74d; --warn-light: #2d2210;
+  --protein: #6fa8e8; --carbs: #f0b429; --fat: #a85aa4;
+  --overlay: rgba(0,0,0,.6); --track: rgba(255,255,255,.1); --shadow: rgba(0,0,0,.4);
+  --page: #161917; --ink: #e3e8e4; --note: #a9b4ad; --tag: #233024; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --hair: #25252b;
+  --text: #e8eaed; --text2: #9aa0a6; --muted: #868e98;
+  --primary: #66bb6a; --primary-light: #1e3320; --on-primary: #121212;
+  --danger: #f26b68; --warn: #ffb74d; --warn-light: #2d2210;
+  --protein: #6fa8e8; --carbs: #f0b429; --fat: #a85aa4;
+  --overlay: rgba(0,0,0,.6); --track: rgba(255,255,255,.1); --shadow: rgba(0,0,0,.4);
+  --page: #161917; --ink: #e3e8e4; --note: #a9b4ad; --tag: #233024; color-scheme: dark; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 40px; align-items: start; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0,1fr); } .phone-col { order: -1; } }
+h1 { font-family: var(--f-head); font-size: 34px; line-height: 1.1; margin: 0 0 8px; text-wrap: balance; letter-spacing: -.01em; }
+h2 { font-family: var(--f-head); font-size: 21px; margin: 0 0 6px; text-wrap: balance; }
+h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--note); margin: 18px 0 6px; }
+p, li { color: var(--note); max-width: 64ch; }
+p { margin: 0 0 10px; }
+ul { margin: 0 0 10px; padding-left: 20px; }
+strong { color: var(--ink); }
+code { font-size: 13px; background: var(--tag); padding: 1px 5px; border-radius: 4px; }
+.lede { font-size: 16.5px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 22px; }
+.tab { font: 600 14px var(--f-body); border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  padding: 9px 14px; border-radius: 999px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.tab:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.scene { display: none; } .scene.on { display: block; }
+.try { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 12px 0 16px; }
+.try ol { margin: 0; padding-left: 20px; } .try li { margin: 3px 0; }
+.try b { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--primary); }
+.model { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13.5px; min-width: 460px; }
+th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--note); }
+th { color: var(--ink); font-weight: 600; }
+.reset { font: 600 13px var(--f-body); background: none; border: 0; color: var(--primary); cursor: pointer; padding: 8px 0; }
+
+/* ===== phone ===== */
+.phone-col { position: sticky; top: 16px; }
+@media (max-width: 900px) { .phone-col { position: static; } }
+.phone { width: 100%; max-width: 390px; height: 780px; margin: 0 auto; border-radius: 34px; border: 10px solid #0d0f0e;
+  background: var(--bg); color: var(--text); font-family: var(--f-ui); font-size: 15px; line-height: 1.35;
+  position: relative; overflow: hidden; box-shadow: 0 20px 50px var(--shadow); }
+.screen { position: absolute; inset: 0 0 64px; overflow-y: auto; padding: 14px 14px 24px; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+.navbar { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: var(--surface); border-top: 1px solid var(--border);
+  display: grid; grid-template-columns: repeat(4, 1fr); }
+.navbar button { background: none; border: 0; display: grid; place-items: center; align-content: center; gap: 2px; font: 600 11.5px var(--f-ui); color: var(--text2); cursor: pointer; }
+.navbar button.cur { color: var(--primary); }
+.seg3 { grid-template-columns: 1fr 1fr 1fr; }
+.seg button { border: 0; background: none; padding: 8px; border-radius: 9px; font: 600 14px var(--f-ui); color: var(--text2); cursor: pointer; }
+.seg button.cur { background: var(--surface); color: var(--text); }
+.res span + span { grid-row: 3; }
+.edhead { display: flex; justify-content: space-between; align-items: center; }
+.uline { border-top: 1px solid var(--hair); padding: 10px 0; display: grid; gap: 8px; }
+.ulhead { display: flex; align-items: center; gap: 4px; } .ulhead .sp { flex: 1; } .ulhead b { font-size: 14.5px; }
+.ulamt { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.step.sm button { width: 34px; height: 34px; font-size: 18px; } .step.sm output { font-size: 14px; min-width: 84px; }
+.optchip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 2px 2px 10px; font-size: 13px; }
+.optchip.on { border-color: var(--primary); color: var(--primary); font-weight: 600; }
+.optchip button { background: none; border: 0; color: var(--muted); width: 26px; height: 26px; cursor: pointer; font-size: 15px; }
+.pill.dash { border-style: dashed; color: var(--primary); }
+.pill.danger { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.pickbtn { border: 1px solid var(--primary); background: var(--primary-light); color: var(--primary); border-radius: 999px; padding: 4px 12px; font: 600 12.5px var(--f-ui); cursor: pointer; }
+.optlist { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.optrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; background: var(--surface); color: var(--text); border: 0; border-top: 1px solid var(--hair); font: inherit; cursor: pointer; }
+.optrow:first-child { border-top: 0; }
+.optrow[aria-checked="true"] { background: var(--primary-light); }
+.radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; }
+.optrow[aria-checked="true"] .radio { border-color: var(--primary); }
+.optrow[aria-checked="true"] .radio::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+.ot { min-width: 0; display: grid; gap: 2px; } .ot b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; } .ot small { font-size: 12px; color: var(--text2); }
+.optrow .kc { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.edopts { display: grid; gap: 6px; justify-items: start; }
+.edopt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 8px 4px 8px 10px; }
+.edopt.on { border-color: var(--primary); }
+.edopt .nick { padding: 7px 9px; font-size: 13px; margin-top: 4px; }
+.slotline .pill { white-space: normal; text-align: left; }
+.picker { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: var(--raised); border: 1px solid var(--border); border-radius: 10px; max-height: 150px; overflow-y: auto; }
+.confirm { border: 1px solid var(--danger); border-radius: 10px; padding: 12px; margin-top: 10px; }
+.icon-btn:disabled { opacity: .3; cursor: default; }
+.navbar span { display: grid; place-items: center; align-content: center; gap: 2px; font-size: 11.5px; color: var(--text2); font-weight: 600; }
+.navbar span.cur { color: var(--primary); }
+.navbar svg { width: 22px; height: 22px; }
+.dayhead { display: grid; grid-template-columns: 36px 1fr 36px; align-items: center; text-align: center; margin-bottom: 12px; }
+.dayhead b { font-size: 20px; display: block; } .dayhead small { color: var(--text2); font-size: 13px; }
+.dayhead button { background: none; border: 0; color: var(--text); font-size: 20px; height: 44px; cursor: pointer; }
+.card { background: var(--surface); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.daytot { display: flex; align-items: baseline; gap: 6px; } .daytot b { font-size: 24px; } .daytot span { color: var(--text2); font-size: 13px; }
+.bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--track); margin: 8px 0 6px; }
+.bar i { display: block; height: 100%; } .bar .p { background: var(--protein); } .bar .c { background: var(--carbs); } .bar .f { background: var(--fat); }
+.macro { color: var(--text2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.mhead { display: flex; align-items: center; gap: 8px; }
+.mhead h4 { margin: 0; font-size: 16px; flex: 1; }
+.mhead .k { font-size: 14px; font-variant-numeric: tabular-nums; } .mhead .k b { font-weight: 700; }
+.icon-btn { background: none; border: 0; color: var(--text2); width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 20px; line-height: 1; display: grid; place-items: center; }
+.icon-btn:hover { background: var(--track); }
+.txt-btn { background: none; border: 0; color: var(--primary); font: 600 14.5px var(--f-ui); cursor: pointer; padding: 10px 2px; min-height: 40px; }
+.add-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border-top: 1px solid var(--hair); margin-top: 4px; padding-top: 10px; }
+.entry { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 6px; padding: 9px 0; border-top: 1px solid var(--hair); }
+.entry .nm { font-weight: 600; font-size: 14.5px; min-width: 0; }
+.entry .kc { font-size: 13.5px; font-variant-numeric: tabular-nums; min-width: 54px; text-align: right; } .entry .kc b { font-weight: 700; }
+.amt { margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: var(--track); border: 0; border-radius: 999px; padding: 3px 10px;
+  font: 500 12.5px var(--f-ui); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+.amt.open { background: var(--primary-light); color: var(--primary); }
+.amt small { color: var(--text2); font-size: 12px; }
+.x { color: var(--muted); font-size: 18px; width: 30px; height: 30px; }
+.group { margin-top: 6px; border-top: 1px solid var(--hair); padding-top: 8px; }
+.ghead { display: flex; align-items: center; gap: 8px; }
+.ghead .gname { font-weight: 700; font-size: 14.5px; }
+.chip { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--primary); background: var(--primary-light); padding: 2px 7px; border-radius: 5px; }
+.chip.warn { color: var(--warn); background: var(--warn-light); }
+.ghead .sp { flex: 1; }
+.gbody { margin-left: 4px; padding-left: 12px; border-left: 2px solid var(--primary-light); }
+.gbody .entry:first-child { border-top: 0; }
+.editor { grid-column: 1 / -1; background: var(--raised); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: grid; gap: 10px; }
+.step { display: flex; align-items: center; gap: 10px; }
+.step button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 20px; cursor: pointer; }
+.step output { font-size: 20px; font-weight: 700; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.step .g { color: var(--text2); font-size: 13px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: 500 13px var(--f-ui); cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.slotline { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: -2px; }
+.slotline .pill { padding: 4px 10px; font-size: 12.5px; }
+.swap { color: var(--primary); font-size: 12px; font-weight: 600; margin-left: 6px; }
+.suggest { width: 100%; text-align: left; border: 1px dashed var(--primary); background: var(--primary-light); color: var(--text); border-radius: 10px; padding: 10px 12px; cursor: pointer; margin-top: 10px; font: inherit; display: grid; gap: 2px; }
+.suggest b { color: var(--primary); font-size: 14px; } .suggest span { font-size: 12.5px; color: var(--text2); }
+.selrow { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--hair); width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border); display: grid; place-items: center; color: var(--on-primary); font-size: 14px; font-weight: 800; }
+.selrow[aria-pressed="true"] .box { background: var(--primary); border-color: var(--primary); }
+.btn { width: 100%; border: 0; border-radius: 12px; padding: 13px; font: 700 15px var(--f-ui); background: var(--primary); color: var(--on-primary); cursor: pointer; margin-top: 12px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.sec { background: var(--track); color: var(--text); }
+.helper { color: var(--text2); font-size: 12.5px; margin-top: 6px; }
+.nsp { border-top: 1px solid var(--hair); padding-top: 10px; display: grid; gap: 6px; }
+.nsh { font-weight: 700; font-size: 13.5px; }
+.nsrow { display: grid; grid-template-columns: 76px 1fr; gap: 8px; } .nsrow .field { padding: 9px 10px; font-size: 14px; }
+.nsrow2 { grid-template-columns: 1fr 96px; }
+.nsor { text-align: center; color: var(--text2); font-size: 12px; margin: 6px 0 0; text-transform: uppercase; letter-spacing: .05em; }
+
+/* sheet */
+.scrim { position: absolute; inset: 0; background: var(--overlay); display: flex; align-items: flex-end; z-index: 5; }
+.sheet { background: var(--surface); width: 100%; max-height: 88%; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 8px 16px 20px; }
+.sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--border); margin: 4px auto 10px; }
+.shead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.shead h5 { margin: 0; font-size: 18px; }
+.lbl { font-size: 12.5px; font-weight: 600; color: var(--text2); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.field { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 15px var(--f-ui); }
+.res { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; text-align: left; padding: 10px 0; border: 0; border-top: 1px solid var(--hair); background: none; color: var(--text); font: inherit; cursor: pointer; }
+.res b { font-size: 14.5px; } .res span { font-size: 12.5px; color: var(--text2); grid-column: 1; } .res em { font-style: normal; font-size: 13px; grid-row: 1 / 3; grid-column: 2; align-self: center; font-variant-numeric: tabular-nums; }
+.menu button { display: block; width: 100%; text-align: left; padding: 13px 2px; border: 0; border-top: 1px solid var(--hair); background: none; color: var(--text); font: 500 15px var(--f-ui); cursor: pointer; }
+.menu button small { display: block; color: var(--text2); font-size: 12.5px; font-weight: 400; margin-top: 2px; }
+.menu button.danger { color: var(--danger); }
+.saveline { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 10px 0; border-top: 1px solid var(--hair); }
+.saveline .opts { grid-column: 1 / -1; font-size: 12.5px; color: var(--text2); }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); cursor: pointer; background: none; border: 0; font-family: var(--f-ui); }
+.switch i { width: 34px; height: 20px; border-radius: 10px; background: var(--track); position: relative; border: 1px solid var(--border); }
+.switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text2); transition: left .15s; }
+.switch[aria-pressed="true"] i { background: var(--primary); border-color: var(--primary); }
+.switch[aria-pressed="true"] i::after { left: 16px; background: var(--on-primary); }
+.toast { position: absolute; left: 12px; right: 12px; bottom: 76px; background: #2b2f2c; color: #f1f3f1; border-radius: 12px; padding: 12px 14px; font-size: 14px; display: flex; gap: 10px; align-items: center; z-index: 6; box-shadow: 0 6px 20px var(--shadow); }
+.toast span { flex: 1; } .toast button { background: none; border: 0; color: #9fd8a2; font: 700 14px var(--f-ui); cursor: pointer; }
+
+/* other-feedback screens */
+.libhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.libhead b { font-size: 22px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--track); border-radius: 12px; padding: 4px; margin-bottom: 10px; }
+.seg span { text-align: center; padding: 8px; border-radius: 9px; font-weight: 600; font-size: 14px; color: var(--text2); }
+.seg span.cur { background: var(--surface); color: var(--text); }
+.frow { padding: 10px 0; border-top: 1px solid var(--hair); } .frow b { display: block; font-size: 14.5px; } .frow span { font-size: 12.5px; color: var(--text2); }
+.fab { position: absolute; right: 16px; bottom: 80px; height: 56px; border-radius: 18px; border: 0; background: var(--primary); color: var(--on-primary); font: 700 15px var(--f-ui); display: flex; align-items: center; gap: 8px; padding: 0 18px 0 14px; box-shadow: 0 6px 18px var(--shadow); cursor: pointer; z-index: 3; }
+.fab svg { width: 24px; height: 24px; }
+.cam { position: absolute; inset: 0; background: #050605; z-index: 7; display: grid; place-items: center; color: #eee; }
+.cam .reticle { width: 240px; height: 130px; border: 3px solid #9fd8a2; border-radius: 14px; position: relative; display: grid; place-items: center; font-size: 13px; color: #cfe8cf; }
+.cam .reticle::after { content: ""; position: absolute; left: 10px; right: 10px; height: 2px; background: #9fd8a2; top: 50%; animation: scan 1.2s ease-in-out infinite alternate; }
+@keyframes scan { from { top: 20%; } to { top: 80%; } }
+@media (prefers-reduced-motion: reduce) { .cam .reticle::after { animation: none; } }
+.cam .camfoot { position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; }
+.cam .camfoot button { background: rgba(255,255,255,.15); color: #fff; border: 0; border-radius: 999px; padding: 10px 18px; font: 600 14px var(--f-ui); cursor: pointer; }
+/* nutrition facts form */
+.nf { border: 2px solid var(--text); border-radius: 6px; padding: 8px 10px; }
+.nf h6 { font: 800 26px/1 var(--f-ui); margin: 0 0 4px; letter-spacing: -.01em; }
+.nf .rule8 { border-top: 8px solid var(--text); margin: 6px 0 2px; }
+.nf .rule4 { border-top: 4px solid var(--text); margin: 4px 0 2px; }
+.nfrow { display: grid; grid-template-columns: 1fr 82px 26px; align-items: center; gap: 6px; padding: 4px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.nfrow:first-of-type { border-top: 0; }
+.nfrow label { font-weight: 700; } .nfrow.i1 label { font-weight: 400; padding-left: 16px; } .nfrow.i2 label { font-weight: 400; padding-left: 32px; }
+.nfrow input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: 600 14px var(--f-ui); text-align: right; font-variant-numeric: tabular-nums; }
+.nfrow input.chg { border-color: var(--warn); }
+.nfrow .u { color: var(--text2); font-size: 12.5px; }
+.nfrow.cal label { font-size: 20px; font-weight: 800; } .nfrow.cal input { font-size: 18px; font-weight: 800; }
+.srcnote { font-size: 12.5px; color: var(--text2); margin: 8px 0; }
+.mini { display: flex; gap: 6px; margin: 6px 0 10px; flex-wrap: wrap; }
+</style>
+
+<div class="wrap">
+<main>
+  <h1>Usuals: meals you eat on repeat</h1>
+  <p class="lede">A prototype for logging the same-ish meal fast. Oatmeal is oats and a nut butter almost every day, plus whatever fruit is around, in amounts that drift. A recipe is the wrong shape for that: it's fixed, and logging it hides the parts. This prototype tries four angles that share one idea: <strong>a meal in the log stays a set of foods you can edit</strong>, and anything reusable just gives you a filled-in starting point.</p>
+  <p>The working name for a reusable meal is a <strong>usual</strong> ("add my usual oatmeal"). It's a placeholder; template, base and go-to all work. The phone on the right is live: tap through it.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-scene="copy" aria-selected="true">1 · Repeat a meal</button>
+    <button class="tab" role="tab" data-scene="usual" aria-selected="false">2 · Start from a usual</button>
+    <button class="tab" role="tab" data-scene="save" aria-selected="false">3 · Save a usual</button>
+    <button class="tab" role="tab" data-scene="manage" aria-selected="false">4 · Manage usuals</button>
+    <button class="tab" role="tab" data-scene="other" aria-selected="false">Other feedback</button>
+    <button class="tab" role="tab" data-scene="model" aria-selected="false">Data model</button>
+  </div>
+
+  <section class="scene on" id="scene-copy">
+    <h2>Angle 1: copy a meal, both directions</h2>
+    <p>You asked for "copy breakfast to another day". You log when you eat, so the common case is probably the reverse: you're on today and want <em>yesterday's</em> breakfast. The prototype offers both.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>Today's Breakfast is empty. Tap <strong>Same as yesterday</strong>. All four foods land, grouped as Oatmeal, amounts exact.</li>
+      <li>Tap <strong>⋯</strong> on Lunch, then <strong>Copy to…</strong>. Pick a day and a meal; the toast has Undo.</li>
+    </ol></div>
+    <h3>How it behaves</h3>
+    <ul>
+      <li><strong>Pull:</strong> an empty meal suggests the same meal from the most recent day that has one, "Same as yesterday" or "Same as Thursday". One tap, no sheet.</li>
+      <li><strong>Push:</strong> the meal's ⋯ menu has <strong>Copy to…</strong>: a day (Tomorrow, the next few days, or a date) and a meal slot, defaulting to the same slot.</li>
+      <li>Copied entries are new FoodLog rows with today's date and the same food, amount and unit. Their numbers are recomputed from the food, so a food you corrected since gives the corrected figures.</li>
+      <li>Copying into a meal that already has entries adds to it; nothing is replaced. Undo removes exactly what was copied.</li>
+      <li>Groups survive a copy: yesterday's Oatmeal arrives as Oatmeal.</li>
+    </ul>
+    <h3>Open question</h3>
+    <p>Should "Same as…" look back further than the last day with that meal, say a short list of the last three distinct breakfasts? I kept it to one so it's a single tap. Detected combinations in the Add sheet (angle 2) cover the rest.</p>
+    <button class="reset" data-reset="copy">Reset the phone for this angle</button>
+  </section>
+
+  <section class="scene" id="scene-usual">
+    <h2>Angle 2: a usual adds its foods, not a recipe</h2>
+    <p>Adding a usual writes one entry per food, grouped under the usual's name. From then on they're ordinary entries: change an amount, remove one, add another. The group is a label, not a container that locks anything.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>Tap <strong>Add to breakfast</strong>. The sheet leads with your <strong>Usuals</strong>, then <strong>Combos you've logged</strong>, then foods.</li>
+      <li>Pick <strong>Oatmeal</strong>. The fruit is a <em>pick-one</em>: choose Blueberries, Banana or Strawberries right on the row.</li>
+      <li>Tap any amount chip (<code>1 tbsp · 16 g</code>). It opens in place: step it, or switch to grams. No sheet.</li>
+      <li>Tap Almond butter's amount. It was imported with a vague <code>serving</code>: tap <strong>Say what it is</strong>, enter <code>2 tbsp</code>, and it gains a real tbsp serving without leaving Eaten. <strong>＋ Serving</strong> on any food lets you weigh and name your own ("bowl, 60 g").</li>
+      <li>Tap <strong>⇄ swap</strong> on Almond butter. Peanut butter is at the top because you've swapped it in before; pick it. The amount carries over (½ serving of almond butter is 16 g, so 1 tbsp of peanut butter).</li>
+      <li>Open the group's <strong>⋯</strong>. It lists what changed, offers <strong>Update the usual</strong>, and, because you've now swapped that line 4 times, <strong>Make it a pick-one</strong>.</li>
+    </ol></div>
+    <h3>The pieces</h3>
+    <ul>
+      <li><strong>Pick-one lines.</strong> A usual line can hold several foods; you choose one when you add it. It starts on whichever you picked last time. This removes the "one recipe per fruit" problem without making you type.</li>
+      <li><strong>Swap.</strong> Every <em>Always</em> line of a usual has <strong>⇄ swap</strong> once it's on a day. It opens a picker: foods that have replaced this line before come first, with a count, then search. A swapped line also offers "Back to Almond butter". The amount carries over when the new food has a serving with the same name, otherwise the grams do. Pick-one lines don't show swap; their options are on the row.</li>
+      <li><strong>Swapping never changes the usual.</strong> It changes that day's entry, like removing one food and adding another in its place. The group gets a <strong>Changed</strong> chip, and its ⋯ offers <strong>Update the usual</strong> (the new food becomes the Always food) or <strong>Make it a pick-one</strong> (both foods become options). The second is suggested once you've swapped the same line 3 times.</li>
+      <li><strong>Inline amounts.</strong> The chip shows serving and grams together. Tapping opens a stepper that moves by half a serving (or 5 g), with the food's named servings and grams as unit pills. The kcal on the right updates as you step. This is the one I'd build first on its own: it helps every entry, not only usuals.</li>
+      <li><strong>Fix a serving where you notice it.</strong> The amount editor has <strong>＋ Serving</strong>. For a food stuck on a vague <code>serving</code>, it asks what the label's serving is ("2 tbsp"), works out 1 tbsp from the grams it already knows, and renames the vague one "2 tbsp". For any food you can also name a portion and type its grams. Either way it saves to the food, so it's there next time, and the entry switches to it.</li>
+      <li><strong>Long names and many options.</strong> A pick-one shows as buttons only when it has 3 options or fewer and every name fits (20 characters). Otherwise the row shows the chosen food and a <strong>Pick one · 2 of 5</strong> button that opens a list: one full-width row per option, the name wrapping instead of cut off, with brand, amount and kcal. Names are never truncated: "Natural Creamy Peanut Butter" and "Natural Crunchy Peanut Butter" differ only in the middle. Each food can have an optional <strong>short name</strong> ("Crunchy PB"), set on the food in Library or right here from the usual. It's used in every usual and wherever space is tight, while search, Library and the meal's own rows keep the full name. Short enough names turn the list back into buttons. Try <strong>Add to after dinner → After dinner cereal</strong>, and the <strong>Yogurt bowl</strong> with five nut butters.</li>
+      <li><strong>Combos you've logged.</strong> Foods you've eaten together in the same meal three or more times show up as one-tap suggestions with no setup. "Yogurt + granola" is a usual you never had to make.</li>
+    </ul>
+    <button class="reset" data-reset="usual">Reset the phone for this angle</button>
+  </section>
+
+  <section class="scene" id="scene-save">
+    <h2>Angle 3: save a usual from a meal</h2>
+    <p>Forage already has this for recipes (#788: <strong>Select</strong> on a meal, tick items, <strong>Save as a recipe</strong>). The prototype keeps that flow and changes what it makes: a usual, with a switch per line for <strong>pick each time</strong>.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>On Lunch, tap <strong>⋯</strong>, then <strong>Select</strong>. Tick the bread, turkey and cheese.</li>
+      <li>Tap <strong>Save 3 as a usual</strong>. Turn on <strong>Pick each time</strong> for the cheese; it lists the other cheeses you've logged as its options.</li>
+      <li>Save, then <strong>Add to dinner</strong>: your new usual is at the top.</li>
+    </ol></div>
+    <h3>Recipe or usual?</h3>
+    <p>I'd keep both and draw the line here. A <strong>recipe</strong> is something you cook in a batch and eat a serving of: chili, banana bread. It logs as one entry, has steps, servings and walkthroughs, and goes on the plan and shopping list. A <strong>usual</strong> is an assembly you eat in one go: it logs as its parts, has no steps or servings, and is about speed in Eaten. Whether usuals also appear on the Plan (and shopping) is a later question; I'd leave it out of the first version.</p>
+    <h3>Keeping a usual current</h3>
+    <p>When a logged group differs from its usual, the group's ⋯ says how ("Peanut butter instead of Almond butter · Oats 50 g, was 40 g") and offers <strong>Update Oatmeal</strong>. Nothing updates on its own; the log is a record of what you ate, the usual is a starting point.</p>
+    <button class="reset" data-reset="save">Reset the phone for this angle</button>
+  </section>
+
+  <section class="scene" id="scene-manage">
+    <h2>Managing usuals, and where combos come from</h2>
+    <p>Usuals get a segment in Library, between Foods and Recipes. The same screen lists the combos Forage found in your log, so you can turn one into a usual or hide it. The Library tab works in the other angles too.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>Open <strong>Oatmeal</strong>. Remove Strawberries from the fruit, add Chia seeds with <strong>＋ Option</strong>, step the oats, or reorder lines. Changes save as you go.</li>
+      <li>Turn <strong>Pick each time</strong> off on the fruit: it becomes a fixed Blueberries line. Turn it back on.</li>
+      <li>Go back. Under <strong>Combos you've logged</strong>, open the sandwich. It shows the meals it came from and typical amounts. Name it and save it: it moves up into your usuals and leaves the combo list.</li>
+      <li>Open another combo and <strong>Hide</strong> it.</li>
+    </ol></div>
+    <h3>The Usuals list</h3>
+    <ul>
+      <li>Each row: name, foods in short (a pick-one shows as <code>Blueberries / Banana</code>), kcal as it starts, the meal it's usually for, and how often and how recently you've used it. Most recently used first.</li>
+      <li><strong>＋ New usual</strong> starts an empty one. Most usuals will come from a meal (angle 3) or a combo, though.</li>
+      <li>The editor has no Save button: each change saves on its own, like the rest of Forage (#785). Deleting asks once and leaves logged days alone.</li>
+      <li>"Usually for" ranks the usual in the Add sheet: Oatmeal comes first when you add to breakfast.</li>
+    </ul>
+    <h3>How combos are found</h3>
+    <ol>
+      <li>Take the last 60 days of the log and group it into meals (a date and a slot), each a set of foods. Amounts are ignored here.</li>
+      <li>From each meal, take every set of 2 to 5 of its foods.</li>
+      <li>Count the meals each set appears in. Keep sets seen in 3 or more.</li>
+      <li>Drop a set when a bigger one holds it in at least 80% of the same meals. "Bread + turkey + cheddar" hides "bread + cheddar".</li>
+      <li>Join sets of the same size that differ by one food into one combo with a pick-one line.</li>
+      <li>Drop combos a usual already covers (all their foods appear in it), and ones you've hidden.</li>
+      <li>Typical amounts are each food's median across those meals.</li>
+    </ol>
+    <p>The Add sheet shows the top 3, the meal you're adding to first, then by count, then by how recently you had it. Library shows all of them. Nothing is stored except the hidden list.</p>
+    <h3>With the sample history behind this phone</h3>
+    <ul id="combo-stats"></ul>
+    <button class="reset" data-reset="manage">Reset the phone for this angle</button>
+  </section>
+
+  <section class="scene" id="scene-other">
+    <h2>The separate feedback</h2>
+    <p>These are filed as their own issues. The phone shows a sketch of each so the direction is concrete.</p>
+    <div class="try"><b>Try it</b><ol>
+      <li>The tab bar is reordered by use, <strong>Eaten · Library · Plan · Shop</strong>, and the app opens on Eaten.</li>
+      <li>Library opens on <strong>Foods</strong> and remembers your last choice.</li>
+      <li>Tap <strong>Scan</strong>: one tap straight to the camera.</li>
+      <li>After the scan, the numbers are laid out as the label is, top to bottom, sub-nutrients indented under their parent. Values that differ from the database are outlined.</li>
+    </ol></div>
+    <h3>The label layout</h3>
+    <p>Today the four core fields sit in a grid at the top and the other seven are flat in a collapsed section below (#776). You read a label top to bottom, so you jump between the two. The sketch puts all eleven in one list in label order: Calories, Total Fat, Saturated, Trans, Cholesterol, Sodium, Total Carbohydrate, Fiber, Sugars, Added Sugars, Protein. Fat and Carbs are fields themselves, so the indented parts have a real parent. That answers #776's main objection to indenting.</p>
+    <button class="reset" data-reset="other">Reset the phone for this sketch</button>
+  </section>
+
+  <section class="scene" id="scene-model">
+    <h2>What the data needs</h2>
+    <p>The log stays a list of food entries, so totals, Thrive's read and the MCP tools keep working. Usuals are a new pair of tabs shaped like Recipes and RecipeLines; the log gains two columns to remember the grouping.</p>
+    <div class="model"><table>
+      <tr><th>Where</th><th>Change</th><th>Why</th></tr>
+      <tr><td><code>Usuals</code> (new tab)</td><td>id (<code>us_</code>), name, slot, created, updated</td><td>The reusable meal. <code>slot</code> is the meal it's usually for, used to rank it in the Add sheet.</td></tr>
+      <tr><td><code>UsualLines</code> (new tab)</td><td>usual_id, line_id, position, food_id, qty, unit, options_json, last_pick</td><td><code>options_json</code> lists the foods a pick-one line can be; blank means fixed. <code>last_pick</code> is the default next time.</td></tr>
+      <tr><td><code>FoodLog</code> (append)</td><td>group_id, group_name, usual_id</td><td>Entries added together share a <code>group_id</code>. <code>usual_id</code> is set when the group came from a usual, so ⋯ can compare and offer Update.</td></tr>
+      <tr><td>API</td><td><code>copyMeal</code> (from date+slot to date+slot), <code>logUsual</code>, <code>upsertUsual</code>, <code>deleteUsual</code>, <code>getUsuals</code></td><td>Each with an MCP tool, per the parity test.</td></tr>
+      <tr><td><code>Foods</code> (append)</td><td><code>short_name</code>, up to 20 characters, blank by default</td><td>Shown on pick-one buttons and in usual summaries in place of the full name. Search matches it too. One per food, so every usual shares it.</td></tr>
+      <tr><td><code>Foods.servings_json</code></td><td>No schema change: ＋ Serving appends <code>{name, g}</code> through <code>upsertFood</code>, which the app can already call</td><td>Renaming the vague <code>serving</code> rewrites no past entry, since each stores its own unit text and grams. One rule to settle: a later edit to an entry that names the old serving must still resolve, so either the rename keeps the old name as a hidden alias or the edit falls back to the stored grams.</td></tr>
+      <tr><td>Combos</td><td>Derived on read from the last 60 days of FoodLog (steps on the Manage usuals tab)</td><td>Nothing stored but the hidden list, a <code>Config</code> key (<code>hidden_combos</code>, the food-id sets).</td></tr>
+      <tr><td><code>Usuals</code> use</td><td>Times used and last used are derived from FoodLog's <code>usual_id</code></td><td>Not stored, like a recipe's last cooked.</td></tr>
+      <tr><td>Swap candidates</td><td>Derived: foods that took a usual line's place in past groups</td><td>Nothing stored.</td></tr>
+    </table></div>
+    <h3>What I'd skip</h3>
+    <ul>
+      <li>Turning recipes into usuals or the reverse. They answer different questions; a recipe logged "as ingredients" would need a serving maths that people don't think in.</li>
+      <li>Nested groups (a usual inside a usual).</li>
+    </ul>
+    <h3>A possible order</h3>
+    <ul>
+      <li>Inline amount editing, with ＋ Serving: helps every entry, no schema change.</li>
+      <li>Copy a meal, push and pull: one action, FoodLog only.</li>
+      <li>Usuals: the tabs, logging as a group, pick-one lines, saving from a meal.</li>
+      <li>Combos, swap suggestions and Update usual, once there's grouped history to learn from.</li>
+    </ul>
+  </section>
+</main>
+
+<div class="phone-col"><div class="phone" id="phone"></div></div>
+</div>
+
+<script>
+(() => {
+// ---------- data ----------
+const F = {
+  oats:   { n: 'Rolled oats', k: 389, p: 16.9, c: 66, f: 6.9, s: 'cup', g: 80 },
+  ab:     { n: 'Almond butter', k: 614, p: 21, c: 19, f: 56, s: 'serving', g: 32 },
+  pb:     { n: 'Peanut butter', k: 588, p: 25, c: 20, f: 50, s: 'tbsp', g: 16 },
+  blue:   { n: 'Blueberries', k: 57, p: .7, c: 14, f: .3, s: 'cup', g: 148 },
+  ban:    { n: 'Banana', k: 89, p: 1.1, c: 23, f: .3, s: 'medium', g: 118 },
+  straw:  { n: 'Strawberries', k: 32, p: .7, c: 7.7, f: .3, s: 'cup', g: 152 },
+  milk:   { n: 'Milk, 2%', k: 50, p: 3.3, c: 4.8, f: 2, s: 'cup', g: 244 },
+  chia:   { n: 'Chia seeds', k: 486, p: 17, c: 42, f: 31, s: 'tbsp', g: 12 },
+  yog:    { n: 'Greek yogurt', k: 59, p: 10, c: 3.6, f: .4, s: 'cup', g: 245 },
+  gran:   { n: 'Granola', k: 471, p: 10, c: 64, f: 20, s: '¼ cup', g: 30 },
+  bread:  { n: 'Sourdough bread', k: 274, p: 11, c: 51, f: 2.4, s: 'slice', g: 50 },
+  turkey: { n: 'Deli turkey', k: 104, p: 17, c: 4, f: 2, s: 'slice', g: 28 },
+  ched:   { n: 'Cheddar', k: 403, p: 25, c: 1.3, f: 33, s: 'slice', g: 21 },
+  swiss:  { n: 'Swiss cheese', k: 380, p: 27, c: 1.5, f: 28, s: 'slice', g: 21 },
+  prov:   { n: 'Provolone', k: 351, p: 26, c: 2.1, f: 27, s: 'slice', g: 21 },
+  apple:  { n: 'Apple', k: 52, p: .3, c: 14, f: .2, s: 'medium', g: 182 },
+  spin:   { n: 'Spring mix', k: 17, p: 1.5, c: 3, f: .2, s: 'cup', g: 42 },
+  chpro:  { n: 'Cinnamon Cheerios Protein', b: 'General Mills', k: 405, p: 21.6, c: 64.9, f: 6.8, s: 'cup', g: 44 },
+  rbc:    { n: 'Raisin Bran Crunch', b: "Kellogg's", k: 345, p: 7.3, c: 83.6, f: 1.8, s: 'cup', g: 55 },
+  kyog:   { n: 'organic GREEK YOGURT plain', b: 'KIRKLAND Signature', k: 59, p: 10.6, c: 4.1, f: 0, s: 'cup', g: 227 },
+  chob:   { n: 'Yogurt - 20g Protein No Sugar Added', b: 'Chobani', k: 74, p: 10.5, c: 4.7, f: 1.6, s: 'container', g: 150 },
+  kab:    { n: 'Creamy Almond Butter', b: 'Kirkland Signature', k: 625, p: 21.9, c: 18.8, f: 56.3, s: 'tbsp', g: 16 },
+  kpbc:   { n: 'Natural Creamy Peanut Butter', b: 'Kroger', k: 594, p: 25, c: 21.9, f: 50, s: 'tbsp', g: 16 },
+  kpbx:   { n: 'Natural Crunchy Peanut Butter', b: 'Kroger', k: 563, p: 25, c: 15.6, f: 50, s: 'tbsp', g: 16 },
+  nuttzo: { n: 'NuttZo Organic 7 Nut & Seed Butter POWER FUEL Crunchy', b: 'NuttZo', k: 562, p: 18.2, c: 24.2, f: 45.5, s: 'tbsp', g: 16 },
+  pbfit:  { n: 'Organic PBfit peanut butter powder', b: 'PBfit', k: 375, p: 43.8, c: 37.5, f: 12.5, s: 'tbsp', g: 8 },
+};
+const SWAPS = { ab: ['pb'], pb: ['ab'], blue: ['ban', 'straw'], ban: ['blue', 'straw'], straw: ['blue', 'ban'], ched: ['swiss', 'prov'], swiss: ['ched', 'prov'], prov: ['ched', 'swiss'], milk: ['yog'] };
+const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'After dinner', 'Snacks'];
+let uid = 1; const nid = () => 'e' + uid++;
+
+const baseUsuals = () => [
+  { id: 'us1', name: 'Oatmeal', slot: 'Breakfast', used: 12, last: 'yesterday', lines: [
+    { food: 'oats', qty: .5, unit: 'srv' }, { food: 'ab', qty: .5, unit: 'srv' },
+    { food: 'blue', qty: .5, unit: 'srv', options: ['blue', 'ban', 'straw'], last: 'blue' }, { food: 'milk', qty: 1, unit: 'srv' } ] },
+  { id: 'us2', name: 'Overnight chia', slot: 'Breakfast', used: 3, last: '36 days ago', lines: [
+    { food: 'chia', qty: 2, unit: 'srv' }, { food: 'milk', qty: 1, unit: 'srv' }, { food: 'ban', qty: .5, unit: 'srv', options: ['ban', 'straw', 'blue'], last: 'ban' } ] },
+  { id: 'us3', name: 'After dinner cereal', slot: 'After dinner', used: 9, last: 'yesterday', lines: [
+    { food: 'chpro', qty: 1.25, unit: 0, options: ['chpro', 'rbc'], last: 'chpro', amts: { chpro: { qty: 1.25, unit: 0 }, rbc: { qty: 1, unit: 0 } } },
+    { food: 'milk', qty: .75, unit: 'srv' } ] },
+  { id: 'us4', name: 'Yogurt bowl', slot: 'Breakfast', used: 5, last: '3 days ago', lines: [
+    { food: 'chob', qty: 1, unit: 0, options: ['kyog', 'chob'], last: 'chob', amts: { kyog: { qty: .75, unit: 0 }, chob: { qty: 1, unit: 0 } } },
+    { food: 'kpbc', qty: 1, unit: 0, options: ['kab', 'kpbc', 'kpbx', 'nuttzo', 'pbfit'], last: 'kpbc', amts: { pbfit: { qty: 2, unit: 0 } } },
+    { food: 'blue', qty: .5, unit: 'srv' } ] },
+];
+// Sample log for the last 60 days: [slot, [[food, qty]], days ago]
+const HIST = (() => { const L = [];
+  const add = (slot, items, days) => days.forEach(d => L.push({ d, slot, items: items.map(([food, qty]) => ({ food, qty, unit: 'srv' })) }));
+  add('Breakfast', [['oats', .5], ['ab', .5], ['blue', .5], ['milk', 1]], [1, 3, 6, 9, 13, 17]);
+  add('Breakfast', [['oats', .5], ['ab', .75], ['ban', .5], ['milk', 1]], [2, 5, 8, 12, 20]);
+  add('Breakfast', [['oats', .5], ['pb', 1], ['straw', 1], ['milk', 1]], [24, 40]);
+  add('Breakfast', [['yog', 1], ['gran', 2]], [4, 7, 10, 15, 19, 23, 30]);
+  add('Breakfast', [['yog', 1], ['gran', 1.5], ['blue', .5]], [27, 33]);
+  add('Breakfast', [['chia', 2], ['milk', 1], ['ban', .5]], [36, 44, 51]);
+  add('Lunch', [['bread', 2], ['turkey', 3], ['ched', 1]], [4, 11]);
+  add('Lunch', [['bread', 2], ['turkey', 3], ['ched', 1], ['spin', 1]], [1, 8]);
+  add('Lunch', [['bread', 2], ['turkey', 4], ['swiss', 1]], [6, 14, 21]);
+  add('Snacks', [['apple', 1], ['pb', 1]], [2, 6, 9, 16, 22]);
+  add('Snacks', [['apple', 1], ['pb', .5]], [29]);
+  add('Dinner', [['spin', 2], ['prov', 1]], [3, 18]);
+  add('Dinner', [['spin', 2], ['straw', 1], ['yog', .5]], [10]);
+  add('Dinner', [['apple', 1], ['prov', 1]], [26]);
+  add('Dinner', [['chia', 1], ['yog', 1]], [31]);
+  return L.sort((x, y) => x.d - y.d); })();
+const short = k => F[k].n.split(',')[0];
+const PILL_MAX = 20;
+const optLabel = (l, f) => F[f].short || F[f].n;
+const pillMode = (l, opts) => opts.length <= 3 && opts.every(o => optLabel(l, o).length <= PILL_MAX);
+const PL = { Breakfast: 'breakfasts', Lunch: 'lunches', Dinner: 'dinners', Snacks: 'snacks', 'After dinner': 'after-dinners' };
+const ago = d => d === 1 ? 'yesterday' : `${d} days ago`;
+const dayLabel = d => new Date(2026, 10, 14 - d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+function subsets(arr, k, start = 0, cur = [], out = []) { if (cur.length === k) { out.push(cur.slice()); return out; }
+  for (let i = start; i < arr.length; i++) { cur.push(arr[i]); subsets(arr, k, i + 1, cur, out); cur.pop(); } return out; }
+const median = xs => { const v = xs.slice().sort((a, b) => a - b), m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
+function detect() {
+  const map = new Map(); let taken = 0;
+  for (const m of HIST) { const foods = [...new Set(m.items.map(i => i.food))].sort();
+    for (let k = 2; k <= Math.min(5, foods.length); k++) for (const c of subsets(foods, k)) { taken++;
+      const key = c.join('+'); const e = map.get(key) || { foods: c, meals: [] }; e.meals.push(m); map.set(key, e); } }
+  const has = (big, small) => small.every(f => big.includes(f));
+  const freq = [...map.values()].filter(e => e.meals.length >= 3);
+  const closed = freq.filter(x => !freq.some(t => t.foods.length > x.foods.length && has(t.foods, x.foods) && t.meals.length >= .8 * x.meals.length));
+  // join same-size sets that differ by one food
+  const cores = new Map();
+  for (let i = 0; i < closed.length; i++) for (let j = i + 1; j < closed.length; j++) { const A = closed[i], B = closed[j];
+    if (A.foods.length !== B.foods.length) continue; const core = A.foods.filter(f => B.foods.includes(f));
+    if (core.length !== A.foods.length - 1 || core.length < 2) continue;
+    const key = core.join('+'); const g = cores.get(key) || { core, members: new Set() }; g.members.add(A); g.members.add(B); cores.set(key, g); }
+  const used = new Set(), out = [];
+  for (const [key, g] of cores) { const mem = [...g.members]; mem.forEach(x => used.add(x)); const coreE = map.get(key); if (coreE) used.add(coreE);
+    const options = mem.map(x => x.foods.find(f => !g.core.includes(f)));
+    const meals = [...new Set(mem.flatMap(x => x.meals))].sort((x, y) => x.d - y.d);
+    out.push({ key: key + '|' + options.join('/'), core: g.core, options, meals, joined: mem.length }); }
+  closed.filter(x => !used.has(x)).forEach(x => out.push({ key: x.foods.join('+'), core: x.foods, options: null, meals: x.meals.slice().sort((p, q) => p.d - q.d), joined: 0 }));
+  // build lines, names, slot
+  for (const c of out) {
+    const order = c.meals[0].items.map(i => i.food); c.core.sort((x, y) => order.indexOf(x) - order.indexOf(y));
+    const qtys = f => c.meals.flatMap(m => m.items.filter(i => i.food === f).map(i => i.qty));
+    c.lines = c.core.map(f => ({ food: f, qty: median(qtys(f)), unit: 'srv' }));
+    if (c.options) { const recent = c.meals.find(m => m.items.some(i => c.options.includes(i.food)));
+      const pick = recent.items.find(i => c.options.includes(i.food)).food;
+      c.lines.push({ food: pick, qty: median(c.options.flatMap(qtys)), unit: 'srv', options: c.options.slice(), last: pick }); }
+    c.count = c.meals.length; c.last = c.meals[0].d;
+    const sc = {}; c.meals.forEach(m => sc[m.slot] = (sc[m.slot] || 0) + 1); c.slot = Object.keys(sc).sort((x, y) => sc[y] - sc[x])[0];
+    c.name = c.core.map(short).join(' + ') + (c.options ? ' + ' + c.options.map(short).join(' / ') : '');
+  }
+  const usualFoods = u => new Set(u.lines.flatMap(l => [l.food, ...(l.options || [])]));
+  const allFoods = c => [...c.core, ...(c.options || [])];
+  const covered = [], hidden = [], list = [];
+  for (const c of out) { const u = S.usuals.find(u => { const fs = usualFoods(u); return u.lines.length && allFoods(c).every(f => fs.has(f)); });
+    if (u) covered.push({ c, u }); else if (S.lib.hidden.has(c.key)) hidden.push(c); else list.push(c); }
+  list.sort((x, y) => y.count - x.count || x.last - y.last);
+  return { list, stats: { meals: HIST.length, taken, distinct: map.size, freq: freq.length, closed: closed.length, joinedSets: [...cores.values()].reduce((n, g) => n + g.members.size, 0), joinedInto: cores.size, combos: out.length, covered, hidden: hidden.length, shown: list.length } };
+}
+const yesterdayBreakfast = () => ({ gname: 'Oatmeal', usual: 'us1', lines: [
+  { food: 'oats', qty: .5, unit: 'srv' }, { food: 'ab', qty: .5, unit: 'srv' }, { food: 'blue', qty: .5, unit: 'srv' }, { food: 'milk', qty: 1, unit: 'srv' } ] });
+
+const mk = (l, gid, gname, usual, slotOpts) => ({ id: nid(), food: l.food, qty: l.qty, unit: l.unit, gid: gid || null, gname: gname || null, usual: usual || null, options: slotOpts || null });
+
+let S;
+function fresh(scene) {
+  uid = 1; Object.values(F).forEach(f => delete f.short); F.ab.s = 'serving'; F.ab.g = 32; F.ab.extra = [];
+  const lunch = [
+    mk({ food: 'bread', qty: 2, unit: 'srv' }), mk({ food: 'turkey', qty: 3, unit: 'srv' }),
+    mk({ food: 'ched', qty: 1, unit: 'srv' }), mk({ food: 'spin', qty: 1, unit: 'srv' }) ];
+  S = { scene, meals: { Breakfast: [], Lunch: lunch, Dinner: [], 'After dinner': [], Snacks: [] },
+    usuals: baseUsuals(), newsrv: null, sheet: null, select: null, editing: null, toast: null, undo: null,
+    other: { cam: false, form: false }, view: scene === 'manage' ? 'library' : 'eaten',
+    lib: { seg: 'Usuals', edit: null, optFor: null, addFood: false, confirmDel: false, hidden: new Set() },
+    swapHist: { 'us1:1': { pb: 3 } } };
+  if (scene === 'usual') S.meals.Breakfast = [];
+}
+
+// ---------- maths ----------
+const SV = f => [{ n: f.s, g: f.g }, ...(f.extra || [])];
+const nu = u => u === 'srv' ? 0 : u;
+const svOf = e => { const l = SV(F[e.food]); return l[nu(e.unit)] || l[0]; };
+const grams = e => e.unit === 'g' ? e.qty : e.qty * svOf(e).g;
+const nut = e => { const f = F[e.food], g = grams(e) / 100; return { k: f.k * g, p: f.p * g, c: f.c * g, f: f.f * g }; };
+const sum = list => list.reduce((a, e) => { const n = nut(e); a.k += n.k; a.p += n.p; a.c += n.c; a.f += n.f; return a; }, { k: 0, p: 0, c: 0, f: 0 });
+const r = n => Math.round(n);
+const fq = q => { const w = Math.floor(q), fr = q - w; const s = fr === .5 ? '½' : fr === .25 ? '¼' : fr === .75 ? '¾' : (fr ? String(+fr.toFixed(2)).slice(1) : ''); return (w || !s ? String(w || (s ? '' : 0)) : '') + s; };
+const amtTxt = e => e.unit === 'g' ? `${r(e.qty)} g` : `${fq(e.qty)} ${svOf(e).n}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const barHtml = t => { const pk = t.p * 4, ck = t.c * 4, fk = t.f * 9, tot = pk + ck + fk || 1;
+  return `<div class="bar"><i class="p" style="width:${pk / tot * 100}%"></i><i class="c" style="width:${ck / tot * 100}%"></i><i class="f" style="width:${fk / tot * 100}%"></i></div>`; };
+
+// ---------- render ----------
+const phone = document.getElementById('phone');
+const ICON = {
+  plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  shop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h2l2.5 11h11L21 8H6.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>',
+  eaten: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9"/></svg>',
+  lib: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2zM12 6v14"/></svg>',
+  cam: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+};
+function navbar(order, cur) {
+  const map = { Plan: ICON.plan, Shop: ICON.shop, Eaten: ICON.eaten, Library: ICON.lib };
+  return `<nav class="navbar" aria-label="Tabs">${order.map(n => `<button class="${n === cur ? 'cur' : ''}" data-a="nav" data-v="${n}" ${n === cur ? 'aria-current="page"' : ''}>${map[n]}${n}</button>`).join('')}</nav>`;
+}
+
+function render() {
+  if (S.scene === 'other') return renderOther();
+  let h = S.view === 'library' ? libraryHtml() : eatenHtml();
+  h += navbar(['Plan', 'Shop', 'Eaten', 'Library'], S.view === 'library' ? 'Library' : 'Eaten');
+  if (S.sheet) h += sheetHtml();
+  if (S.toast) h += `<div class="toast" role="status"><span>${esc(S.toast)}</span>${S.undo ? '<button data-a="undo">Undo</button>' : ''}</div>`;
+  const st = document.getElementById('scr')?.scrollTop || 0;
+  phone.innerHTML = h;
+  const scr = document.getElementById('scr'); if (scr) scr.scrollTop = st;
+  nsPreview(); cbPreview(); updateStats();
+}
+
+function updateStats() {
+  const el = document.getElementById('combo-stats'); if (!el) return; const st = detect().stats;
+  el.innerHTML = [
+    `${st.meals} meals in 60 days gave ${st.taken} food sets, ${st.distinct} of them different.`,
+    `${st.freq} were in 3 or more meals.`,
+    `${st.closed} were left after dropping sets that only happen inside a bigger one.`,
+    st.joinedInto ? `${st.joinedSets} of those differed by one food, so they became ${st.joinedInto} combo${st.joinedInto > 1 ? 's' : ''} with a pick-one line. That leaves ${st.combos}.` : `That leaves ${st.combos}.`,
+    st.covered.length ? `${st.covered.length} ${st.covered.length > 1 ? 'are' : 'is'} covered by a usual you have: ${st.covered.map(x => `${esc(x.c.name)} (by ${esc(x.u.name)})`).join('; ')}.` : 'None is covered by a usual yet.',
+    st.hidden ? `${st.hidden} hidden by you.` : '',
+    `<strong>${st.shown} shown.</strong>` ].filter(Boolean).map(x => `<li>${x}</li>`).join('');
+}
+
+function libraryHtml() {
+  let h = `<div class="screen" id="scr">`;
+  if (S.lib.edit) return h + usualEditor() + `</div>`;
+  h += `<div class="libhead"><b>Library</b>${S.lib.seg === 'Usuals' ? '<button class="txt-btn" data-a="newusual">＋ New usual</button>' : ''}</div>
+    <div class="seg seg3">${['Foods', 'Usuals', 'Recipes'].map(x => `<button data-a="lib-seg" data-s="${x}" class="${S.lib.seg === x ? 'cur' : ''}">${x}</button>`).join('')}</div>`;
+  if (S.lib.seg !== 'Usuals') return h + `<p class="macro" style="padding:20px 4px">${S.lib.seg} stays as it is today. Tap Usuals.</p></div>`;
+  for (const u of S.usuals) { const t = sum(u.lines.map(l => { const f = l.options ? (l.last || l.food) : l.food, a = (l.amts && l.amts[f]) || l; return { food: f, qty: a.qty, unit: a.unit }; }));
+    h += `<button class="res" data-a="openusual" data-u="${u.id}"><b>${esc(u.name)}</b><span>${u.lines.length ? u.lines.map(l => l.options ? (pillMode(l, l.options) ? l.options.map(o => esc(optLabel(l, o))).join(' / ') : `${esc(optLabel(l, l.last || l.food))} or ${l.options.length - 1} more`) : esc(short(l.food))).join(' · ') : 'No foods yet'}</span><span>${u.slot} · ${u.used ? `used ${u.used} times, last ${u.last}` : 'not used yet'}</span><em>${r(t.k)} kcal</em></button>`; }
+  if (!S.usuals.length) h += `<p class="macro">No usuals yet. Save one from a meal, or from a combo below.</p>`;
+  const det = detect();
+  h += `<div class="lbl" style="margin-top:22px">Combos you've logged</div><div class="helper" style="margin:0 0 4px">Foods you've had together in 3 or more meals in the last 60 days.</div>`;
+  det.list.forEach(c => h += `<button class="res" data-a="opencombo" data-k="${esc(c.key)}"><b>${esc(c.name)}</b><span>${c.count} ${PL[c.slot]} · last ${ago(c.last)}</span><em>${r(sum(c.lines).k)} kcal</em></button>`);
+  if (!det.list.length) h += `<p class="macro">Nothing new. Combos your usuals already cover don't show here.</p>`;
+  if (S.lib.hidden.size) h += `<button class="txt-btn" data-a="unhide">Show ${S.lib.hidden.size} hidden</button>`;
+  return h + `</div>`;
+}
+
+function foodPicker(action, i, exclude) {
+  return `<div class="picker">${Object.keys(F).filter(k => !exclude.includes(k)).map(k => `<button class="pill" data-a="${action}" data-i="${i}" data-f="${k}">${F[k].n}</button>`).join('')}</div>`;
+}
+function usualEditor() {
+  const u = S.usuals.find(x => x.id === S.lib.edit), L = S.lib;
+  const t = sum(u.lines.map(l => { const f = l.options ? (l.last || l.food) : l.food, a = (l.amts && l.amts[f]) || l; return { food: f, qty: a.qty, unit: a.unit }; }));
+  let h = `<div class="edhead"><button class="txt-btn" data-a="ue-back">‹ Usuals</button><span class="macro">Changes save as you go</span></div>
+    <div class="lbl" style="margin-top:2px">Name</div><input class="field" id="ued-name" value="${esc(u.name)}" autocomplete="off">
+    <div class="lbl">Usually for</div><div class="pills">${['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(x => `<button class="pill" aria-pressed="${u.slot === x}" data-a="ue-slot" data-s="${x}">${x}</button>`).join('')}</div>
+    <div class="lbl">Foods (${u.lines.length})</div>`;
+  u.lines.forEach((l, i) => { const food = l.options ? (l.last || l.food) : l.food, am = (l.options && l.amts && l.amts[food]) || l, e = { food, qty: am.qty, unit: am.unit };
+    h += `<div class="uline"><div class="ulhead">${l.options ? `<span class="chip">Pick one</span>` : `<b>${F[food].n}</b>`}<span class="sp"></span>
+      <button class="icon-btn x" aria-label="Move up" data-a="ue-up" data-i="${i}" ${i ? '' : 'disabled'}>↑</button><button class="icon-btn x" aria-label="Move down" data-a="ue-down" data-i="${i}" ${i < u.lines.length - 1 ? '' : 'disabled'}>↓</button><button class="icon-btn x" aria-label="Remove line" data-a="ue-del" data-i="${i}">×</button></div>`;
+    if (l.options) h += `<div class="edopts">${l.options.map(o => `<div class="edopt ${o === food ? 'on' : ''}"><div class="ot"><b>${esc(F[o].n)}</b><small>${esc(F[o].b || 'No brand')}${o === food ? ' · starts here' : ''}</small>
+        <input class="field nick" data-i="${i}" data-f="${o}" value="${esc(F[o].short || '')}" placeholder="Short name (saved to the food)" maxlength="20" aria-label="Short name for ${esc(F[o].n)}"></div>
+        <button class="icon-btn x" aria-label="Remove ${esc(F[o].n)}" data-a="ue-optdel" data-i="${i}" data-f="${o}">×</button></div>`).join('')}
+      <button class="pill dash" data-a="ue-optpick" data-i="${i}">＋ Option</button>
+      <div class="helper" style="margin:0">${pillMode(l, l.options) ? 'On a day these show as buttons on the row.' : `On a day this shows as a list you open, because ${l.options.length > 3 ? 'there are more than 3 options' : `a name is longer than ${PILL_MAX} characters`}. Short names on the foods can turn it back into buttons.`}</div></div>` + (L.optFor === i ? foodPicker('ue-optadd', i, l.options) : '');
+    h += `<div class="ulamt"><div class="step sm"><button data-a="ue-dec" data-i="${i}" aria-label="Less">−</button><output>${amtTxt(e)}</output><button data-a="ue-inc" data-i="${i}" aria-label="More">+</button></div><span class="macro">${r(grams(e))} g · ${r(nut(e).k)} kcal</span></div>
+      <div><button class="switch" aria-pressed="${!!l.options}" data-a="ue-pick" data-i="${i}"><i></i>Pick each time</button></div></div>`; });
+  h += `<button class="txt-btn" data-a="ue-addfood" aria-expanded="${L.addFood}">＋ Add a food</button>` + (L.addFood ? foodPicker('ue-addline', -1, u.lines.map(l => l.food)) : '');
+  if (u.lines.length) h += `<div class="card" style="background:var(--raised);margin-top:10px"><div class="daytot"><b>${r(t.k)}</b><span>kcal as it starts</span></div>${barHtml(t)}<div class="macro">Protein ${r(t.p)} g · Carbs ${r(t.c)} g · Fat ${r(t.f)} g</div></div>`;
+  h += L.confirmDel ? `<div class="confirm"><b>Delete ${esc(u.name)}?</b><div class="helper">Days you logged it keep their entries.</div><div class="pills" style="margin-top:8px"><button class="pill danger" data-a="ue-dodel">Delete</button><button class="pill" data-a="ue-keep">Keep it</button></div></div>`
+    : `<button class="txt-btn" style="color:var(--danger)" data-a="ue-askdel">Delete usual</button>`;
+  return h;
+}
+
+function eatenHtml() {
+  const all = Object.values(S.meals).flat(), t = sum(all);
+  let h = `<div class="screen" id="scr">
+    <div class="dayhead"><button aria-label="Previous day">‹</button><div><b>Today</b><small>Saturday 14 November 2026</small></div><button aria-label="Next day" disabled style="opacity:.3">›</button></div>
+    <div class="card"><div class="daytot"><b>${r(t.k)}</b><span>kcal so far</span></div>${barHtml(t)}
+    <div class="macro">Protein ${r(t.p)} g · Carbs ${r(t.c)} g · Fat ${r(t.f)} g</div></div>`;
+  for (const slot of ['Breakfast', 'Lunch', 'Dinner', 'After dinner', 'Snacks']) h += mealCard(slot);
+  return h + `</div>`;
+}
+
+function mealCard(slot) {
+  const list = S.meals[slot], t = sum(list), sel = S.select && S.select.meal === slot;
+  let h = `<div class="card"><div class="mhead"><h4>${slot}</h4>${list.length ? `<span class="k"><b>${r(t.k)}</b> kcal</span>` : ''}
+    ${sel ? `<button class="txt-btn" data-a="cancelsel">Cancel</button>` : `<button class="icon-btn" aria-label="${slot} options" data-a="mealmenu" data-m="${slot}">⋯</button>`}</div>`;
+  if (list.length) h += barHtml(t) + `<div class="macro">P ${r(t.p)} g · C ${r(t.c)} g · F ${r(t.f)} g</div>`;
+  if (sel) {
+    for (const e of list) { const on = S.select.ticked.has(e.id);
+      h += `<button class="selrow" aria-pressed="${on}" data-a="tick" data-id="${e.id}"><span class="box">${on ? '✓' : ''}</span><span><b style="font-size:14.5px">${F[e.food].n}</b><br><span class="macro">${amtTxt(e)} · ${r(grams(e))} g</span></span><span class="macro">${r(nut(e).k)} kcal</span></button>`; }
+    const n = S.select.ticked.size;
+    h += `<button class="btn" data-a="opensave" ${n ? '' : 'disabled'}>${n ? `Save ${n} as a usual` : 'Save as a usual'}</button>${n ? '' : '<div class="helper">Tick the items that go together.</div>'}</div>`;
+    return h;
+  }
+  // group the entries in order
+  const seen = new Set();
+  for (const e of list) {
+    if (e.gid) { if (seen.has(e.gid)) continue; seen.add(e.gid);
+      const kids = list.filter(x => x.gid === e.gid), gt = sum(kids), changed = diffUsual(slot, e.gid).length;
+      h += `<div class="group"><div class="ghead"><span class="gname">${esc(e.gname)}</span>${e.usual ? `<span class="chip">Usual</span>` : ''}${changed ? `<span class="chip warn">Changed</span>` : ''}<span class="sp"></span><span class="k macro"><b style="color:var(--text)">${r(gt.k)}</b> kcal</span><button class="icon-btn" aria-label="${esc(e.gname)} options" data-a="groupmenu" data-m="${slot}" data-g="${e.gid}">⋯</button></div><div class="gbody">`;
+      for (const k of kids) h += entryRow(k, slot);
+      h += `</div></div>`;
+    } else h += entryRow(e, slot);
+  }
+  if (!list.length && slot === 'Breakfast') { const y = yesterdayBreakfast(), yt = sum(y.lines);
+    h += `<button class="suggest" data-a="sameas"><b>↻ Same as yesterday</b><span>Oatmeal · ${y.lines.map(l => F[l.food].n.split(',')[0]).join(', ')} · ${r(yt.k)} kcal</span></button>`; }
+  h += `<button class="txt-btn add-row" data-a="openadd" data-m="${slot}">＋ Add to ${slot.toLowerCase()}</button></div>`;
+  return h;
+}
+
+function entryRow(e, slot) {
+  const f = F[e.food], n = nut(e), ed = S.editing === e.id;
+  const canSwap = !e.options && e.gid;
+  let h = `<div class="entry"><div class="nm">${f.n}${canSwap ? `<button class="txt-btn swap" style="padding:0 0 0 6px;min-height:0" data-a="swap" data-id="${e.id}" data-m="${slot}">⇄ swap</button>` : ''}<br>
+    <button class="amt ${ed ? 'open' : ''}" data-a="edit" data-id="${e.id}" aria-expanded="${ed}">${amtTxt(e)}${e.unit === 'g' ? '' : ` <small>· ${r(grams(e))} g</small>`}</button></div>
+    <span class="kc"><b>${r(n.k)}</b> kcal</span><button class="icon-btn x" aria-label="Remove ${f.n}" data-a="remove" data-id="${e.id}" data-m="${slot}">×</button>`;
+  if (e.options) { const ln = lineOf(e), l = ln && ln.l;
+    if (pillMode(l, e.options)) h += `<div class="slotline" role="group" aria-label="Pick one">${e.options.map(o => `<button class="pill" aria-pressed="${o === e.food}" data-a="pick" data-id="${e.id}" data-f="${o}" data-m="${slot}">${esc(optLabel(l, o))}</button>`).join('')}</div>`;
+    else { const open = S.optOpen === e.id;
+      h += `<div class="slotline"><button class="pickbtn" data-a="optopen" data-id="${e.id}" aria-expanded="${open}">Pick one · ${e.options.indexOf(e.food) + 1} of ${e.options.length} <span aria-hidden="true">${open ? '▴' : '▾'}</span></button></div>`;
+      if (open) h += `<div class="optlist" role="radiogroup" aria-label="Pick one">${e.options.map(o => { const a = (l && l.amts && l.amts[o]) || (l ? { qty: l.qty, unit: l.unit } : { qty: e.qty, unit: e.unit }), t = { food: o, qty: a.qty, unit: a.unit };
+        return `<button class="optrow" role="radio" aria-checked="${o === e.food}" data-a="pick" data-id="${e.id}" data-f="${o}"><span class="radio"></span><span class="ot"><b>${esc(optLabel(l, o))}</b><small>${esc(F[o].b || '')}${F[o].b ? ' · ' : ''}${amtTxt(t)}</small></span><span class="kc"><b>${r(nut(t).k)}</b> kcal</span></button>`; }).join('')}</div>`; } }
+  if (ed) { const cur = e.unit === 'g' ? -1 : nu(e.unit), sv = svOf(e), open = S.newsrv && S.newsrv.id === e.id;
+    h += `<div class="editor"><div class="step"><button data-a="dec" data-id="${e.id}" aria-label="Less">−</button><output>${e.unit === 'g' ? r(e.qty) : fq(e.qty)}</output><button data-a="inc" data-id="${e.id}" aria-label="More">+</button><span class="g">${e.unit === 'g' ? 'grams' : `${esc(sv.n)} · ${r(grams(e))} g`}</span></div>
+    <div class="pills">${SV(f).map((x, i) => `<button class="pill" aria-pressed="${cur === i}" data-a="unit" data-u="${i}" data-id="${e.id}">${esc(x.n)} (${r(x.g)} g)</button>`).join('')}<button class="pill" aria-pressed="${cur === -1}" data-a="unit" data-u="g" data-id="${e.id}">grams</button><button class="pill" style="border-style:dashed;color:var(--primary)" data-a="newsrv" data-id="${e.id}" aria-expanded="${!!open}">＋ Serving</button></div>
+    ${f.s === 'serving' && !open ? `<div class="helper" style="margin:0">“serving” isn't a real amount. <button class="txt-btn" style="padding:0;min-height:0;font-size:12.5px" data-a="newsrv" data-id="${e.id}">Say what it is</button></div>` : ''}
+    ${open ? newSrvPanel(e) : ''}
+    <div style="display:flex;justify-content:flex-end"><button class="txt-btn" style="padding:4px;min-height:0" data-a="edit" data-id="${e.id}">Done</button></div></div>`; }
+  return h + `</div>`;
+}
+
+function newSrvPanel(e) {
+  const f = F[e.food], ns = S.newsrv, generic = f.s === 'serving';
+  let h = `<div class="nsp">`;
+  if (generic) h += `<div class="nsh">What is 1 serving (${r(f.g)} g) on the label?</div>
+    <div class="nsrow"><input class="field" id="ns-count" inputmode="decimal" value="${esc(ns.count)}" aria-label="How many"><input class="field" id="ns-cname" value="${esc(ns.cname)}" aria-label="Unit" placeholder="tbsp"></div>
+    <div class="helper" id="ns-prev-split"></div>
+    <button class="btn" style="margin-top:6px" data-a="ns-split" id="ns-split-btn">Add it</button>
+    <div class="nsor">or weigh your own</div>`;
+  else h += `<div class="nsh">New serving for ${esc(f.n)}</div>`;
+  h += `<div class="nsrow nsrow2"><input class="field" id="ns-name" value="${esc(ns.name)}" placeholder="bowl" aria-label="Serving name"><input class="field" id="ns-g" inputmode="decimal" value="${esc(ns.g)}" placeholder="grams" aria-label="Grams"></div>
+    <div class="helper" id="ns-prev-add"></div>
+    <button class="btn ${generic ? 'sec' : ''}" style="margin-top:6px" data-a="ns-add" id="ns-add-btn">Add serving</button>
+    <div class="helper">Saved to ${esc(f.n)}, so it's there next time. Past days don't change.</div></div>`;
+  return h;
+}
+function nsPreview() {
+  const ns = S.newsrv; if (!ns) return; const [, e] = findE(ns.id); if (!e) return; const f = F[e.food];
+  const ps = document.getElementById('ns-prev-split'), bs = document.getElementById('ns-split-btn');
+  if (ps) { const c = parseFloat(ns.count), n = ns.cname.trim(), ok = c > 0 && n;
+    ps.textContent = ok ? `Adds 1 ${n} = ${+(f.g / c).toFixed(1)} g, and renames the serving “${fq(c)} ${n}”.` : "Type the label's serving, like 2 tbsp.";
+    bs.disabled = !ok; bs.textContent = ok ? `Add ${n}` : 'Add it'; }
+  const pa = document.getElementById('ns-prev-add'), ba = document.getElementById('ns-add-btn');
+  if (pa) { const g = parseFloat(ns.g), n = ns.name.trim(), ok = g > 0 && n;
+    pa.textContent = ok ? `1 ${n} = ${g} g · ${r(f.k * g / 100)} kcal` : "Weigh it once, name it, and it's a serving from now on.";
+    ba.disabled = !ok; }
+}
+function useServing(e, idx) { const g = grams(e); e.unit = idx; e.qty = Math.max(.25, Math.round(g / SV(F[e.food])[idx].g * 4) / 4); }
+
+function swapTarget(e, f) {
+  if (e.unit === 'g') return { food: f, unit: 'g', qty: e.qty };
+  const list = SV(F[f]), idx = list.findIndex(x => x.n === svOf(e).n);
+  if (idx >= 0) return { food: f, unit: idx, qty: e.qty };
+  return { food: f, unit: 0, qty: Math.max(.25, Math.round(grams(e) / list[0].g * 4) / 4) };
+}
+const lineOf = e => { if (!e.usual) return null; const u = S.usuals.find(x => x.id === e.usual); return u && u.lines[e.line] ? { u, l: u.lines[e.line], key: `${u.id}:${e.line}` } : null; };
+
+function diffUsual(slot, gid) {
+  const kids = S.meals[slot].filter(x => x.gid === gid); if (!kids.length || !kids[0].usual) return [];
+  const u = S.usuals.find(x => x.id === kids[0].usual); if (!u) return [];
+  const out = [], used = new Set();
+  u.lines.forEach((l, i) => {
+    const k = kids.find(x => x.line === i);
+    if (!k) { out.push(`${F[l.food].n} removed`); return; } used.add(k.id);
+    if (!l.options && k.food !== l.food) out.push(`${F[k.food].n} instead of ${F[l.food].n}`);
+    else { const x = (l.options && l.amts && l.amts[k.food]) || l;
+      if (nu(k.unit) !== nu(x.unit) || Math.abs(k.qty - x.qty) > .001) out.push(`${short(k.food)} ${amtTxt(k)}, was ${amtTxt({ ...x, food: k.food })}`); }
+  });
+  kids.filter(k => !used.has(k.id)).forEach(k => out.push(`${F[k.food].n} added`));
+  return out;
+}
+
+function sheetHtml() {
+  const sh = S.sheet; let h = `<div class="scrim" data-a="closesheet"><div class="sheet" role="dialog" aria-modal="true" data-stop><div class="grab"></div>`;
+  if (sh.type === 'add') {
+    const q = (sh.q || '').toLowerCase(), m = sh.meal;
+    const us = S.usuals.filter(u => u.name.toLowerCase().includes(q)).sort((a, b) => (b.slot === m) - (a.slot === m));
+    const cb = detect().list.filter(c => c.name.toLowerCase().includes(q)).sort((a, b) => (b.slot === m) - (a.slot === m) || b.count - a.count || a.last - b.last).slice(0, q ? 99 : 3);
+    const fd = Object.keys(F).filter(k => F[k].n.toLowerCase().includes(q)).slice(0, q ? 8 : 4);
+    h += `<div class="shead"><h5>Add to ${m.toLowerCase()}</h5><button class="txt-btn" data-a="closesheet">Cancel</button></div>
+      <input class="field" id="addq" placeholder="Search usuals and foods" value="${esc(sh.q || '')}" autocomplete="off">`;
+    if (us.length) { h += `<div class="lbl">Usuals</div>`; us.forEach(u => { const t = sum(u.lines.map(l => { const f = l.options ? (l.last || l.food) : l.food, a = (l.amts && l.amts[f]) || l; return { food: f, qty: a.qty, unit: a.unit }; }));
+      h += `<button class="res" data-a="addusual" data-u="${u.id}"><b>${esc(u.name)}</b><span>${u.lines.map(l => l.options ? (pillMode(l, l.options) ? l.options.map(o => esc(optLabel(l, o))).join(' / ') : `${esc(optLabel(l, l.last || l.food))} or ${l.options.length - 1} more`) : esc(short(l.food))).join(' · ')}</span><em>${r(t.k)} kcal</em></button>`; }); }
+    if (cb.length) { h += `<div class="lbl">Combos you've logged</div>`; cb.forEach((c, i) => { const t = sum(c.lines);
+      h += `<button class="res" data-a="addcombo" data-k="${esc(c.key)}"><b>${esc(c.name)}</b><span>In ${c.count} meals · last ${ago(c.last)}</span><em>${r(t.k)} kcal</em></button>`; }); }
+    h += `<div class="lbl">Foods</div>`; fd.forEach(k => h += `<button class="res" data-a="addfood" data-f="${k}"><b>${F[k].n}</b><span>1 ${F[k].s} · ${F[k].g} g</span><em>${r(F[k].k * F[k].g / 100)} kcal</em></button>`);
+  }
+  if (sh.type === 'swap') { const [, e] = findE(sh.id), q = (sh.q || '').toLowerCase(), ln = lineOf(e), hist = ln ? (S.swapHist[ln.key] || {}) : {};
+    const row = (f, sub) => { const t = swapTarget(e, f); return `<button class="res" data-a="doswap" data-f="${f}"><b>${F[f].n}</b><span>${sub ? sub + ' · ' : ''}${amtTxt(t)} · ${r(grams(t))} g</span><em>${r(nut(t).k)} kcal</em></button>`; };
+    h += `<div class="shead"><h5>Swap ${F[e.food].n}</h5><button class="txt-btn" data-a="closesheet">Cancel</button></div>
+      <div class="macro">Just for this day. ${ln ? `Your ${esc(ln.u.name)} usual stays as it is.` : ''}</div>
+      <input class="field" id="swapq" placeholder="Search foods" value="${esc(sh.q || '')}" autocomplete="off" style="margin-top:10px">`;
+    const shown = new Set([e.food]);
+    if (ln && ln.l.food !== e.food && !q) { h += `<div class="lbl">Your usual</div>` + row(ln.l.food, 'Back to the usual'); shown.add(ln.l.food); }
+    const sug = Object.keys(hist).filter(f => !shown.has(f) && F[f].n.toLowerCase().includes(q)).sort((a, b) => hist[b] - hist[a]);
+    if (sug.length) { h += `<div class="lbl">Swapped in before</div>`; sug.forEach(f => { h += row(f, `${hist[f]} time${hist[f] > 1 ? 's' : ''}`); shown.add(f); }); }
+    const rest = Object.keys(F).filter(f => !shown.has(f) && F[f].n.toLowerCase().includes(q)).slice(0, q ? 10 : 5);
+    h += `<div class="lbl">${q ? 'Foods' : 'Or any food'}</div>` + rest.map(f => row(f)).join(''); }
+  if (sh.type === 'combo') { const c = detect().list.find(x => x.key === sh.key);
+    h += `<div class="shead"><h5>${esc(c.name)}</h5><button class="txt-btn" data-a="closesheet">Close</button></div>
+      <div class="macro">In ${c.count} ${c.slot.toLowerCase()} meals over the last 60 days · last ${ago(c.last)}</div>
+      ${c.options ? `<div class="helper">${c.joined} combos that differ only by ${c.options.map(short).join(' or ')} were joined, so that's a pick-one.</div>` : ''}
+      <div class="lbl">Typical amounts</div>`;
+    c.lines.forEach(l => h += `<div class="saveline"><span>${l.options ? `<span class="chip">Pick one</span> ${l.options.map(short).join(' / ')}` : `<b style="font-size:14.5px">${F[l.food].n}</b>`}</span><span class="macro">${amtTxt(l)}</span></div>`);
+    h += `<div class="lbl">Meals it came from</div>${c.meals.map(m => `<div class="macro" style="padding:3px 0">${dayLabel(m.d)} · ${m.items.map(i => short(i.food)).join(', ')}</div>`).join('')}
+      <div class="lbl">Save as a usual</div><input class="field" id="cbname" value="${esc(sh.name)}" autocomplete="off" placeholder="Name it">
+      <button class="btn" data-a="savecombo" id="cbsave">Save as a usual</button>
+      <button class="btn sec" data-a="hidecombo">Hide this combo</button>`; }
+  if (sh.type === 'mealmenu') { const n = S.meals[sh.meal].length;
+    h += `<div class="shead"><h5>${sh.meal}</h5><button class="txt-btn" data-a="closesheet">Close</button></div><div class="menu">
+      <button data-a="opencopy" ${n ? '' : 'disabled style="opacity:.4"'}>Copy to…<small>Another day or meal, exactly as it is</small></button>
+      <button data-a="startsel" ${n ? '' : 'disabled style="opacity:.4"'}>Select<small>Pick items to save as a usual</small></button>
+      <button data-a="copyfrom">Copy from another day…<small>Pick a day's ${sh.meal.toLowerCase()} to bring here</small></button></div>`; }
+  if (sh.type === 'copy') { const list = sh.gid ? S.meals[sh.meal].filter(x => x.gid === sh.gid) : S.meals[sh.meal], t = sum(list);
+    const days = ['Today', 'Tomorrow', 'Mon 16', 'Tue 17', 'Wed 18'];
+    h += `<div class="shead"><h5>Copy ${sh.gid ? esc(list[0].gname) : sh.meal.toLowerCase()}</h5><button class="txt-btn" data-a="closesheet">Cancel</button></div>
+      <div class="macro">${list.length} items · ${r(t.k)} kcal · ${list.map(e => F[e.food].n.split(',')[0]).join(', ')}</div>
+      <div class="lbl">Day</div><div class="pills">${days.map(d => `<button class="pill" aria-pressed="${sh.day === d}" data-a="cday" data-d="${d}">${d}</button>`).join('')}<button class="pill">Pick a date…</button></div>
+      <div class="lbl">Meal</div><div class="pills">${SLOTS.map(s => `<button class="pill" aria-pressed="${sh.to === s}" data-a="cslot" data-s="${s}">${s}</button>`).join('')}</div>
+      <button class="btn" data-a="docopy">Copy ${list.length} items to ${sh.day === 'Today' ? 'today' : sh.day}</button>
+      <div class="helper">Adds to what's there already; nothing is replaced.</div>`; }
+  if (sh.type === 'groupmenu') { const kids = S.meals[sh.meal].filter(x => x.gid === sh.gid), d = diffUsual(sh.meal, sh.gid), nm = kids[0].gname;
+    h += `<div class="shead"><h5>${esc(nm)}</h5><button class="txt-btn" data-a="closesheet">Close</button></div><div class="menu">
+      ${kids[0].usual ? `<button data-a="updateusual" ${d.length ? '' : 'disabled style="opacity:.45"'}>Update the ${esc(nm)} usual<small>${d.length ? esc(d.join(' · ')) : 'Matches your usual'}</small></button>` : `<button data-a="groupsave">Save as a usual<small>Use these ${kids.length} as a starting point</small></button>`}
+      ${kids.map(k => { const ln = lineOf(k); if (!ln || ln.l.options || k.food === ln.l.food) return ''; const n = (S.swapHist[ln.key] || {})[k.food] || 0;
+        return `<button data-a="makepick" data-id="${k.id}">${n >= 3 ? '<span class="chip" style="margin-right:6px">Suggested</span>' : ''}Make it a pick-one: ${short(ln.l.food)} / ${short(k.food)}<small>${n >= 3 ? `You've swapped this line ${n} times. ` : ''}Both become options, and you choose each time</small></button>`; }).join('')}
+      <button data-a="groupcopy">Copy to…<small>Another day or meal</small></button>
+      <button data-a="ungroup">Ungroup<small>Keep the ${kids.length} entries, drop the heading</small></button>
+      <button class="danger" data-a="groupremove">Remove all ${kids.length}</button></div>`; }
+  if (sh.type === 'save') { const ticked = S.meals[sh.meal].filter(e => sh.ids.includes(e.id)), t = sum(ticked);
+    h += `<div class="shead"><h5>New usual</h5><button class="txt-btn" data-a="closesheet">Cancel</button></div>
+      <div class="lbl">Name</div><input class="field" id="usname" placeholder="Turkey sandwich" value="${esc(sh.name || '')}" autocomplete="off">
+      <div class="lbl">Foods (${ticked.length})</div>`;
+    ticked.forEach(e => { const on = sh.pick.has(e.id), alts = [e.food, ...(SWAPS[e.food] || [])];
+      h += `<div class="saveline"><span><b style="font-size:14.5px">${F[e.food].n}</b> <span class="macro">${amtTxt(e)}</span></span>
+        ${SWAPS[e.food] ? `<button class="switch" aria-pressed="${on}" data-a="togglepick" data-id="${e.id}"><i></i>Pick each time</button>` : '<span class="macro">Always</span>'}
+        ${on ? `<div class="opts">Options: ${alts.map(a => F[a].n).join(' · ')} <span style="color:var(--primary);font-weight:600">＋ add</span></div>` : ''}</div>`; });
+    h += `<div class="card" style="background:var(--raised);margin:12px 0 0"><div class="daytot"><b>${r(t.k)}</b><span>kcal as saved</span></div><div class="macro">Protein ${r(t.p)} g · Carbs ${r(t.c)} g · Fat ${r(t.f)} g</div></div>
+      <div class="helper">Saved from Lunch today. Your log stays as it is.</div>
+      <button class="btn" data-a="dosave" ${sh.name && sh.name.trim() ? '' : 'disabled'}>Save usual</button>`; }
+  return h + `</div></div>`;
+}
+
+// ---------- other feedback ----------
+function renderOther() {
+  const o = S.other; let h;
+  if (o.form) {
+    const rows = [
+      ['cal', 'Calories', '', 230, 230], ['', 'Total Fat', 'g', 8, 8], ['i1', 'Saturated Fat', 'g', 1, 1], ['i1', 'Trans Fat', 'g', 0, 0],
+      ['', 'Cholesterol', 'mg', 0, 0], ['', 'Sodium', 'mg', 160, 135], ['', 'Total Carbohydrate', 'g', 37, 37], ['i1', 'Dietary Fiber', 'g', 4, 4],
+      ['i1', 'Total Sugars', 'g', 12, 12], ['i2', 'Incl. Added Sugars', 'g', 10, 10], ['', 'Protein', 'g', 3, 3] ];
+    h = `<div class="screen"><div class="shead"><h5 style="font-size:18px">Check the label</h5><button class="txt-btn" data-a="o-back">Cancel</button></div>
+      <div class="macro" style="margin-bottom:8px"><b style="color:var(--text)">Nature's Path</b> · Pumpkin Seed Granola · from Open Food Facts</div>
+      <div class="nf"><h6>Nutrition Facts</h6><div class="nfrow" style="border:0"><label>Serving size</label><input value="⅔ cup" aria-label="Serving size"><span class="u"></span></div>
+      <div class="nfrow" style="border:0;padding-top:0"><label style="font-weight:400">Grams</label><input value="55" inputmode="decimal" aria-label="Serving grams"><span class="u">g</span></div>
+      <div class="rule8"></div>`;
+    rows.forEach(([c, n, u, v, db], i) => { if (i === 1) h += '<div class="rule4"></div>';
+      h += `<div class="nfrow ${c}"><label for="nf${i}">${n}</label><input id="nf${i}" inputmode="decimal" value="${v}" class="${v !== db ? 'chg' : ''}"><span class="u">${u}</span></div>`; });
+    h += `<div class="rule8"></div></div>
+      <div class="srcnote">Sodium is outlined: Open Food Facts had 135 mg. Each field is in the label's order, so you can read down both together.</div>
+      <button class="btn">Save food</button></div>${navbar(['Eaten', 'Library', 'Plan', 'Shop'], 'Library')}`;
+  } else {
+    const foods = [['Almond butter', '614 kcal / 100 g · Costco'], ['Banana', '89 kcal / 100 g'], ['Blueberries', '57 kcal / 100 g · usually have'], ['Cheddar', '403 kcal / 100 g'], ['Chia seeds', '486 kcal / 100 g'], ['Deli turkey', '104 kcal / 100 g'], ['Greek yogurt', '59 kcal / 100 g'], ['Granola', '471 kcal / 100 g'], ['Milk, 2%', '50 kcal / 100 g']];
+    h = `<div class="screen"><div class="libhead"><b>Library</b><button class="txt-btn">Add food</button></div>
+      <div class="seg"><span>Recipes</span><span class="cur">Foods</span></div>
+      <input class="field" placeholder="Search foods" style="margin-bottom:8px">
+      <div class="mini"><span class="pill" aria-pressed="true" style="background:var(--primary);color:var(--on-primary)">Ingredients</span><span class="pill">Packaged</span></div>
+      ${foods.map(([n, s]) => `<div class="frow"><b>${n}</b><span>${s}</span></div>`).join('')}</div>
+      <button class="fab" data-a="o-cam">${ICON.cam}Scan</button>${navbar(['Eaten', 'Library', 'Plan', 'Shop'], 'Library')}`;
+  }
+  if (o.cam) h += `<div class="cam"><div class="reticle">Point at the barcode</div><div class="camfoot"><button data-a="o-scanned">Simulate a scan</button> <button data-a="o-back">Cancel</button></div></div>`;
+  phone.innerHTML = h;
+}
+
+// ---------- actions ----------
+let toastT;
+const toast = (msg, undo) => { S.toast = msg; S.undo = undo || null; clearTimeout(toastT); toastT = setTimeout(() => { S.toast = null; S.undo = null; render(); }, 5000); };
+const findE = id => { for (const s in S.meals) { const e = S.meals[s].find(x => x.id === id); if (e) return [s, e]; } return []; };
+const snapshot = () => JSON.parse(JSON.stringify(S.meals));
+function addUsual(meal, u) {
+  const gid = 'g' + uid++, before = snapshot();
+  u.lines.forEach((l, i) => { const food = l.options ? (l.last || l.food) : l.food, a = (l.amts && l.amts[food]) || l;
+    const e = mk({ food, qty: a.qty, unit: a.unit }, gid, u.name, u.id, l.options); e.line = i; S.meals[meal].push(e); });
+  toast(`Added ${u.name} · ${u.lines.length} items. Change anything below.`, before);
+}
+
+phone.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-a]'); if (!b) return;
+  if (b.dataset.a === 'closesheet' && ev.target.closest('[data-stop]') && b.classList.contains('scrim')) return;
+  const a = b.dataset.a, d = b.dataset;
+  switch (a) {
+    case 'closesheet': S.sheet = null; break;
+    case 'sameas': { const y = yesterdayBreakfast(), gid = 'g' + uid++, before = snapshot();
+      y.lines.forEach((l, i) => { const e = mk(l, gid, y.gname, y.usual, null); e.line = i; S.meals.Breakfast.push(e); });
+      toast('Copied yesterday\'s breakfast · 4 items', before); break; }
+    case 'openadd': S.sheet = { type: 'add', meal: d.m, q: '' }; S.editing = null; break;
+    case 'addusual': { const m = S.sheet.meal; S.sheet = null; addUsual(m, S.usuals.find(u => u.id === d.u)); break; }
+    case 'addcombo': { const m = S.sheet.meal, c = detect().list.find(x => x.key === d.k), gid = 'g' + uid++, before = snapshot();
+      c.lines.forEach(l => S.meals[m].push(mk(l, gid, c.name, null, l.options || null))); S.sheet = null; toast(`Added ${c.name}`, before); break; }
+    case 'nav': if (d.v === 'Library') { S.view = 'library'; S.lib.edit = null; } else if (d.v === 'Eaten') S.view = 'eaten'; else toast(`${d.v} isn't part of this prototype.`); S.sheet = null; S.editing = null; break;
+    case 'lib-seg': S.lib.seg = d.s; break;
+    case 'openusual': Object.assign(S.lib, { edit: d.u, optFor: null, addFood: false, confirmDel: false }); break;
+    case 'newusual': { const id = 'us' + uid++; S.usuals.unshift({ id, name: 'New usual', slot: 'Breakfast', used: 0, lines: [] }); Object.assign(S.lib, { edit: id, optFor: null, addFood: true, confirmDel: false }); break; }
+    case 'ue-back': S.lib.edit = null; break;
+    case 'ue-slot': cu().slot = d.s; break;
+    case 'ue-up': case 'ue-down': { const L = cu().lines, i = +d.i, j = a === 'ue-up' ? i - 1 : i + 1; [L[i], L[j]] = [L[j], L[i]]; S.lib.optFor = null; break; }
+    case 'ue-del': cu().lines.splice(+d.i, 1); S.lib.optFor = null; break;
+    case 'ue-optdel': { const l = cu().lines[+d.i]; l.options = l.options.filter(o => o !== d.f);
+      if (l.last === d.f) l.last = l.options[0]; if (l.options.length < 2) { l.food = l.options[0]; delete l.options; delete l.last; } break; }
+    case 'ue-optpick': S.lib.optFor = S.lib.optFor === +d.i ? null : +d.i; break;
+    case 'ue-optadd': cu().lines[+d.i].options.push(d.f); S.lib.optFor = null; break;
+    case 'ue-pick': { const l = cu().lines[+d.i];
+      if (l.options) { l.food = l.last || l.food; delete l.options; delete l.last; }
+      else { l.options = [l.food, ...(SWAPS[l.food] || [])]; l.last = l.food; if (l.options.length < 2) S.lib.optFor = +d.i; } break; }
+    case 'ue-inc': case 'ue-dec': { const ln = cu().lines[+d.i], fd = ln.options ? (ln.last || ln.food) : ln.food, l = (ln.options && ln.amts && ln.amts[fd]) || ln, st = l.unit === 'g' ? 5 : (l.qty < 1 || (a === 'ue-dec' && l.qty <= 1) ? .25 : .5);
+      l.qty = Math.max(l.unit === 'g' ? 5 : .25, +(l.qty + (a === 'ue-inc' ? st : -st)).toFixed(2)); break; }
+    case 'ue-addfood': S.lib.addFood = !S.lib.addFood; break;
+    case 'ue-addline': cu().lines.push({ food: d.f, qty: 1, unit: 'srv' }); S.lib.addFood = false; break;
+    case 'ue-askdel': S.lib.confirmDel = true; break;
+    case 'ue-keep': S.lib.confirmDel = false; break;
+    case 'ue-dodel': { const u = cu(); S.usuals = S.usuals.filter(x => x !== u); S.lib.edit = null; S.lib.confirmDel = false; toast(`Deleted ${u.name}`); break; }
+    case 'opencombo': { const c = detect().list.find(x => x.key === d.k); S.sheet = { type: 'combo', key: c.key, name: c.options ? '' : c.name }; break; }
+    case 'hidecombo': S.lib.hidden.add(S.sheet.key); S.sheet = null; toast('Hidden. It won\'t be suggested again.'); break;
+    case 'unhide': S.lib.hidden.clear(); break;
+    case 'savecombo': { const sh = S.sheet, c = detect().list.find(x => x.key === sh.key), n = (sh.name || '').trim(); if (!n) break;
+      S.usuals.unshift({ id: 'us' + uid++, name: n, slot: c.slot, used: 0, lines: c.lines.map(l => ({ ...l, options: l.options ? l.options.slice() : undefined })) });
+      S.sheet = null; toast(`Saved ${n} to your usuals`); break; }
+    case 'addfood': { const m = S.sheet.meal, before = snapshot(); S.meals[m].push(mk({ food: d.f, qty: 1, unit: 'srv' })); S.sheet = null; toast(`Added ${F[d.f].n}`, before); break; }
+    case 'edit': S.editing = S.editing === d.id ? null : d.id; S.newsrv = null; break;
+    case 'newsrv': S.newsrv = S.newsrv && S.newsrv.id === d.id ? null : { id: d.id, count: '2', cname: 'tbsp', name: '', g: '' }; break;
+    case 'ns-split': { const ns = S.newsrv, [, e] = findE(ns.id), f = F[e.food], c = parseFloat(ns.count), n = ns.cname.trim(); if (!(c > 0 && n)) break;
+      const oldG = f.g; f.extra = [...(f.extra || []), { n, g: +(oldG / c).toFixed(1) }]; f.s = `${fq(c)} ${n}`; const idx = SV(f).length - 1;
+      Object.values(S.meals).flat().filter(x => x.food === e.food && x.unit !== 'g' && nu(x.unit) === 0).forEach(x => { x.qty = +(x.qty * c).toFixed(2); x.unit = idx; });
+      S.usuals.forEach(u => u.lines.forEach(l => { if (l.food === e.food && nu(l.unit) === 0) { l.qty = +(l.qty * c).toFixed(2); l.unit = idx; } }));
+      S.newsrv = null; toast(`Added ${n} (${+(oldG / c).toFixed(1)} g) to ${f.n}`); break; }
+    case 'ns-add': { const ns = S.newsrv, [, e] = findE(ns.id), f = F[e.food], g = parseFloat(ns.g), n = ns.name.trim(); if (!(g > 0 && n)) break;
+      f.extra = [...(f.extra || []), { n, g }]; useServing(e, SV(f).length - 1); S.newsrv = null; toast(`Added ${n} (${g} g) to ${f.n}`); break; }
+    case 'inc': case 'dec': { const [, e] = findE(d.id), st = e.unit === 'g' ? 5 : (e.qty < 1 || (a === 'dec' && e.qty <= 1) ? .25 : .5);
+      e.qty = Math.max(e.unit === 'g' ? 5 : .25, +(e.qty + (a === 'inc' ? st : -st)).toFixed(2)); break; }
+    case 'unit': { const [, e] = findE(d.id); if (d.u === 'g') { if (e.unit === 'g') break; const g = grams(e); e.unit = 'g'; e.qty = Math.round(g / 5) * 5 || 5; }
+      else { const i = +d.u; if (e.unit !== 'g' && nu(e.unit) === i) break; useServing(e, i); } break; }
+    case 'remove': { const before = snapshot(), [s, e] = findE(d.id); S.meals[s] = S.meals[s].filter(x => x.id !== d.id); toast(`Removed ${F[e.food].n}`, before); break; }
+    case 'pick': { const [, e] = findE(d.id), ln = lineOf(e), a = ln && ln.l.amts && ln.l.amts[d.f]; const b = a || (ln && { qty: ln.l.qty, unit: ln.l.unit }); if (b) Object.assign(e, { food: d.f, qty: b.qty, unit: b.unit }); else e.food = d.f; if (ln) ln.l.last = d.f; S.optOpen = null; break; }
+    case 'optopen': S.optOpen = S.optOpen === d.id ? null : d.id; S.editing = null; break;
+    case 'swap': S.sheet = { type: 'swap', id: d.id, q: '' }; S.editing = null; break;
+    case 'doswap': { const [, e] = findE(S.sheet.id), before = snapshot(), ln = lineOf(e); Object.assign(e, swapTarget(e, d.f));
+      if (ln && d.f !== ln.l.food) { const h = S.swapHist[ln.key] = S.swapHist[ln.key] || {}; h[d.f] = (h[d.f] || 0) + 1; }
+      S.sheet = null; toast(ln && d.f === ln.l.food ? `Back to ${F[d.f].n}` : `Swapped in ${F[d.f].n} for this day`, before); break; }
+    case 'makepick': { const [, k] = findE(d.id), ln = lineOf(k); ln.l.amts = { [ln.l.food]: { qty: ln.l.qty, unit: ln.l.unit }, [k.food]: { qty: k.qty, unit: k.unit } }; ln.l.options = [ln.l.food, k.food]; ln.l.last = k.food; k.options = ln.l.options.slice();
+      S.sheet = null; toast(`${ln.u.name} now asks: ${short(ln.l.food)} or ${short(k.food)}`); break; }
+    case 'mealmenu': S.sheet = { type: 'mealmenu', meal: d.m }; break;
+    case 'opencopy': S.sheet = { type: 'copy', meal: S.sheet.meal, day: 'Tomorrow', to: S.sheet.meal }; break;
+    case 'groupcopy': S.sheet = { type: 'copy', meal: S.sheet.meal, gid: S.sheet.gid, day: 'Tomorrow', to: S.sheet.meal }; break;
+    case 'copyfrom': S.sheet = null; toast('Here a date picker would list recent days with this meal.'); break;
+    case 'cday': S.sheet.day = d.d; break;
+    case 'cslot': S.sheet.to = d.s; break;
+    case 'docopy': { const sh = S.sheet, list = sh.gid ? S.meals[sh.meal].filter(x => x.gid === sh.gid) : S.meals[sh.meal], before = snapshot();
+      if (sh.day === 'Today') { const map = {}; list.forEach(e => { const c = { ...e, id: nid() }; if (e.gid) c.gid = map[e.gid] || (map[e.gid] = 'g' + uid++); S.meals[sh.to].push(c); }); }
+      S.sheet = null; toast(`Copied ${list.length} items to ${sh.day === 'Today' ? 'today' : sh.day}'s ${sh.to.toLowerCase()}`, before); break; }
+    case 'startsel': S.select = { meal: S.sheet.meal, ticked: new Set() }; S.sheet = null; S.editing = null; break;
+    case 'cancelsel': S.select = null; break;
+    case 'tick': { const t = S.select.ticked; t.has(d.id) ? t.delete(d.id) : t.add(d.id); break; }
+    case 'opensave': S.sheet = { type: 'save', meal: S.select.meal, ids: [...S.select.ticked], name: '', pick: new Set() }; break;
+    case 'groupsave': { const kids = S.meals[S.sheet.meal].filter(x => x.gid === S.sheet.gid); S.sheet = { type: 'save', meal: S.sheet.meal, ids: kids.map(k => k.id), name: kids[0].gname, pick: new Set() }; break; }
+    case 'togglepick': { const p = S.sheet.pick; p.has(d.id) ? p.delete(d.id) : p.add(d.id); break; }
+    case 'dosave': { const sh = S.sheet, ticked = S.meals[sh.meal].filter(e => sh.ids.includes(e.id)), id = 'us' + uid++, gid = 'g' + uid++;
+      S.usuals.unshift({ id, name: sh.name.trim(), slot: sh.meal, lines: ticked.map(e => ({ food: e.food, qty: e.qty, unit: e.unit, options: sh.pick.has(e.id) ? [e.food, ...SWAPS[e.food]] : undefined, last: e.food })) });
+      ticked.forEach((e, i) => { e.gid = gid; e.gname = sh.name.trim(); e.usual = id; e.line = i; e.options = sh.pick.has(e.id) ? [e.food, ...SWAPS[e.food]] : null; });
+      S.meals[sh.meal] = [...S.meals[sh.meal].filter(e => !sh.ids.includes(e.id)), ...ticked];
+      S.sheet = null; S.select = null; toast(`Saved ${sh.name.trim()} to your usuals`); break; }
+    case 'groupmenu': S.sheet = { type: 'groupmenu', meal: d.m, gid: d.g }; break;
+    case 'updateusual': { const kids = S.meals[S.sheet.meal].filter(x => x.gid === S.sheet.gid), u = S.usuals.find(x => x.id === kids[0].usual);
+      u.lines = kids.map((k, i) => { const old = u.lines[k.line]; k.line = i; return { food: k.food, qty: k.qty, unit: k.unit, options: old && old.options, last: k.food }; });
+      S.sheet = null; toast(`Updated ${u.name}. Next time it starts like this.`); break; }
+    case 'ungroup': { S.meals[S.sheet.meal].forEach(e => { if (e.gid === S.sheet.gid) { e.gid = e.gname = e.usual = null; e.options = null; } }); S.sheet = null; toast('Ungrouped'); break; }
+    case 'groupremove': { const before = snapshot(), g = S.sheet.gid; S.meals[S.sheet.meal] = S.meals[S.sheet.meal].filter(e => e.gid !== g); S.sheet = null; toast('Removed the group', before); break; }
+    case 'undo': S.meals = S.undo; S.undo = null; S.toast = null; break;
+    case 'o-cam': S.other.cam = true; break;
+    case 'o-scanned': S.other.cam = false; S.other.form = true; break;
+    case 'o-back': S.other.cam = false; S.other.form = false; break;
+  }
+  render();
+});
+function cu() { return S.usuals.find(x => x.id === S.lib.edit); }
+function cbPreview() { const b = document.getElementById('cbsave'); if (b && S.sheet) b.disabled = !(S.sheet.name || '').trim(); }
+phone.addEventListener('input', ev => {
+  if (ev.target.id === 'ued-name') { cu().name = ev.target.value; return; }
+  if (ev.target.classList.contains('nick')) { const l = cu().lines[+ev.target.dataset.i], v = ev.target.value.trim(); if (v) F[ev.target.dataset.f].short = v; else delete F[ev.target.dataset.f].short;
+    const help = ev.target.closest('.edopts').querySelector('.helper'); help.textContent = pillMode(l, l.options) ? 'On a day these show as buttons on the row.' : `On a day this shows as a list you open, because ${l.options.length > 3 ? 'there are more than 3 options' : `a name is longer than ${PILL_MAX} characters`}. Short names on the foods can turn it back into buttons.`; return; }
+  if (ev.target.id === 'cbname') { S.sheet.name = ev.target.value; cbPreview(); return; }
+  const nsMap = { 'ns-count': 'count', 'ns-cname': 'cname', 'ns-name': 'name', 'ns-g': 'g' };
+  if (nsMap[ev.target.id] && S.newsrv) { S.newsrv[nsMap[ev.target.id]] = ev.target.value; nsPreview(); return; }
+  if (ev.target.id === 'swapq') { S.sheet.q = ev.target.value; const pos = ev.target.selectionStart; render(); const i = document.getElementById('swapq'); i.focus(); i.setSelectionRange(pos, pos); return; }
+  if (ev.target.id === 'addq') { S.sheet.q = ev.target.value; const pos = ev.target.selectionStart; render(); const i = document.getElementById('addq'); i.focus(); i.setSelectionRange(pos, pos); }
+  if (ev.target.id === 'usname') { S.sheet.name = ev.target.value; const pos = ev.target.selectionStart; render(); const i = document.getElementById('usname'); i.focus(); i.setSelectionRange(pos, pos); }
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.sheet) { S.sheet = null; render(); } });
+
+// ---------- scenes ----------
+function go(scene, reset) {
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.scene === scene));
+  document.querySelectorAll('.scene').forEach(s => s.classList.toggle('on', s.id === 'scene-' + scene));
+  const ph = scene === 'model' ? (S ? S.scene : 'copy') : scene;
+  if (reset || !S || S.scene !== ph) { fresh(ph); }
+  render();
+  try { if (location.hash !== '#' + scene) history.replaceState(null, '', '#' + scene); } catch (e) {}
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => go(t.dataset.scene)));
+document.querySelectorAll('[data-reset]').forEach(b => b.addEventListener('click', () => go(b.dataset.reset, true)));
+const start = (location.hash || '').slice(1);
+go(['copy', 'usual', 'save', 'manage', 'other', 'model'].includes(start) ? start : 'copy');
+})();
+</script>

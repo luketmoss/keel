@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/preact
 import App from './App';
 import { TABS } from './shell/tabs';
 import { _resetPlan } from './plan/plan-store';
+import { _resetFoods, librarySection } from './library/foods-store';
 import { fakeApi } from './test-api';
 
 function signIn() {
@@ -26,6 +27,7 @@ function tabs() {
 beforeEach(() => {
   localStorage.clear();
   signIn();
+  _resetFoods();
   window.history.replaceState(null, '', '/');
 });
 
@@ -109,7 +111,6 @@ describe('empty states', () => {
     plan: ['Nothing planned yet', 'Meals you plan will show here, by day, with their calories.'],
     // #718: Shop has its own no-trip card, with Plan a trip (shop.test.tsx). #712: Eaten is always the day view,
     // whose "Nothing logged" card is in eaten.test.tsx.
-    library: ['No foods yet', 'Foods you use in recipes and logs will be kept here, with their nutrition.'],
   };
 
   it.each(Object.entries(COPY))('%s names what will appear, with no control', async (id, [heading, sentence]) => {
@@ -121,9 +122,39 @@ describe('empty states', () => {
     await waitFor(() => expect(screenEl.querySelector('h2')!.textContent).toBe(heading));
     expect(screenEl.querySelector('h2')!.textContent).toBe(heading);
     expect(screenEl.querySelector('p')!.textContent).toBe(sentence);
-    // #707: Library's Recipes | Foods switch is the only control.
+    // #707: Library's segmented switch is the only control.
     const controls = [...screenEl.querySelectorAll('button, a, input')].filter((el) => !el.closest('.segmented'));
     expect(controls.length).toBe(0);
+  });
+});
+
+describe('Library opens on Foods (#873)', () => {
+  it('with no foods, the first visit shows the Foods empty state, with Foods pressed', async () => {
+    fakeApi();
+    render(<App />);
+    go('#/library');
+    const screenEl = screen.getByTestId('screen-library');
+    await waitFor(() => expect(screenEl.querySelector('h2')!.textContent).toBe('No foods yet'));
+    expect(screen.getByTestId('foods-tab').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: /^Recipes/ }).getAttribute('aria-pressed')).toBe('false');
+  });
+});
+
+describe('Library remembers the segment for the session (#873)', () => {
+  it('keeps the last segment chosen across a trip to another tab, and _resetFoods starts on Foods again', async () => {
+    fakeApi();
+    render(<App />);
+    go('#/library');
+    await waitFor(() => expect(screen.getByTestId('foods-tab').getAttribute('aria-pressed')).toBe('true'));
+    fireEvent.click(screen.getByRole('button', { name: /^Recipes/ }));
+    expect(screen.getByRole('button', { name: /^Recipes/ }).getAttribute('aria-pressed')).toBe('true');
+    go('#/shop');
+    go('#/library');
+    expect(screen.getByRole('button', { name: /^Recipes/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('foods-tab').getAttribute('aria-pressed')).toBe('false');
+    expect(librarySection.value).toBe('recipes');
+    _resetFoods();
+    expect(librarySection.value).toBe('foods');
   });
 });
 

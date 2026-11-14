@@ -14,7 +14,7 @@ var TIMEZONE = 'America/Denver';
 /** A `payload` longer than this is refused, which keeps a cell under Sheets' 50,000 limit. */
 var MAX_PAYLOAD_CHARS = 45000;
 
-var SCHEMA_VERSION = '3';
+var SCHEMA_VERSION = '4';
 
 var FOOD_FIELDS = [
   'id', 'name', 'kind', 'brand', 'category',
@@ -25,6 +25,8 @@ var FOOD_FIELDS = [
   // #755: the seven optional values beyond the core four, per 100 g.
   'satfat_100g', 'transfat_100g', 'cholesterol_mg_100g', 'sodium_mg_100g', 'fiber_100g', 'sugars_100g',
   'added_sugars_100g',
+  // #880: a short name for tight places, at most 20 characters, blank for none.
+  'short_name',
 ];
 
 var RECIPE_FIELDS = [

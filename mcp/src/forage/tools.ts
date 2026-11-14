@@ -284,6 +284,10 @@ const FOOD_FIELDS = {
   name: z.string().describe('The food\'s name, without the brand ("Dark Chocolate Nuts & Sea Salt bar")'),
   kind: z.enum(['ingredient', 'packaged']).optional().describe('Default ingredient'),
   brand: z.string().optional().describe('Packaged foods only'),
+  short_name: z
+    .string()
+    .optional()
+    .describe('A short name for tight places ("Crunchy PB"), at most 20 characters; "" clears it'),
   category: z.string().optional(),
   serving: z
     .object({ name: z.string(), g: z.number() })
@@ -329,7 +333,7 @@ function foodRow(f: any, partial = false): { row?: Record<string, unknown>; erro
   if (f.per_serving && f.per_100g) return { error: `${label}: send per_serving or per_100g, not both.` }
   if (f.per_serving && !(f.serving?.g > 0)) return { error: `${label}: per_serving needs serving with its grams.` }
 
-  const copy = ['name', 'kind', 'brand', 'category', 'buy_unit', 'buy_unit_plural', 'buy_unit_g', 'usual_store']
+  const copy = ['name', 'kind', 'brand', 'short_name', 'category', 'buy_unit', 'buy_unit_plural', 'buy_unit_g', 'usual_store']
   for (const k of [...copy, 'usually_have', 'regular', 'never_shop', 'barcode', 'source', 'source_ref']) {
     if (f[k] !== undefined) row[k] = f[k]
   }
@@ -375,6 +379,7 @@ function compactFood(f: any) {
     id: f.id,
     name: f.name,
     brand: f.brand,
+    short_name: f.short_name ?? '',
     kind: f.kind,
     kcal_100g: f.kcal_100g,
     protein_100g: f.protein_100g,
@@ -1080,11 +1085,11 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
     {
       description:
         "Search Forage's food library: ingredients and packaged foods with their nutrition per 100 g. Filter by " +
-        'q (part of the name or brand), kind, regular or barcode. With include_starter, also lists the starter ' +
+        'q (part of the name, brand or short name), kind, regular or barcode. With include_starter, also lists the starter ' +
         'list (about 75 USDA pantry staples) matching q, each with its starter_id and whether it is already in the ' +
         'library; add one with forage_add_food and starter_id. Answers JSON.',
       inputSchema: {
-        q: z.string().optional().describe('Part of the name or brand, case-insensitive'),
+        q: z.string().optional().describe('Part of the name, brand or short name, case-insensitive'),
         kind: z.enum(['ingredient', 'packaged']).optional(),
         regular: z.boolean().optional().describe('Only the foods offered on every shopping list'),
         barcode: z.string().optional().describe('The food with this barcode'),

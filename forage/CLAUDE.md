@@ -87,7 +87,7 @@ the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
 
 | Tab | Key | Columns |
 |---|---|---|
-| **Foods** | `id` | id, name, kind, brand, category, kcal_100g, protein_100g, carbs_100g, fat_100g, servings_json, buy_unit, buy_unit_plural, buy_unit_g, usual_store, usually_have, regular, packs_json, last_buy, last_bought_on, never_shop, source, source_ref, verified, barcode, created, updated, satfat_100g, transfat_100g, cholesterol_mg_100g, sodium_mg_100g, fiber_100g, sugars_100g, added_sugars_100g |
+| **Foods** | `id` | id, name, kind, brand, category, kcal_100g, protein_100g, carbs_100g, fat_100g, servings_json, buy_unit, buy_unit_plural, buy_unit_g, usual_store, usually_have, regular, packs_json, last_buy, last_bought_on, never_shop, source, source_ref, verified, barcode, created, updated, satfat_100g, transfat_100g, cholesterol_mg_100g, sodium_mg_100g, fiber_100g, sugars_100g, added_sugars_100g, short_name |
 | **Recipes** | `id` | id, name, source_url, source_site, servings, total_min, notes, created, updated |
 | **RecipeLines** | `recipe_id` + `line_id` | recipe_id, line_id, position, section, text, qty, unit, food_id, grams, optional |
 | **Steps** | `recipe_id` + `position` | recipe_id, position, section, name, text |
@@ -118,7 +118,8 @@ What the columns mean:
   time and `last_bought_on` its date. `never_shop` keeps it off shopping lists
   (water). `source` is `usda`, `off`, `label` or `manual`; `source_ref` the FDC
   id or Open Food Facts code; `verified` means checked against the label,
-  which shared Open Food Facts data needs. The seven after `updated` (#755) are
+  which shared Open Food Facts data needs. `short_name` (#880, after the seven) is a name for tight places,
+  trimmed, at most 20 characters, blank for none; `getFoods` `q` matches it too. The seven after `updated` (#755) are
   saturated fat, trans fat, cholesterol (mg), sodium (mg), fiber, sugars and
   added sugars, per 100 g (`EXTRA_NUTRIENTS` in `nutrition.js`). Each is blank
   (unknown) or a number ≥ 0, independently, and can be set only on a food with
@@ -167,7 +168,8 @@ What the columns mean:
   and `partial` are a **snapshot** the API computes when the entry is written
   and recomputes only when that entry's `qty`, `unit` or food changes (#712):
   editing a food or recipe later does not rewrite past days, and moving an
-  entry to another meal keeps its numbers. `logFood` and `updateLogEntry` take
+  entry to another meal keeps its numbers. An edit that keeps an entry's `unit` after the food renamed that serving
+  takes the grams per unit from the entry (`grams` / `qty`, #880); a unit the entry never had is still refused. `logFood` and `updateLogEntry` take
   `dry_run` (the entry as it would be stored, nothing written), the app's amount
   preview. `getFoodLogTotals` is the one read Thrive (#714) relies on, shaped in
   `forage/docs/design/712-food-log.md`: a date with nothing logged is absent, a
@@ -182,7 +184,7 @@ What the columns mean:
   the seven makes anything partial.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns), and `ingredient_aliases` (#706): a JSON
+- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`), and `ingredient_aliases` (#706): a JSON
   object from a normalised ingredient name to the `food_id` a saved import
   matched it to. Later issues add keys here, not tabs.
 - **MCPChangeLog** (#713). One row per sheet row a key-caller write created,

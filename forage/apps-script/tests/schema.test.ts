@@ -25,6 +25,7 @@ const EXPECTED: Record<string, string[]> = {
     'id', 'date', 'slot', 'food_id', 'recipe_id', 'qty', 'unit', 'grams', 'kcal', 'protein_g', 'carbs_g',
     'fat_g', 'partial', 'source', 'logged_at', 'created', 'updated',
     'satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g',
+    'group_id', 'group_name', 'usual_id', 'usual_line_id',
   ],
   Cooks: ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'created'],
   Config: ['key', 'value', 'updated'],
@@ -63,14 +64,14 @@ describe('AC2: ensureSchema', () => {
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(Object.keys(EXPECTED));
     expect(data.existing).toEqual([]);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
     for (const [tab, fields] of Object.entries(EXPECTED)) {
       const sheet = api.ss.getSheetByName(tab)!;
       expect(sheet.rows[0]).toEqual(fields);
       expect(sheet.frozenRows).toBe(1);
     }
-    expect(api.rows('Config').map((r) => r.slice(0, 2))).toEqual([['schema_version', '5']]);
-    expect(api.ok('getConfig')).toEqual({ schema_version: '5' });
+    expect(api.rows('Config').map((r) => r.slice(0, 2))).toEqual([['schema_version', '6']]);
+    expect(api.ok('getConfig')).toEqual({ schema_version: '6' });
   });
 
   it('changes nothing on a second run', () => {
@@ -107,7 +108,7 @@ describe('AC2: ensureSchema', () => {
     const before = others();
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(['MCPChangeLog']);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
     expect(api.ss.getSheetByName('MCPChangeLog')!.rows).toEqual([EXPECTED.MCPChangeLog]);
     expect(others()).toBe(before);
     expect(api.rows('Config').map((r) => r[0])).toEqual(['schema_version']);
@@ -127,7 +128,9 @@ const OLD_FOOD_LOG = EXPECTED.FoodLog.slice(0, 17);
 const SEVEN_FOODS = EXPECTED.Foods.slice(26, 33);
 // What a version 2 Sheet gains in Foods now: the seven, then #880's short_name.
 const ADDED_FOODS = EXPECTED.Foods.slice(26);
-const SEVEN_LOG = EXPECTED.FoodLog.slice(17);
+const SEVEN_LOG = EXPECTED.FoodLog.slice(17, 24);
+// What a version 2 Sheet gains in FoodLog now: the seven, then #878's four group columns.
+const ADDED_LOG = EXPECTED.FoodLog.slice(17);
 
 /** A Sheet as schema version 2 left it: Foods and FoodLog without the seven, each with a row of data. */
 function versionTwo() {
@@ -147,7 +150,7 @@ const snapshot = (api: ReturnType<typeof loadApi>) =>
   JSON.stringify([...api.ss.sheets.entries()].filter(([n]) => n !== 'Config').map(([n, s]) => [n, s.rows]));
 
 describe('#755: ensureSchema appends the seven nutrient columns', () => {
-  it('appends them to Foods and FoodLog after updated, moves nothing, and raises the version to 5', () => {
+  it('appends them to Foods and FoodLog after updated, moves nothing, and raises the version to 6', () => {
     const api = versionTwo();
     // Foods had 26 columns, as many as a new Sheet has: the tab must be widened first.
     expect(api.ss.getSheetByName('Foods')!.getMaxColumns()).toBe(NEW_SHEET_COLUMNS);
@@ -159,10 +162,10 @@ describe('#755: ensureSchema appends the seven nutrient columns', () => {
     expect(data.created).toEqual([]);
     expect(data.extended).toEqual([
       { tab: 'Foods', added: ADDED_FOODS },
-      { tab: 'FoodLog', added: SEVEN_LOG },
+      { tab: 'FoodLog', added: ADDED_LOG },
     ]);
     expect(data.mismatched).toEqual([]);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
 
     const foods = api.ss.getSheetByName('Foods')!.rows;
     expect(foods[0]).toEqual(EXPECTED.Foods);
@@ -190,7 +193,7 @@ describe('#755: ensureSchema appends the seven nutrient columns', () => {
     expect(data.created).toEqual([]);
     expect(data.extended).toEqual([]);
     expect(data.mismatched).toEqual([]);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
     expect(snapshot(api)).toBe(before);
   });
 
@@ -202,7 +205,7 @@ describe('#755: ensureSchema appends the seven nutrient columns', () => {
     const foodsBefore = JSON.stringify(api.ss.getSheetByName('Foods')!.rows);
     const data = api.ok('ensureSchema');
     expect(data.mismatched).toEqual(['Foods']);
-    expect(data.extended).toEqual([{ tab: 'FoodLog', added: SEVEN_LOG }]);
+    expect(data.extended).toEqual([{ tab: 'FoodLog', added: ADDED_LOG }]);
     expect(JSON.stringify(api.ss.getSheetByName('Foods')!.rows)).toBe(foodsBefore);
     expect(data.schema_version).toBe('2');
   });
@@ -239,7 +242,7 @@ describe('#880: ensureSchema appends short_name', () => {
     expect(data.created).toEqual([]);
     expect(data.extended).toEqual([{ tab: 'Foods', added: ['short_name'] }]);
     expect(data.mismatched).toEqual([]);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
     const foods = api.ss.getSheetByName('Foods')!.rows;
     expect(foods[0]).toEqual(EXPECTED.Foods);
     (JSON.parse(before) as CellValue[][]).forEach((row, r) => row.forEach((v, c) => expect(foods[r][c]).toEqual(v)));
@@ -254,7 +257,7 @@ describe('#880: ensureSchema appends short_name', () => {
     const before = snapshot(api);
     const data = api.ok('ensureSchema');
     expect(data.extended).toEqual([]);
-    expect(data.schema_version).toBe('5');
+    expect(data.schema_version).toBe('6');
     expect(snapshot(api)).toBe(before);
   });
 });

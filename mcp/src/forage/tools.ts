@@ -828,6 +828,13 @@ function dayLine(date: string, day: any, entries: any[], today: string): string 
   return `${dayText(date)} — ${kcal}${note}.${macros ? ` ${macros}.` : ''}`
 }
 
+/** `  [group Oatmeal gr_1a2b3c4d, usual us_1, line L2]` for an entry in a group (#878), else nothing. */
+function groupNote(e: any): string {
+  if (!e.group_id) return ''
+  const usual = e.usual_id ? `, usual ${e.usual_id}${e.usual_line_id ? `, line ${e.usual_line_id}` : ''}` : ''
+  return `  [group ${e.group_name ? `${e.group_name} ` : ''}${e.group_id}${usual}]`
+}
+
 /** One logged day: the day line, then each meal with its entries or `(nothing)`. */
 function logDayText(date: string, day: any, entries: any[], names: LogNames, today: string): string[] {
   const out = [dayLine(date, day, entries, today)]
@@ -839,7 +846,7 @@ function logDayText(date: string, day: any, entries: any[], names: LogNames, tod
     const mine = entries.filter((e) => e.slot === slot)
     const lines = mine.flatMap((e) => {
       const extras = extrasText(e)
-      return [`  ${e.id}  ${entryText(e, names)}`, ...(extras ? [`      ${extras}`] : [])]
+      return [`  ${e.id}  ${entryText(e, names)}${groupNote(e)}`, ...(extras ? [`      ${extras}`] : [])]
     })
     out.push(slot, ...(lines.length ? lines : ['  (nothing)']))
   }
@@ -2394,26 +2401,41 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
     'forage_delete_log',
     {
       description:
-        "Delete an entry from Forage's food log; its calories come off that day's total. Only delete what the user " +
-        'asked to delete. On the write connector; undo with forage_undo, which brings it back with its numbers.',
-      inputSchema: { id: z.string().describe('The log entry (lg_...)') },
+        "Delete one entry, or several with ids (1 to 50, all or none), from Forage's food log; the calories come off " +
+        "that day's total. Send id or ids. An unknown id refuses the whole call, naming it, and deletes nothing. " +
+        'Deleting every entry of a group removes the group. Only delete what the user asked to delete. On the write ' +
+        'connector; undo with forage_undo, which brings them back with their numbers.',
+      inputSchema: {
+        id: z.string().optional().describe('One log entry (lg_...)'),
+        ids: z.array(z.string()).min(1).max(50).optional().describe('Several log entries, deleted together or not at all'),
+      },
       annotations: UNDO,
     },
-    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
-      const found = await findLogEntry(cfg, id)
-      if (found.error) return failed(`Nothing changed. ${found.error}`)
-      const was = found.entry
-      if (!was) return failed(noEntry(id))
+    guarded(async (args: { id?: string; ids?: string[] }): Promise<ToolResult> => {
+      if (!args.id === !args.ids) return failed('Send exactly one of id and ids. Nothing changed.')
+      const wanted = args.ids ? [...new Set(args.ids)] : [args.id as string]
+      const read = await apiRead(cfg, 'getFoodLog')
+      if (!read.success) return failed(`Nothing changed. ${read.error}`)
+      const all = (read.data ?? []) as any[]
+      const was = wanted.map((id) => all.find((e) => e.id === id))
+      const missing = wanted.filter((_, i) => !was[i])
+      if (missing.length) {
+        return failed(
+          wanted.length === 1 ? noEntry(missing[0]) : `Nothing changed. No log entry ${missing.join(', ')}. Nothing was deleted.`,
+        )
+      }
       let saved: ApiResult
       try {
-        saved = await apiWrite(cfg, 'deleteLogEntry', { id })
+        declareRows(wanted.length)
+        saved = await apiWrite(cfg, 'deleteLogEntry', args.ids ? { ids: wanted } : { id: wanted[0] }, wanted.length)
       } catch (err) {
         inTransit(err, 'delete')
       }
       if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
       const names = await logNames(cfg)
+      const lines = was.map((e) => `${e.id} (${entryName(e, names)}, ${e.slot}, ${dayText(e.date)})`)
       return text(
-        `Deleted ${id} (${entryName(was, names)}, ${was.slot}, ${dayText(was.date)}).\n` +
+        `Deleted ${lines.length === 1 ? lines[0] : `${lines.length} entries:\n${lines.map((l) => `  ${l}`).join('\n')}`}.\n` +
           `Undo with forage_undo, call ${currentCallId()}`,
       )
     }),
@@ -2543,6 +2565,199 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       return text(`Deleted usual ${id} with its lines.\nUndo with forage_undo, call ${currentCallId()}`)
     }),
   )
+
+  // ---------------------------------------------------------------- groups, logging a usual, copying a meal (#878)
+
+  server.registerTool(
+    'forage_log_usual',
+    {
+      description:
+        "Log a usual to Forage's food log: one entry per line, in order, grouped under the usual's name. A line " +
+        'that is Always logs its food and amount; a pick-one logs the option in picks (line_id to food_id) or, ' +
+        "without one, the option picked last (or the first), at that option's own amount, and remembers it. " +
+        'A dry run by default: it shows the entries and their calories, and logs nothing. Call again with ' +
+        'dry_run: false to log them. Only log what the user said they ate. On the write connector; undo with forage_undo.',
+      inputSchema: {
+        usual_id: z.string().describe('The usual (us_...), from forage_list_usuals'),
+        slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
+        date: z.string().optional().describe("YYYY-MM-DD, 'today' or '-1d'. Default today"),
+        picks: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe('A pick-one line_id (L3) to the food_id of the option eaten; leave a line out for its last pick'),
+        dry_run: z.boolean().optional().describe('Default true: preview only. false logs them'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const date = args.date === undefined ? homeToday() : planDate(args.date)
+      if (!date) return failed(`Nothing logged. Could not read "${args.date}" as a date — ${DATE_HINT}.`)
+      const payload = { ...sent(args, ['usual_id', 'slot', 'picks']), date }
+      if (args.dry_run !== false) {
+        const preview = await apiDry(cfg, 'logUsual', { ...payload, dry_run: true })
+        if (!preview.success) return failed(`Nothing logged. ${preview.error}`)
+        const names = await logNames(cfg)
+        return text(
+          ['Preview — nothing logged.', groupText(preview.data.entries, names), '', 'Call again with dry_run: false to log them.'].join('\n'),
+        )
+      }
+      let saved: ApiResult
+      try {
+        declareRows(8)
+        saved = await apiWrite(cfg, 'logUsual', payload, 8)
+      } catch (err) {
+        inTransit(err, 'log entries')
+      }
+      if (!saved.success) return failed(`Nothing logged. ${saved.error}`)
+      const names = await logNames(cfg)
+      return text(`Logged.\n${groupText(saved.data.entries, names)}\nUndo with forage_undo, call ${currentCallId()}`)
+    }),
+  )
+
+  server.registerTool(
+    'forage_log_group',
+    {
+      description:
+        "Log 1 to 30 foods to Forage's food log together under a name (a group, like Oatmeal), with no usual. Each item " +
+        'is a food_id, qty and unit (a serving name or g). A dry run by default: it shows the entries and their ' +
+        'calories, and logs nothing. Call again with dry_run: false to log them. Only log what the user said they ate. ' +
+        'On the write connector; undo with forage_undo.',
+      inputSchema: {
+        name: z.string().describe('The heading shown for the group, at most 120 characters'),
+        slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
+        date: z.string().optional().describe("YYYY-MM-DD, 'today' or '-1d'. Default today"),
+        items: z
+          .array(z.object({ food_id: z.string(), qty: AMOUNT_INPUT.qty, unit: AMOUNT_INPUT.unit }))
+          .min(1)
+          .max(30)
+          .describe('The foods, in order'),
+        dry_run: z.boolean().optional().describe('Default true: preview only. false logs them'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const date = args.date === undefined ? homeToday() : planDate(args.date)
+      if (!date) return failed(`Nothing logged. Could not read "${args.date}" as a date — ${DATE_HINT}.`)
+      const payload = { ...sent(args, ['name', 'slot', 'items']), date }
+      if (args.dry_run !== false) {
+        const preview = await apiDry(cfg, 'logGroup', { ...payload, dry_run: true })
+        if (!preview.success) return failed(`Nothing logged. ${preview.error}`)
+        const names = await logNames(cfg)
+        return text(
+          ['Preview — nothing logged.', groupText(preview.data.entries, names), '', 'Call again with dry_run: false to log them.'].join('\n'),
+        )
+      }
+      const rows = (args.items as any[]).length
+      let saved: ApiResult
+      try {
+        declareRows(rows)
+        saved = await apiWrite(cfg, 'logGroup', payload, rows)
+      } catch (err) {
+        inTransit(err, 'log entries')
+      }
+      if (!saved.success) return failed(`Nothing logged. ${saved.error}`)
+      const names = await logNames(cfg)
+      return text(`Logged.\n${groupText(saved.data.entries, names)}\nUndo with forage_undo, call ${currentCallId()}`)
+    }),
+  )
+
+  server.registerTool(
+    'forage_copy_meal',
+    {
+      description:
+        "Copy a meal in Forage's food log to another day or meal: every entry of from_slot on from_date, or only the " +
+        'ones in group_id, added after what the target meal already holds. Calories are worked out again from the ' +
+        'food as it is now; the source stays as it was. A group is copied as a new group with the same name. ' +
+        'Refused for a date after today or a meal with nothing logged. Only copy what the user asked for. On the ' +
+        'write connector; undo with forage_undo, which removes exactly the copies.',
+      inputSchema: {
+        from_date: z.string().describe("The day to copy from: YYYY-MM-DD, 'today', 'yesterday' or '-3d'"),
+        from_slot: z.enum(SLOTS).describe('The meal to copy from'),
+        group_id: z.string().optional().describe('Copy only this group (gr_...) of that meal'),
+        to_date: z.string().optional().describe('The day to copy to. Default today'),
+        to_slot: z.enum(SLOTS).optional().describe('The meal to copy to. Default the same meal'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const today = homeToday()
+      const read = (v: string) => (v.trim().toLowerCase() === 'yesterday' ? plusDays(today, -1) : planDate(v))
+      const from = read(args.from_date)
+      if (!from) return failed(`Nothing copied. Could not read "${args.from_date}" as a date — ${DATE_HINT}.`)
+      const to = args.to_date === undefined ? today : read(args.to_date)
+      if (!to) return failed(`Nothing copied. Could not read "${args.to_date}" as a date — ${DATE_HINT}.`)
+      const log = await apiRead(cfg, 'getFoodLog', { from, to: from })
+      if (!log.success) return failed(`Nothing copied. ${log.error}`)
+      const rows = Math.max(
+        1,
+        ((log.data ?? []) as any[]).filter((e) => e.slot === args.from_slot && (!args.group_id || e.group_id === args.group_id)).length,
+      )
+      const payload = {
+        from_date: from,
+        from_slot: args.from_slot,
+        ...sent(args, ['group_id']),
+        to_date: to,
+        to_slot: args.to_slot ?? args.from_slot,
+      }
+      let saved: ApiResult
+      try {
+        declareRows(rows)
+        saved = await apiWrite(cfg, 'copyMeal', payload, rows)
+      } catch (err) {
+        inTransit(err, 'copy')
+      }
+      if (!saved.success) return failed(`Nothing copied. ${saved.error}`)
+      const names = await logNames(cfg)
+      const entries = saved.data as any[]
+      return text(
+        `Copied ${plural(entries.length, 'entry', 'entries')} to ${payload.to_slot} on ${dayText(to)}.\n` +
+          `${groupText(entries, names)}\nUndo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_group_log',
+    {
+      description:
+        "Group or ungroup entries in Forage's food log. Send ids (1 to 50, all in the same meal on the same day) and " +
+        'group: null to ungroup them (clears their group and usual links, nothing else), or { name, usual_id? } to put ' +
+        'them in a new group with that heading; with a usual_id each entry is linked to the usual\'s line with its ' +
+        'food. Only change what the user asked for. On the write connector; undo with forage_undo.',
+      inputSchema: {
+        ids: z.array(z.string()).min(1).max(50).describe('The log entries (lg_...)'),
+        group: z
+          .object({
+            name: z.string().describe('The heading, at most 120 characters'),
+            usual_id: z.string().optional().describe('Link the entries to this usual (us_...)'),
+          })
+          .nullable()
+          .describe('The new group, or null to ungroup'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const payload = { ids: args.ids, group: args.group ?? null }
+      const rows = (args.ids as string[]).length
+      let saved: ApiResult
+      try {
+        declareRows(rows)
+        saved = await apiWrite(cfg, 'setLogGroup', payload, rows)
+      } catch (err) {
+        inTransit(err, 'change')
+      }
+      if (!saved.success) return failed(`Nothing changed. ${saved.error}`)
+      const names = await logNames(cfg)
+      const entries = saved.data as any[]
+      const what = args.group ? `Grouped ${plural(entries.length, 'entry', 'entries')} as ${args.group.name}` : `Ungrouped ${plural(entries.length, 'entry', 'entries')}`
+      return text(`${what}.\n${groupText(entries, names)}\nUndo with forage_undo, call ${currentCallId()}`)
+    }),
+  )
+}
+
+/** Entries as a list, each with its meal, day, amount and group: what a group tool answers. */
+function groupText(entries: any[], names: LogNames): string {
+  return entries.map((e) => `  ${e.id}  ${placedEntry(e, names)}${groupNote(e)}`).join('\n')
 }
 
 /** A usual as the read tools answer it: each food with its name beside its id. */

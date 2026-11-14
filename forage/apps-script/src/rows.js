@@ -142,3 +142,24 @@ function deleteRecordsWhere(tab, predicate) {
     return doomed.length;
   });
 }
+
+/**
+ * Change the rows the predicate picks: `mutate` gets each record and edits it
+ * in place, and each changed row is written back, from one read of the tab.
+ * Returns the records as written, in sheet order. For a bulk edit that must
+ * not read the whole tab once per row (#878).
+ */
+function updateRecordsWhere(tab, predicate, mutate) {
+  return withScriptLock(function () {
+    var spec = tabSpec(tab);
+    var sheet = getSheet(tab);
+    var out = [];
+    readTab(tab).forEach(function (r) {
+      if (!predicate(r.record)) return;
+      mutate(r.record);
+      sheet.getRange(r.rowNum, 1, 1, spec.fields.length).setValues([asText(recordToRow(tab, r.record))]);
+      out.push(r.record);
+    });
+    return out;
+  });
+}

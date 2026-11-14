@@ -61,10 +61,14 @@ var CHANGE_LOGGED_ACTIONS = {
   logFood: ['FoodLog'],
   updateLogEntry: ['FoodLog'],
   deleteLogEntry: ['FoodLog'],
+  logUsual: ['FoodLog', 'UsualLines'],
+  logGroup: ['FoodLog'],
+  copyMeal: ['FoodLog'],
+  setLogGroup: ['FoodLog'],
   upsertCook: ['Cooks'],
   deleteCook: ['Cooks'],
   upsertUsual: ['Usuals', 'UsualLines'],
-  deleteUsual: ['Usuals', 'UsualLines'],
+  deleteUsual: ['Usuals', 'UsualLines', 'FoodLog'],
 };
 
 /** The write actions that are never logged, and why. */
@@ -121,7 +125,7 @@ function isChangeLogged(caller, action, rawPayload) {
   if (!Object.prototype.hasOwnProperty.call(CHANGE_LOGGED_ACTIONS, action)) return false;
   var dryRun = payloadField(rawPayload, 'dry_run');
   if (action === 'importRecipe' || action === 'planWeek') return dryRun === false || dryRun === 'false';
-  if (action === 'startTrip' || action === 'logFood' || action === 'updateLogEntry') {
+  if (action === 'startTrip' || action === 'logFood' || action === 'updateLogEntry' || action === 'logUsual' || action === 'logGroup') {
     return dryRun !== true && dryRun !== 'true';
   }
   return true;

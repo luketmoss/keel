@@ -39,6 +39,7 @@ var TOKEN_ACTIONS = [
   'getPlan', 'upsertPlanEntry', 'movePlanEntry', 'deletePlanEntry', 'planWeek',
   'getTrips', 'getTrip', 'startTrip', 'setTripItem', 'closeTrip', 'discardTrip', 'addToTrip', 'removeTripItem',
   'getFoodLog', 'getFoodLogTotals', 'logFood', 'updateLogEntry', 'deleteLogEntry',
+  'logUsual', 'logGroup', 'copyMeal', 'setLogGroup',
   'getCooks', 'upsertCook', 'deleteCook',
   'getUsuals', 'getUsual', 'upsertUsual', 'deleteUsual',
 ];

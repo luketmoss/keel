@@ -304,7 +304,6 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
 .pg { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border-light); }
 .pg:first-of-type { border-top: 0; padding-top: 0; }
 .pg .pgh { display: flex; justify-content: space-between; gap: 10px; font-size: .9375rem; }
-.pg .pgh span { color: var(--text-2); white-space: nowrap; }
 .pg .meter { height: 6px; border-radius: 3px; background: var(--border-light); overflow: hidden; }
 .pg .meter i { display: block; height: 100%; background: var(--primary); }
 .pg .wait { font-size: .8125rem; color: var(--text-2); }
@@ -398,7 +397,7 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
        "so": "One is logged tonight, so expect a little less deep sleep."}
     ],
     "progress": [
-      {"slug": "test-late-snack", "title": "Do late snacks cost deep sleep?", "kind": "collecting", "text": "3 + 4 of 6 + 6", "fraction": 0.58},
+      {"slug": "test-late-snack", "title": "Do late snacks cost deep sleep?", "kind": "collecting", "text": "Late snack nights: 3 of 6 · Nights without: 7, enough", "fraction": 0.75},
       {"slug": "test-bp", "title": "Does evening salt raise morning pressure?", "kind": "blocked", "text": "Waiting for a morning blood pressure reading"}
     ]
   },
@@ -849,7 +848,7 @@ a.lk:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; bor
         if (t.kind === "blocked") { p.appendChild(el("div", "pg", [el("div", "pgh", [el("b", null, t.title)]), el("div", "wait", t.text)])); return; }
         var m = el("div", "meter", [el("i")]);
         m.firstChild.style.width = Math.round(Math.max(0, Math.min(1, t.fraction || 0)) * 100) + "%";
-        p.appendChild(el("div", "pg", [el("div", "pgh", [el("b", null, t.title), el("span", "num", t.text)]), m]));
+        p.appendChild(el("div", "pg", [el("div", "pgh", [el("b", null, t.title)]), m, el("div", "wait", t.text)]));
       });
       root.appendChild(p);
     }

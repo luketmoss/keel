@@ -261,12 +261,23 @@ class Grades(unittest.TestCase):
     def test_collecting_when_one_side_is_short(self):
         r = grade(page(), sleepers(2, 6))
         self.assertEqual(r["tonight"], "collecting")
-        self.assertEqual(r["progress"]["text"], "2 + 6 of 3 + 3")
+        self.assertEqual(r["progress"]["text"], "First group: 2 of 3 · Second group: 6, enough")
+        self.assertEqual(r["progress"]["fraction"], 5 / 6.0)
+
+    def test_progress_names_the_groups_from_compare(self):
+        r = grade(page(compare="asleep by 10:30 vs asleep after 11"), sleepers(3, 1))
+        self.assertEqual(r["progress"]["text"], "Asleep by 10:30: 3, enough · Asleep after 11: 1 of 3")
+
+    def test_a_thirds_test_names_top_and_bottom_third(self):
+        t = parse(page(compare="x vs y"))
+        t["thirds"] = "kcal"
+        self.assertEqual(g.progress(t, {"a": 1, "b": 0})["text"], "Top third: 1 of 3 · Bottom third: 0 of 3")
 
     def test_collecting_when_the_total_is_short(self):
         r = grade(page(total="10"), sleepers(4, 4))
         self.assertEqual(r["tonight"], "collecting")
-        self.assertEqual(r["progress"]["text"], "8 of 10")
+        self.assertEqual(r["progress"]["text"], "Both groups have enough · 8 of 10 days in all")
+        self.assertEqual(r["progress"]["fraction"], 0.8)
 
     def test_ruled_out_when_every_difference_is_under_threshold(self):
         r = grade(page(), sleepers(5, 5, early_min=480, late_min=470))

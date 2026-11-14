@@ -462,13 +462,22 @@ def grade_window(ctx, test, end):
     return res
 
 
+def group_labels(test):
+    """The two groups' names: the page's `compare:` halves, Top and Bottom third for a thirds test."""
+    if test.get("thirds"):
+        return "Top third", "Bottom third"
+    return test.get("a_label") or "First group", test.get("b_label") or "Second group"
+
+
 def progress(test, res):
-    """The live count of a collecting test: `7 of 10`, or `3 + 4 of 6 + 6` while a group is short."""
+    """The live count of a collecting test, naming its groups (#893): `Earlier: 3 of 6 · Later: 7, enough` while a
+    group is short, else `Both groups have enough · 9 of 12 days in all`."""
     na, nb, ps = res["a"], res["b"], test["per_side"]
     if na < ps or nb < ps:
-        return {"a": na, "b": nb, "text": "%d + %d of %d + %d" % (na, nb, ps, ps),
-                "fraction": (min(na, ps) + min(nb, ps)) / (2.0 * ps)}
-    return {"a": na, "b": nb, "text": "%d of %d" % (na + nb, test["total"]),
+        text = " · ".join("%s: %d, enough" % (lab, n) if n >= ps else "%s: %d of %d" % (lab, n, ps)
+                          for lab, n in zip(group_labels(test), (na, nb)))
+        return {"a": na, "b": nb, "text": text, "fraction": (min(na, ps) + min(nb, ps)) / (2.0 * ps)}
+    return {"a": na, "b": nb, "text": "Both groups have enough · %d of %d days in all" % (na + nb, test["total"]),
             "fraction": min(1.0, (na + nb) / float(test["total"]))}
 
 

@@ -25,6 +25,110 @@ export const dayPlan = signal<PlanEntry[]>([]);
 export const logFoods = signal<Food[]>([]);
 export const logRecipes = signal<RecipeSummary[]>([]);
 
+/**
+ * The one inline amount editor open in the day (#882): the entry, the amount being set, the dry-run preview of it, and
+ * whether it is saving or the save failed. The row reads it for its chip and calories; the editor writes it.
+ */
+export interface AmountEdit {
+  id: string;
+  /** What is stored, to tell a change from none. */
+  base: { qty: number; unit: string };
+  qty: number;
+  unit: string;
+  /** The API's dry run of `qty` and `unit`; null until one answers, or while the amount is the stored one. */
+  preview: FoodLogEntry | null;
+  busy: boolean;
+  error: boolean;
+}
+export const editing = signal<AmountEdit | null>(null);
+
+/** The preview is asked for this long after the last change to the amount or unit. */
+export const PREVIEW_DELAY_MS = 400;
+let previewSeq = 0;
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+let saving: Promise<boolean> | null = null;
+
+function stopPreview(): void {
+  clearTimeout(previewTimer);
+  previewSeq++;
+}
+
+/** Open the editor on an entry, at its stored amount. The caller has closed any other first. */
+export function openEditor(entry: FoodLogEntry): void {
+  stopPreview();
+  editing.value = {
+    id: entry.id,
+    base: { qty: entry.qty, unit: entry.unit },
+    qty: entry.qty,
+    unit: entry.unit,
+    preview: null,
+    busy: false,
+    error: false,
+  };
+}
+
+/** Set the amount being edited; the row's calories follow from one dry run, 400ms after the last change. */
+export function setDraft(api: ForageApi, qty: number, unit: string): void {
+  const e = editing.value;
+  if (!e || e.busy) return;
+  stopPreview();
+  const changed = qty !== e.base.qty || unit !== e.base.unit;
+  editing.value = { ...e, qty, unit, error: false, preview: changed ? e.preview : null };
+  if (!changed) return;
+  const mine = previewSeq;
+  previewTimer = setTimeout(() => {
+    api.updateLogEntry(e.id, { qty, unit }, true).then(
+      (preview) => {
+        const now = editing.value;
+        if (mine === previewSeq && now && now.id === e.id) editing.value = { ...now, preview };
+      },
+      // A failed preview leaves the old figure and says nothing: the save is still allowed.
+      () => {},
+    );
+  }, PREVIEW_DELAY_MS);
+}
+
+/**
+ * Close the editor, saving a changed amount first (#882, #785): the entry as the write answered it goes into the day,
+ * the editor closes, and the totals refresh quietly. Resolves true when nothing is left open; false when the save
+ * failed, which leaves the editor open with its error.
+ */
+export function closeEditor(api: ForageApi): Promise<boolean> {
+  const e = editing.value;
+  if (!e) return Promise.resolve(true);
+  if (saving) return saving;
+  stopPreview();
+  const changes: { qty?: number; unit?: string } = {};
+  if (e.qty !== e.base.qty) changes.qty = e.qty;
+  if (e.unit !== e.base.unit) changes.unit = e.unit;
+  if (!Object.keys(changes).length) {
+    editing.value = null;
+    return Promise.resolve(true);
+  }
+  editing.value = { ...e, busy: true, error: false };
+  saving = (async () => {
+    try {
+      upsertEntry(await api.updateLogEntry(e.id, changes));
+      editing.value = null;
+      void refreshDay(api);
+      return true;
+    } catch {
+      const now = editing.value;
+      if (now) editing.value = { ...now, busy: false, error: true };
+      return false;
+    } finally {
+      saving = null;
+    }
+  })();
+  return saving;
+}
+
+/** Run `go` once the editor is closed and saved; if the save fails, it stays open and `go` does not run. */
+export function afterEditor(api: ForageApi, go: () => void): void {
+  if (!editing.value) go();
+  else void closeEditor(api).then((ok) => ok && go());
+}
+
 let latest = 0;
 /** The day the last load was for (#825): a hash that moves `eatenDate` without a day move is loaded by the screen. */
 export let loadedDate = '';
@@ -151,6 +255,9 @@ export function _resetEaten(): void {
   fullOut = false;
   patches = 0;
   loadedDate = '';
+  stopPreview();
+  saving = null;
+  editing.value = null;
   eatenDate.value = localDate();
   eatenToday.value = localDate();
   dayState.value = 'loading';

@@ -9,6 +9,7 @@ import {
   type RecipeDetail,
   type FoodLogDay,
   type FoodLogEntry,
+  type FoodLogMeal,
   type PlanEntry,
   type Slot,
 } from '../api/types';
@@ -28,6 +29,7 @@ import { EntryRow } from './entry-row';
 import { SaveRecipeSheet } from './save-recipe-sheet';
 import {
   dayEntries,
+  dayMeals,
   dayPlan,
   dayState,
   dayTotals,
@@ -50,6 +52,8 @@ import {
   dayTitle,
   entryName,
   fullDate,
+  mealGrams,
+  mealMg,
   newLogId,
   nothingLogged,
   wholeGrams,
@@ -151,6 +155,60 @@ function DayCard({ day, date, today }: { day: FoodLogDay | null; date: string; t
         </p>
       )}
     </section>
+  );
+}
+
+/** One of the line's two figures: `Sodium 160 mg`, `Sodium 300+ mg`, `Fiber —`. Never split, never 0 when unknown. */
+function ExtraFigure({
+  name,
+  value,
+  unknown,
+  render,
+}: {
+  name: string;
+  value: number | null | undefined;
+  unknown: number | undefined;
+  render: (v: number) => string;
+}) {
+  if (typeof value !== 'number') {
+    return (
+      <span class="nowrap">
+        {name}{' '}
+        <span class="mn-unknown" role="img" aria-label="not known">
+          —
+        </span>
+      </span>
+    );
+  }
+  const text = render(value);
+  const shown = unknown && unknown > 0 ? text.replace(/^([^ ]+)/, '$1+') : text;
+  return (
+    <span class="nowrap">
+      {name} {shown}
+    </span>
+  );
+}
+
+/** The meal card's total (#866): the API's figures for the slot, shown as text under a thin split bar. */
+function MealTotals({ meal }: { meal: FoodLogMeal }) {
+  const macros = { protein: meal.protein_g, carbs: meal.carbs_g, fat: meal.fat_g };
+  return (
+    <div class="meal-totals" data-testid="meal-totals">
+      <MacroBar protein={macros.protein} carbs={macros.carbs} fat={macros.fat} size="meal" />
+      <p class="meal-line tabular" data-testid="meal-line">
+        <span class="meal-group">
+          <span class="nowrap">P {mealGrams(macros.protein)}</span> ·{' '}
+          <span class="nowrap">C {mealGrams(macros.carbs)}</span> ·{' '}
+          <span class="nowrap">F {mealGrams(macros.fat)}</span>
+          <span aria-hidden="true"> |</span>
+        </span>{' '}
+        <span class="meal-group">
+          <ExtraFigure name="Sodium" value={meal.sodium_mg} unknown={meal.unknown?.sodium_mg} render={mealMg} />
+          {' · '}
+          <ExtraFigure name="Fiber" value={meal.fiber_g} unknown={meal.unknown?.fiber_g} render={mealGrams} />
+        </span>
+      </p>
+    </div>
   );
 }
 
@@ -496,6 +554,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           const headId = `meal-${slot.toLowerCase().replace(/ /g, '-')}`;
           const selectingHere = selecting === slot;
           const canSelect = mine.some((e) => !blockedReason(e));
+          const meal = mine.length ? dayMeals.value.find((m) => m.slot === slot) : undefined;
+          const mealUnknown = !!meal && meal.kcal === null;
           const count = selectingHere ? mine.filter((e) => ticked.includes(e.id) && !blockedReason(e)).length : 0;
           return (
             <section key={slot} class="card meal-card" aria-labelledby={headId} data-testid="meal-card">
@@ -503,6 +563,30 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                 <h2 id={headId} class="meal-card-head">
                   {slot}
                 </h2>
+                {meal && (
+                  <span class="meal-total" data-testid="meal-total">
+                    {mealUnknown ? (
+                      <span class="mn-unknown" role="img" aria-label="not known">
+                        —
+                      </span>
+                    ) : (
+                      <>
+                        {meal.partial && (
+                          <span
+                            class="chip-flag low-chip"
+                            role="img"
+                            aria-label="Low: some entries have no nutrition or are missing ingredients"
+                          >
+                            Low
+                          </span>
+                        )}
+                        <span class="log-row-kcal tabular" data-testid="meal-kcal">
+                          {wholeKcal(meal.kcal!)} <span class="hint-inline">kcal</span>
+                        </span>
+                      </>
+                    )}
+                  </span>
+                )}
                 {state === 'ready' && (canSelect || selectingHere) && (
                   <button
                     type="button"
@@ -514,6 +598,12 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                   </button>
                 )}
               </div>
+              {meal && !mealUnknown && <MealTotals meal={meal} />}
+              {meal && mealUnknown && (
+                <p class="meal-line" data-testid="meal-none">
+                  None of these entries has nutrition yet.
+                </p>
+              )}
               <ul class="plain-list">
                 {mine.map((e) =>
                   selectingHere ? (

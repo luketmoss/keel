@@ -3,7 +3,7 @@
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
-import type { Food, FoodLogDay, FoodLogEntry, PlanEntry, RecipeSummary } from '../api/types';
+import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSummary } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 
@@ -17,6 +17,8 @@ export const dayState = signal<DayState>('loading');
 export const dayEntries = signal<FoodLogEntry[]>([]);
 /** The day's totals, or null when nothing is logged (the date is absent from `days`). */
 export const dayTotals = signal<FoodLogDay | null>(null);
+/** The day's per-meal totals (#866), one per slot with an entry; empty when the API answered without `meals`. */
+export const dayMeals = signal<FoodLogMeal[]>([]);
 /** The day's planned recipe meals, in plan order, before the log hides any. */
 export const dayPlan = signal<PlanEntry[]>([]);
 /** The library, for the entries' names and the Add sheet. */
@@ -57,7 +59,7 @@ export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = fa
   try {
     const [entries, totals, plan, foods, recipes] = await Promise.all([
       api.getFoodLog(date, date),
-      api.getFoodLogTotals(date, date),
+      api.getFoodLogTotals(date, date, true),
       everything ? api.getPlan(date, date, today) : null,
       everything ? api.getFoods() : null,
       withRecipes ? api.getRecipes() : null,
@@ -65,7 +67,9 @@ export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = fa
     if (seq !== latest) return;
     if (quiet && patches !== before) return;
     dayEntries.value = entries;
-    dayTotals.value = totals.days.find((d) => d.date === date) ?? null;
+    const day = totals.days.find((d) => d.date === date) ?? null;
+    dayTotals.value = day;
+    dayMeals.value = day?.meals ?? [];
     if (plan) dayPlan.value = plan.entries.filter((p) => p.date === date && p.recipe_id);
     if (foods) logFoods.value = foods;
     if (recipes) logRecipes.value = recipes;
@@ -152,6 +156,7 @@ export function _resetEaten(): void {
   dayState.value = 'loading';
   dayEntries.value = [];
   dayTotals.value = null;
+  dayMeals.value = [];
   dayPlan.value = [];
   logFoods.value = [];
   logRecipes.value = [];

@@ -2439,7 +2439,8 @@ a.text-btn {
   margin-top: var(--space-xs);
 }
 
-.nowrap {
+.nowrap,
+.meal-group {
   white-space: nowrap;
 }
 

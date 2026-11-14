@@ -11,7 +11,7 @@ import type { LoadState } from './recipes-store';
 export type LibrarySection = 'recipes' | 'foods' | 'usuals';
 export type FoodKind = 'ingredient' | 'packaged';
 
-export const librarySection = signal<LibrarySection>('recipes');
+export const librarySection = signal<LibrarySection>('foods');
 /** Which kind the Foods chips show (#787), remembered for the session. */
 export const foodsKind = signal<FoodKind>('ingredient');
 export const libraryFoods = signal<Food[]>([]);
@@ -104,6 +104,6 @@ export function _resetFoods(): void {
   libraryFoods.value = [];
   foodsState.value = 'idle';
   foodsNotice.value = null;
-  librarySection.value = 'recipes';
+  librarySection.value = 'foods';
   foodsKind.value = 'ingredient';
 }

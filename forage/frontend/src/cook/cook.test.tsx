@@ -3,6 +3,7 @@
 // timers and persistence; finishing, logging to Eaten and undo; rating later;
 // and demo mode end to end.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { librarySection } from '../library/foods-store';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
 import App from '../App';
 import type { Cook, RecipeDetail, RecipeSummary } from '../api/types';
@@ -150,6 +151,7 @@ beforeEach(() => {
   review.value = null;
   savedNotice.value = null;
   _resetRecipes();
+  librarySection.value = 'recipes'; // #873: Library opens on Foods
   document.title = 'Forage';
 });
 

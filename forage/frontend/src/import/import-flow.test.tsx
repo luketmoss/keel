@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { librarySection } from '../library/foods-store';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
 import App from '../App';
 import { _resetDemoApi } from '../api/use-api';
@@ -59,6 +60,7 @@ beforeEach(() => {
   review.value = null;
   savedNotice.value = null;
   _resetRecipes();
+  librarySection.value = 'recipes'; // #873: Library opens on Foods
 });
 
 afterEach(() => {

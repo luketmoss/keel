@@ -9,7 +9,7 @@ import { _resetDemoApi } from '../api/use-api';
 import { _resetDemoModeCache } from '../demo/is-demo-mode';
 import { FoodForm } from '../library/food-form';
 import { FoodSheet } from '../library/food-sheet';
-import { _resetFoods } from '../library/foods-store';
+import { _resetFoods, librarySection } from '../library/foods-store';
 import { _resetRecipes } from '../library/recipes-store';
 import { _resetEaten } from '../eaten/eaten-store';
 import { _resetPlan } from '../plan/plan-store';
@@ -458,6 +458,7 @@ describe('demo mode', () => {
   });
 
   it('has a recipe Nutrition sheet showing all seven per serving', async () => {
+    librarySection.value = 'recipes';
     await open('library');
     fireEvent.click(document.querySelector('.recipe-open')!);
     await settle();

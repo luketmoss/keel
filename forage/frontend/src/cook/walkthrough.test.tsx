@@ -2,6 +2,7 @@
 // amounts scaled with servings, timers that never move the cook, the Cook
 // choice sheet's stale and missing states, and the stylesheet's rules.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { librarySection } from '../library/foods-store';
 import { act, fireEvent, render, screen, within } from '@testing-library/preact';
 import App from '../App';
 import type { RecipeDetail, RecipeSummary } from '../api/types';
@@ -105,6 +106,7 @@ beforeEach(() => {
   _resetCookMemory();
   signIn();
   _resetRecipes();
+  librarySection.value = 'recipes'; // #873: Library opens on Foods
   document.title = 'Forage';
 });
 

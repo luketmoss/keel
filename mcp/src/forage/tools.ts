@@ -44,6 +44,8 @@ export const FORAGE_READ_TOOLS: ReadonlySet<string> = new Set([
   'forage_list_plan',
   'forage_get_trip',
   'forage_food_log',
+  'forage_list_usuals',
+  'forage_get_usual',
 ])
 
 const NO_UNDO_YET = "Error: Forage's API doesn't have undo yet. Redeploy the Apps Script."
@@ -400,7 +402,8 @@ const OFF_WARNINGS: Record<string, string> = {
 function inUseText(id: string, result: ApiResult): string {
   const recipes = (result.uses?.recipes ?? []).map((r) => `${r.name} (${r.id})`)
   const trips = (result.uses?.trips ?? []).map((t) => `trip ${t}`)
-  const uses = [...recipes, ...trips]
+  const usuals = (result.uses?.usuals ?? []).map((u) => `usual ${u.name} (${u.id})`)
+  const uses = [...recipes, ...trips, ...usuals]
   if (!uses.length) return `Nothing deleted. ${result.error}`
   const list = uses.length === 1 ? uses[0] : `${uses.slice(0, -1).join(', ')} and ${uses[uses.length - 1]}`
   return `Nothing deleted — ${id} is used by ${list}. Remove it from those first.`
@@ -1371,7 +1374,7 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
     'forage_delete_food',
     {
       description:
-        "Delete a food from Forage's library. Refused while a recipe or a shopping trip uses it, naming them: " +
+        "Delete a food from Forage's library. Refused while a recipe, a shopping trip or a usual uses it, naming them: " +
         'change those first. Undo with forage_undo. Only delete what the user asked to delete.',
       inputSchema: { id: z.string().describe('The food id (fd_...)') },
       annotations: UNDO,
@@ -2415,4 +2418,151 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       )
     }),
   )
+
+  // ---------------------------------------------------------------- usuals (#877)
+
+  server.registerTool(
+    'forage_list_usuals',
+    {
+      description:
+        "List Forage's usuals: meals the owner eats on repeat with a part that may vary, like oatmeal with whichever " +
+        'fruit is around. Each has a slot (the meal it is usually for) and lines. An Always line is one food at an ' +
+        'amount. A pick-one line is a choice of 2 to 12 foods, each option with its own amount (brands and fruits ' +
+        'come in different units); last_pick is the option picked last time, the default next time, and blank means ' +
+        'the first. Each usual also has start, its nutrition as it starts (Always lines plus each last_pick; partial ' +
+        'when a food has no nutrition), used_count and last_used. Newest use first. Answers JSON.',
+      inputSchema: { slot: z.enum(SLOTS).optional().describe('Only usuals for this meal') },
+      annotations: READ,
+    },
+    guarded(async ({ slot }: { slot?: string }): Promise<ToolResult> => {
+      const result = await apiRead(cfg, 'getUsuals', { slot })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      const foods = await apiRead(cfg, 'getFoods')
+      if (!foods.success) return failed(`Error: ${foods.error}`)
+      const names = new Map(((foods.data ?? []) as any[]).map((f) => [f.id, foodName(f)]))
+      const usuals = ((result.data ?? []) as any[]).map((u) => compactUsual(u, names))
+      return text(JSON.stringify({ count: usuals.length, usuals }, null, 2))
+    }),
+  )
+
+  server.registerTool(
+    'forage_get_usual',
+    {
+      description:
+        'One Forage usual by id, as forage_list_usuals shows it: its lines in order with line_id, each Always line ' +
+        'as food, qty and unit, each pick-one line as its options (every option with its own food, qty and unit) and ' +
+        'last_pick, then start (nutrition as it starts), used_count and last_used. Answers JSON.',
+      inputSchema: { id: z.string().describe('The usual id (us_...)') },
+      annotations: READ,
+    },
+    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
+      const result = await apiRead(cfg, 'getUsual', { id })
+      if (!result.success) return failed(`Error: ${result.error}`)
+      const foods = await apiRead(cfg, 'getFoods')
+      if (!foods.success) return failed(`Error: ${foods.error}`)
+      const names = new Map(((foods.data ?? []) as any[]).map((f) => [f.id, foodName(f)]))
+      return text(JSON.stringify(compactUsual(result.data, names), null, 2))
+    }),
+  )
+
+  server.registerTool(
+    'forage_save_usual',
+    {
+      description:
+        'Create a Forage usual, or replace the one with this id, with all its lines (zero lines is allowed). A usual ' +
+        'is a meal eaten on repeat with a part that may vary. A line is either Always (food_id, qty and unit) or a ' +
+        'pick-one (options only: 2 to 12 options of distinct foods, each with its own food_id, qty and unit, because ' +
+        'brands and fruits come in different units, e.g. 1.25 cup of one cereal and 1 cup of another; optionally ' +
+        'last_pick, the food_id of the option to start with, default the first). A unit is a serving name exactly as ' +
+        'forage_get_food lists the food\'s weights, or g; qty is over 0. Replacing sends every line: send a line_id ' +
+        '(L1, L2...) to keep a line\'s id, and lines left out are removed. Refused, saving nothing, with the field ' +
+        'named. Undo with forage_undo.',
+      inputSchema: {
+        id: z.string().optional().describe('The usual to replace (us_...); omit to create'),
+        name: z.string().describe('At most 120 characters'),
+        slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
+        lines: z
+          .array(
+            z.object({
+              line_id: z.string().optional().describe('Keep this existing line (L1, L2...)'),
+              food_id: z.string().optional().describe('Always line: the food (fd_...)'),
+              qty: z.number().positive().optional().describe('Always line: the amount'),
+              unit: z.string().optional().describe('Always line: a serving name of the food, or g'),
+              options: z
+                .array(
+                  z.object({
+                    food_id: z.string(),
+                    qty: z.number().positive().describe("This option's own amount"),
+                    unit: z.string().describe('A serving name of this food, or g'),
+                  }),
+                )
+                .optional()
+                .describe('Pick-one line: 2 to 12 options of distinct foods; leave food_id, qty and unit out'),
+              last_pick: z.string().optional().describe('Pick-one line: the food_id of the option picked last'),
+            }),
+          )
+          .describe('Every line, in order'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const payload = { ...sent(args, ['id', 'name', 'slot']), lines: args.lines }
+      declareRows(1 + (args.lines as any[]).length)
+      let saved: ApiResult
+      try {
+        saved = await apiWrite(cfg, 'upsertUsual', payload, 1 + (args.lines as any[]).length)
+      } catch (err) {
+        inTransit(err, 'save')
+      }
+      if (!saved.success) return failed(`Nothing saved. ${saved.error}`)
+      const u = saved.data
+      return text(
+        `Saved usual ${u.name} (${u.id}) for ${u.slot}: ${u.lines.length} line${u.lines.length === 1 ? '' : 's'}.\n` +
+          `Undo with forage_undo, call ${currentCallId()}`,
+      )
+    }),
+  )
+
+  server.registerTool(
+    'forage_delete_usual',
+    {
+      description:
+        'Delete a Forage usual and its lines. Food already logged from it stays in the log. Undo with forage_undo, ' +
+        'which brings the usual and its lines back. Only delete what the user asked to delete.',
+      inputSchema: { id: z.string().describe('The usual id (us_...)') },
+      annotations: UNDO,
+    },
+    guarded(async ({ id }: { id: string }): Promise<ToolResult> => {
+      let result: ApiResult
+      try {
+        result = await apiWrite(cfg, 'deleteUsual', { id })
+      } catch (err) {
+        inTransit(err, 'delete')
+      }
+      if (!result.success) return failed(`Nothing deleted. ${result.error}`)
+      return text(`Deleted usual ${id} with its lines.\nUndo with forage_undo, call ${currentCallId()}`)
+    }),
+  )
+}
+
+/** A usual as the read tools answer it: each food with its name beside its id. */
+function compactUsual(u: any, names: Map<string, string>) {
+  const named = (id: string) => (id ? { food_id: id, food_name: names.get(id) ?? '' } : { food_id: '' })
+  return {
+    id: u.id,
+    name: u.name,
+    slot: u.slot,
+    lines: ((u.lines ?? []) as any[]).map((l) =>
+      l.options
+        ? {
+            line_id: l.line_id,
+            pick_one: ((l.options ?? []) as any[]).map((o) => ({ ...named(o.food_id), qty: o.qty, unit: o.unit })),
+            last_pick: l.last_pick,
+          }
+        : { line_id: l.line_id, ...named(l.food_id), qty: l.qty, unit: l.unit },
+    ),
+    start: u.start,
+    used_count: u.used_count,
+    last_used: u.last_used,
+  }
 }

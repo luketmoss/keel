@@ -80,8 +80,8 @@ disjoint and together are exactly the app's tools.
 | `Thrive (write)` | `<PUBLIC_URL>/thrive/write/mcp` | the 21 write tools | **off** |
 | `Hive` | `<PUBLIC_URL>/hive/mcp` | the 4 read tools | on |
 | `Hive (write)` | `<PUBLIC_URL>/hive/write/mcp` | the 5 write tools | **off** |
-| `Forage` | `<PUBLIC_URL>/forage/mcp` | the 9 read tools | on |
-| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 24 write tools | **off** |
+| `Forage` | `<PUBLIC_URL>/forage/mcp` | the 11 read tools | on |
+| `Forage (write)` | `<PUBLIC_URL>/forage/write/mcp` | the 26 write tools | **off** |
 
 **The write connectors are off unless you are writing.** claude.ai remembers the
 toggle across chats, so turning `Thrive (write)` on to log a session leaves it on
@@ -330,14 +330,14 @@ say its Apps Script needs the update. **Ordering:** #765's Apps Script (deployed
 
 `/forage/mcp` and `/forage/write/mcp` (#713) serve Forage's tools: `forage_status`, `forage_search_foods`,
 `forage_get_food`, `forage_search_recipes`, `forage_get_recipe`, `forage_cook_history`, `forage_list_plan`,
-`forage_get_trip` and `forage_food_log` (read),
+`forage_get_trip`, `forage_food_log`, `forage_list_usuals` and `forage_get_usual` (read),
 and `forage_import_recipe`, `forage_add_food`, `forage_update_food`, `forage_delete_food`, `forage_update_recipe`,
 `forage_log_cook`, `forage_rate_cook`, `forage_delete_recipe`, `forage_plan_meal`, `forage_move_meal`,
 `forage_remove_meal`, `forage_plan_week`, `forage_start_trip`, `forage_set_trip_item`, `forage_close_trip`,
 `forage_discard_trip`, `forage_add_to_trip`, `forage_remove_from_trip`, `forage_set_walkthrough`,
-`forage_delete_walkthrough`, `forage_log_food`, `forage_update_log`, `forage_delete_log` and `forage_undo` (write); the
+`forage_delete_walkthrough`, `forage_log_food`, `forage_update_log`, `forage_delete_log`, `forage_save_usual`, `forage_delete_usual` and `forage_undo` (write); the
 food tools are #707's, the recipe and cook tools #708's, the plan tools #709's, the trip tools #718's and #719's, the
-walkthrough tools #711's and the food log tools #712's. Every `main.js` action now has a tool or a `NO_TOOL` reason; the
+walkthrough tools #711's, the food log tools #712's and the usual tools #877's. Every `main.js` action now has a tool or a `NO_TOOL` reason; the
 table of every tool, and how to add one, is `docs/forage-tools.md`. Wording:
 [`docs/design/713-forage-connectors.md`](docs/design/713-forage-connectors.md). Secrets: `FORAGE_API_URL` and
 `FORAGE_API_KEY`, the Forage Apps Script's `API_KEY` (#703); the app never holds it, only this Worker and the
@@ -367,7 +367,7 @@ The tools below are on the write connectors, `Thrive (write)`, `Hive (write)` an
 (it deletes the old rows), `thrive_set_journal_entry` (clearing a note is a
 delete), `thrive_set_workout_rest` (it overwrites planned rest, #583),
 `thrive_delete_drink` (#595), `thrive_update_ride_workout` and `thrive_delete_ride_workout` (#774; an update replaces the whole step list) and `thrive_undo` can destroy data. `hive_delete_item` (#725) and
-`hive_undo` are the same for Hive, and `forage_undo` (#713), `forage_delete_food` (#707), `forage_delete_recipe` (#708), `forage_discard_trip` (#718), `forage_delete_walkthrough` (#711) and `forage_delete_log` (#712) for Forage; they get the same treatment. Reverting can itself destroy work done
+`hive_undo` are the same for Hive, and `forage_undo` (#713), `forage_delete_food` (#707), `forage_delete_recipe` (#708), `forage_discard_trip` (#718), `forage_delete_walkthrough` (#711), `forage_delete_log` (#712) and `forage_delete_usual` (#877) for Forage; they get the same treatment. Reverting can itself destroy work done
 since, so the app's conflict check is the first line and a human approval the second. Their dry-run-until-`confirm: true`
 behaviour only prevents accidents; against prompt injection the one control is a
 human approving each call.
@@ -376,7 +376,7 @@ human approving each call.
 prompt switches it off on that device only, and a new device starts at the
 default. So:
 
-- **Never choose "Always allow" on those tools, `hive_delete_item`, `hive_undo`, `forage_undo`, `forage_delete_food`, `forage_delete_recipe`, `forage_discard_trip`, `forage_delete_walkthrough` and `forage_delete_log` included, on any device.**
+- **Never choose "Always allow" on those tools, `hive_delete_item`, `hive_undo`, `forage_undo`, `forage_delete_food`, `forage_delete_recipe`, `forage_discard_trip`, `forage_delete_walkthrough`, `forage_delete_log` and `forage_delete_usual` included, on any device.**
 - On each device you use, set them to "Needs approval" in the connector's tool
   list, and check by calling one.
 

@@ -33,6 +33,8 @@
 //   action=removeTripItem&key=...&payload={"food_id":"fd_1a2b3c4d"}   — an added item with no meals (#719)
 //   action=logFood&access_token=...&payload={"date":"2026-11-01","slot":"Dinner","recipe_id":"rc_1","qty":1}
 //   action=getFoodLogTotals&key=...&from=2026-11-01&to=2026-11-07
+//   action=getUsuals&key=...&slot=Breakfast   action=getUsual&key=...&id=us_1a2b3c4d   — usuals with `start` nutrition (#877)
+//   action=upsertUsual&key=...&payload={"name":"Oatmeal","slot":"Breakfast","lines":[...]}   action=deleteUsual&key=...&payload={"id":"us_1a2b3c4d"}
 //   action=ensureSchema&key=...              — key-only: the 703 migration
 //   action=getChangeLog&key=...&call_id=...&since=2026-11-01T00:00:00Z&limit=50   — key-only (#713)
 //   action=undoCall&key=...&payload={"call_id":"abc123"}               — key-only; dry run unless confirm: true
@@ -158,6 +160,11 @@ function dispatch(action, params, caller) {
     case 'logFood': return write(function (p) { return logFood(p, caller); });
     case 'updateLogEntry': return write(function (p) { return updateLogEntry(p, caller); });
     case 'deleteLogEntry': return write(deleteLogEntry);
+    // Usuals (#877)
+    case 'getUsuals': return getUsuals(params);
+    case 'getUsual': return getUsual(params.id);
+    case 'upsertUsual': return write(upsertUsual);
+    case 'deleteUsual': return write(deleteUsual);
     // Cooks
     case 'getCooks': return getCooks(params);
     case 'upsertCook': return write(upsertCook);

@@ -14,7 +14,7 @@ var TIMEZONE = 'America/Denver';
 /** A `payload` longer than this is refused, which keeps a cell under Sheets' 50,000 limit. */
 var MAX_PAYLOAD_CHARS = 45000;
 
-var SCHEMA_VERSION = '4';
+var SCHEMA_VERSION = '5';
 
 var FOOD_FIELDS = [
   'id', 'name', 'kind', 'brand', 'category',
@@ -53,6 +53,11 @@ var FOOD_LOG_FIELDS = [
   // #755: the seven in the snapshot.
   'satfat_g', 'transfat_g', 'cholesterol_mg', 'sodium_mg', 'fiber_g', 'sugars_g', 'added_sugars_g',
 ];
+
+/** #877: a usual, and its lines. A line is Always (food, qty, unit) or a pick-one (`options_json`). */
+var USUAL_FIELDS = ['id', 'name', 'slot', 'created', 'updated'];
+
+var USUAL_LINE_FIELDS = ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick'];
 
 var COOK_FIELDS = ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'created'];
 
@@ -105,15 +110,21 @@ var TABS = {
   Cooks: { fields: COOK_FIELDS, key: ['id'], kinds: { rating: 'num' } },
   Config: { fields: CONFIG_FIELDS, key: ['key'], kinds: {} },
   MCPChangeLog: { fields: CHANGE_LOG_FIELDS, key: ['call_id', 'tab', 'row_key'], kinds: {} },
+  Usuals: { fields: USUAL_FIELDS, key: ['id'], kinds: {} },
+  UsualLines: {
+    fields: USUAL_LINE_FIELDS,
+    key: ['usual_id', 'line_id'],
+    kinds: { position: 'num', qty: 'num', options_json: 'json' },
+  },
 };
 
 var TAB_ORDER = [
   'Foods', 'Recipes', 'RecipeLines', 'Steps', 'Walkthroughs', 'Plan', 'Trips', 'TripItems', 'FoodLog', 'Cooks',
-  'Config', 'MCPChangeLog',
+  'Config', 'MCPChangeLog', 'Usuals', 'UsualLines',
 ];
 
 /** The prefix an API-made id gets, by entity. */
-var ID_PREFIXES = { food: 'fd', recipe: 'rc', plan: 'pl', trip: 'tr', log: 'lg', cook: 'ck' };
+var ID_PREFIXES = { food: 'fd', recipe: 'rc', plan: 'pl', trip: 'tr', log: 'lg', cook: 'ck', usual: 'us' };
 
 var FOOD_KINDS = ['ingredient', 'packaged'];
 var STORES = ['ks', 'costco', 'other'];

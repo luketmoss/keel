@@ -1,4 +1,4 @@
-// #703 AC1, AC2: the tabs and their columns, and ensureSchema; #713 adds the 12th, MCPChangeLog; #755 appends
+// #703 AC1, AC2: the tabs and their columns, and ensureSchema; #713 adds the 12th, MCPChangeLog; #877 the 13th and 14th, Usuals and UsualLines; #755 appends
 // seven nutrient columns to Foods and FoodLog, and ensureSchema appends them to an existing Sheet.
 
 import { describe, expect, it } from 'vitest';
@@ -29,18 +29,21 @@ const EXPECTED: Record<string, string[]> = {
   Cooks: ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'created'],
   Config: ['key', 'value', 'updated'],
   MCPChangeLog: ['logged_at', 'call_id', 'action', 'tab', 'row_key', 'before', 'after'],
+  Usuals: ['id', 'name', 'slot', 'created', 'updated'],
+  UsualLines: ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick'],
 };
 
 const KEYS: Record<string, string[]> = {
   Foods: ['id'], Recipes: ['id'], RecipeLines: ['recipe_id', 'line_id'], Steps: ['recipe_id', 'position'],
   Walkthroughs: ['recipe_id'], Plan: ['id'], Trips: ['id'], TripItems: ['trip_id', 'food_id'], FoodLog: ['id'],
   Cooks: ['id'], Config: ['key'], MCPChangeLog: ['call_id', 'tab', 'row_key'],
+  Usuals: ['id'], UsualLines: ['usual_id', 'line_id'],
 };
 
-describe('AC1: types.js defines the 12 tabs with exactly these columns', () => {
+describe('AC1: types.js defines the 14 tabs with exactly these columns', () => {
   const { sandbox } = loadApi();
 
-  it('has exactly the 12 tabs, in order', () => {
+  it('has exactly the 14 tabs, in order', () => {
     expect(sandbox.TAB_ORDER).toEqual(Object.keys(EXPECTED));
     expect(Object.keys(sandbox.TABS).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
@@ -55,19 +58,19 @@ describe('AC1: types.js defines the 12 tabs with exactly these columns', () => {
 });
 
 describe('AC2: ensureSchema', () => {
-  it('creates all 12 tabs with frozen header rows and schema_version 4 on an empty sheet', () => {
+  it('creates all 14 tabs with frozen header rows and schema_version 4 on an empty sheet', () => {
     const api = loadApi({ empty: true });
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(Object.keys(EXPECTED));
     expect(data.existing).toEqual([]);
-    expect(data.schema_version).toBe('4');
+    expect(data.schema_version).toBe('5');
     for (const [tab, fields] of Object.entries(EXPECTED)) {
       const sheet = api.ss.getSheetByName(tab)!;
       expect(sheet.rows[0]).toEqual(fields);
       expect(sheet.frozenRows).toBe(1);
     }
-    expect(api.rows('Config').map((r) => r.slice(0, 2))).toEqual([['schema_version', '4']]);
-    expect(api.ok('getConfig')).toEqual({ schema_version: '4' });
+    expect(api.rows('Config').map((r) => r.slice(0, 2))).toEqual([['schema_version', '5']]);
+    expect(api.ok('getConfig')).toEqual({ schema_version: '5' });
   });
 
   it('changes nothing on a second run', () => {
@@ -86,7 +89,7 @@ describe('AC2: ensureSchema', () => {
     api.ss.sheets.set('Foods', makeSheet('Foods', odd));
     const data = api.ok('ensureSchema');
     expect(data.existing).toEqual(['Foods']);
-    expect(data.created).toHaveLength(11);
+    expect(data.created).toHaveLength(13);
     expect(api.ss.getSheetByName('Foods')!.rows).toEqual([['something', 'else'], ['kept', 'as is']]);
   });
 
@@ -104,7 +107,7 @@ describe('AC2: ensureSchema', () => {
     const before = others();
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(['MCPChangeLog']);
-    expect(data.schema_version).toBe('4');
+    expect(data.schema_version).toBe('5');
     expect(api.ss.getSheetByName('MCPChangeLog')!.rows).toEqual([EXPECTED.MCPChangeLog]);
     expect(others()).toBe(before);
     expect(api.rows('Config').map((r) => r[0])).toEqual(['schema_version']);
@@ -144,7 +147,7 @@ const snapshot = (api: ReturnType<typeof loadApi>) =>
   JSON.stringify([...api.ss.sheets.entries()].filter(([n]) => n !== 'Config').map(([n, s]) => [n, s.rows]));
 
 describe('#755: ensureSchema appends the seven nutrient columns', () => {
-  it('appends them to Foods and FoodLog after updated, moves nothing, and raises the version to 4', () => {
+  it('appends them to Foods and FoodLog after updated, moves nothing, and raises the version to 5', () => {
     const api = versionTwo();
     // Foods had 26 columns, as many as a new Sheet has: the tab must be widened first.
     expect(api.ss.getSheetByName('Foods')!.getMaxColumns()).toBe(NEW_SHEET_COLUMNS);
@@ -159,7 +162,7 @@ describe('#755: ensureSchema appends the seven nutrient columns', () => {
       { tab: 'FoodLog', added: SEVEN_LOG },
     ]);
     expect(data.mismatched).toEqual([]);
-    expect(data.schema_version).toBe('4');
+    expect(data.schema_version).toBe('5');
 
     const foods = api.ss.getSheetByName('Foods')!.rows;
     expect(foods[0]).toEqual(EXPECTED.Foods);
@@ -187,7 +190,7 @@ describe('#755: ensureSchema appends the seven nutrient columns', () => {
     expect(data.created).toEqual([]);
     expect(data.extended).toEqual([]);
     expect(data.mismatched).toEqual([]);
-    expect(data.schema_version).toBe('4');
+    expect(data.schema_version).toBe('5');
     expect(snapshot(api)).toBe(before);
   });
 
@@ -226,7 +229,7 @@ describe('#880: ensureSchema appends short_name', () => {
     return api;
   }
 
-  it('appends short_name to the Foods header, touches no other cell, and sets the version to 4', () => {
+  it('appends short_name to the Foods header, touches no other cell, and sets the version to 5', () => {
     const api = versionThree();
     const before = JSON.stringify(api.ss.getSheetByName('Foods')!.rows);
     const others = () =>
@@ -236,7 +239,7 @@ describe('#880: ensureSchema appends short_name', () => {
     expect(data.created).toEqual([]);
     expect(data.extended).toEqual([{ tab: 'Foods', added: ['short_name'] }]);
     expect(data.mismatched).toEqual([]);
-    expect(data.schema_version).toBe('4');
+    expect(data.schema_version).toBe('5');
     const foods = api.ss.getSheetByName('Foods')!.rows;
     expect(foods[0]).toEqual(EXPECTED.Foods);
     (JSON.parse(before) as CellValue[][]).forEach((row, r) => row.forEach((v, c) => expect(foods[r][c]).toEqual(v)));
@@ -251,7 +254,7 @@ describe('#880: ensureSchema appends short_name', () => {
     const before = snapshot(api);
     const data = api.ok('ensureSchema');
     expect(data.extended).toEqual([]);
-    expect(data.schema_version).toBe('4');
+    expect(data.schema_version).toBe('5');
     expect(snapshot(api)).toBe(before);
   });
 });

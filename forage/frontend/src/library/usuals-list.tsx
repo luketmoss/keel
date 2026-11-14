@@ -2,7 +2,15 @@
 import { useMemo } from 'preact/hooks';
 import { localDate } from '../cook/format';
 import { libraryFoods } from './foods-store';
-import { foodsInShort, sortedUsuals, startKcalText, usageLine, usuals, usualsState } from './usuals-store';
+import {
+  foodsInShort,
+  freshUsualId,
+  sortedUsuals,
+  startKcalText,
+  usageLine,
+  usuals,
+  usualsState,
+} from './usuals-store';
 
 interface Props {
   onOpen: (id: string) => void;
@@ -11,7 +19,9 @@ interface Props {
 
 export function UsualsList({ onOpen, onRetry }: Props) {
   const state = usualsState.value;
-  const list = sortedUsuals(usuals.value);
+  const sorted = sortedUsuals(usuals.value);
+  const fresh = sorted.find((u) => u.id === freshUsualId.value);
+  const list = fresh ? [fresh, ...sorted.filter((u) => u !== fresh)] : sorted;
   const foods = useMemo(() => new Map(libraryFoods.value.map((f) => [f.id, f])), [libraryFoods.value]);
   const today = localDate();
 

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import {
   SLOTS,
+  type Combo,
   type CopyMealInput,
   type Food,
   type RecipeDetail,
@@ -17,6 +18,7 @@ import {
   type UsualOption,
 } from '../api/types';
 import { BarcodeSheet } from '../library/barcode-sheet';
+import { groupItems } from '../library/combos-store';
 import { FoodForm, type FoodFormOrigin } from '../library/food-form';
 import { hasNutrition } from '../library/food-math';
 import { keepFood } from '../library/foods-store';
@@ -393,6 +395,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   // #885: the usual being logged, the pick-one list open (an entry id), a pick or a menu action saving.
   const [loggingUsual, setLoggingUsual] = useState<string | null>(null);
+  const [loggingCombo, setLoggingCombo] = useState<string | null>(null);
   const [openPick, setOpenPick] = useState<string | null>(null);
   const [pickBusy, setPickBusy] = useState<string | null>(null);
   const [groupBusy, setGroupBusy] = useState(false);
@@ -655,6 +658,33 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       setPass((p) => p && { ...p, status: `Couldn't add ${u.name}. Try again.` });
     } finally {
       setLoggingUsual(null);
+    }
+  }
+
+  /** Tap a combo in the Add sheet (#888): its foods go in as one group with no usual, and the toast offers Undo. */
+  async function logCombo(c: Combo, slot: Slot) {
+    if (loggingCombo) return;
+    setLoggingCombo(c.key);
+    try {
+      const { entries: made } = await api.logGroup({
+        date,
+        slot,
+        name: c.name.slice(0, 120),
+        items: groupItems(c),
+      });
+      for (const e of made) upsertEntry(e);
+      void refreshDay(api);
+      setOverlay(null);
+      setPass(null);
+      const ids = made.map((e) => e.id);
+      showToast(`Added ${c.name}`, { label: 'Undo', run: () => void undoLogged(ids) });
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${slot}"]`)?.focus(),
+      );
+    } catch {
+      setPass((p) => p && { ...p, status: `Couldn't add ${c.name}. Try again.` });
+    } finally {
+      setLoggingCombo(null);
     }
   }
 
@@ -1153,6 +1183,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           usuals={usuals}
           loggingUsual={loggingUsual}
           onLogUsual={(u) => void logUsual(u, overlay.slot)}
+          loggingCombo={loggingCombo}
+          onLogCombo={(c) => void logCombo(c, overlay.slot)}
           onPick={(target) => setOverlay({ kind: 'amount', slot: overlay.slot, target })}
           onAddNutrition={(target) => addNutrition(target, overlay.slot)}
           onAddFood={() => setOverlay({ kind: 'addFood', slot: overlay.slot })}

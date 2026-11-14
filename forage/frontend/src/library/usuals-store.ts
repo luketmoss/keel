@@ -11,6 +11,9 @@ export const usualsState = signal<LoadState>('idle');
 /** The header's "＋ New usual" was tapped: Library creates one and opens it. */
 export const newUsualRequested = signal(false);
 
+/** #888: the usual just saved from a combo, listed first until Library is left. */
+export const freshUsualId = signal<string | null>(null);
+
 let latest = 0;
 
 export async function loadUsuals(api: ForageApi, quiet = false): Promise<void> {
@@ -53,6 +56,7 @@ export function _resetUsuals(): void {
   usuals.value = [];
   usualsState.value = 'idle';
   newUsualRequested.value = false;
+  freshUsualId.value = null;
 }
 
 // ---- words

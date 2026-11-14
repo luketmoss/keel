@@ -95,7 +95,8 @@ Five things, all of which have a right answer that needs no judgment: `.keel/`
 compiles, every skill's frontmatter parses and matches its directory, every
 relative link in a tracked `.md` file resolves, every design note cited by
 filename is committed, `pr.py`'s matcher and editors behave on fixtures, and
-`worktrees.py` classifies a worktree correctly on fixtures.
+`worktrees.py` classifies a worktree correctly on fixtures, and the
+scripts decode `gh` output as UTF-8 whatever the locale codepage is.
 CI runs this and nothing else, so a green run here is a green run there.
 
 Adding a check means adding a function to `CHECKS` in `check.py`. Do not add one

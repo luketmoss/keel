@@ -131,6 +131,58 @@ describe('Library → Foods', () => {
     expect(screen.getByTestId('add-food-btn').textContent).toBe('Add food');
   });
 
+  it('shows Scan (primary, 44px) before Add food (secondary) on Foods only (#874)', async () => {
+    await openFoods();
+    const scan = screen.getByTestId('scan-btn');
+    const add = screen.getByTestId('add-food-btn');
+    expect(scan.getAttribute('aria-label')).toBe('Scan a barcode');
+    expect(scan.textContent).toBe('Scan');
+    expect(scan.classList.contains('btn-primary')).toBe(true);
+    expect(add.classList.contains('btn-secondary')).toBe(true);
+    expect(scan.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rule(readGlobalCss(), '.btn')).toContain('min-height: var(--touch-target)');
+    fireEvent.click(screen.getByTestId('usuals-tab'));
+    await settle();
+    expect(screen.queryByTestId('scan-btn')).toBeNull();
+    fireEvent.click(within(screen.getByRole('group', { name: 'Library' })).getByRole('button', { name: /^Recipes/ }));
+    await settle();
+    expect(screen.queryByTestId('scan-btn')).toBeNull();
+  });
+
+  it('Scan opens the Barcode sheet with the camera running; Add food route does not (#874)', async () => {
+    vi.stubGlobal(
+      'BarcodeDetector',
+      Object.assign(
+        function () {
+          return { detect: () => Promise.resolve([]) };
+        },
+        { getSupportedFormats: () => Promise.resolve(['ean_13', 'upc_a']) },
+      ),
+    );
+    const getUserMedia = vi.fn(() => Promise.resolve({ getTracks: () => [{ stop: vi.fn() }] }));
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
+    await openFoods();
+    fireEvent.click(screen.getByTestId('scan-btn'));
+    await screen.findByTestId('barcode-camera');
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    const typing = await screen.findByRole('button', { name: 'Scan with the camera' });
+    await waitFor(() => expect(document.activeElement).toBe(typing));
+    expect(screen.getByTestId('barcode-sheet')).toBeDefined();
+  });
+
+  it('Scan without camera support opens the typing view and never asks for the camera (#874)', async () => {
+    const getUserMedia = vi.fn();
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    await openFoods();
+    fireEvent.click(screen.getByTestId('scan-btn'));
+    await screen.findByTestId('barcode-sheet');
+    await settle();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('barcode-camera')).toBeNull();
+  });
+
   it('empty: offers the starter list and a food', async () => {
     await openFoods();
     const screenEl = screen.getByTestId('screen-library');
@@ -479,6 +531,29 @@ describe('a barcode', () => {
       await new Promise((r) => setTimeout(r, 0));
       expect(screen.queryByRole('button', { name: 'Scan with the camera' })).toBeNull();
       expect(document.activeElement).toBe(screen.getByRole('dialog'));
+    });
+
+    it('startCamera opens the camera view with no tap, and stays off without it (#874)', async () => {
+      withDetector(['ean_13', 'upc_a']);
+      const getUserMedia = vi.fn(() => Promise.reject(new Error('no')));
+      vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+      const { unmount } = render(
+        <BarcodeSheet
+          api={stubApi()}
+          startCamera
+          onFound={() => {}}
+          onTypeIt={() => {}}
+          onOpen={() => {}}
+          onClose={() => {}}
+        />,
+      );
+      await screen.findByText(/Couldn't use the camera/);
+      expect(getUserMedia).toHaveBeenCalledTimes(1);
+      unmount();
+      getUserMedia.mockClear();
+      open();
+      await screen.findByRole('button', { name: 'Scan with the camera' });
+      expect(getUserMedia).not.toHaveBeenCalled();
     });
 
     it('still lets the owner type and look up, and gives focus back after Cancel', async () => {

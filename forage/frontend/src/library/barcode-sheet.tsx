@@ -13,6 +13,8 @@ interface Props {
   /** Already yours: that food's sheet. */
   onOpen: (id: string) => void;
   onClose: () => void;
+  /** #874: open with the camera already running, once the browser is known to scan. */
+  startCamera?: boolean;
 }
 
 type Outcome =
@@ -37,7 +39,7 @@ function detectorClass(): DetectorClass | null {
 }
 
 /** The Barcode sheet (#707): type the digits, or scan where the browser can, then look it up. */
-export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props) {
+export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose, startCamera = false }: Props) {
   const [value, setValue] = useState('');
   const [touched, setTouched] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' });
@@ -47,6 +49,7 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
   const video = useRef<HTMLVideoElement>(null);
   const scanButton = useRef<HTMLButtonElement>(null);
   const stream = useRef<MediaStream | null>(null);
+  const autoStarted = useRef(false);
 
   const code = barcodeDigits(value);
 
@@ -66,6 +69,13 @@ export function BarcodeSheet({ api, onFound, onTypeIt, onOpen, onClose }: Props)
   useEffect(() => {
     if (canScan && !scanning) scanButton.current?.focus();
   }, [canScan, scanning]);
+
+  // #874: the header's Scan opens the sheet with the camera running; support is known only once checked.
+  useEffect(() => {
+    if (!startCamera || !canScan || autoStarted.current) return;
+    autoStarted.current = true;
+    void scan();
+  }, [startCamera, canScan]);
 
   function stopCamera() {
     stream.current?.getTracks().forEach((t) => t.stop());

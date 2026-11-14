@@ -274,6 +274,7 @@ describe('the inline editor', () => {
     expect(chipOf(oil).textContent).toBe('2½ tbsp · 35 g');
     // Calories are the stored ones until the preview answers.
     expect(oil.textContent).toContain('124');
+    await new Promise((r) => setTimeout(r, 200));
     expect(dryRuns(api)).toHaveLength(0);
     await waitFor(() => expect(oil.textContent).toContain('309'), { timeout: 2000 });
     expect(dryRuns(api)).toHaveLength(1);

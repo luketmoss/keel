@@ -20,6 +20,8 @@ export const foodsState = signal<LoadState>('idle');
 export const foodsNotice = signal<string | null>(null);
 /** The header's "Add food" was tapped: Library opens the Add a food sheet. */
 export const addFoodRequested = signal(false);
+/** The header's "Scan" was tapped: Library opens the Barcode sheet with the camera running (#874). */
+export const scanRequested = signal(false);
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -105,5 +107,6 @@ export function _resetFoods(): void {
   foodsState.value = 'idle';
   foodsNotice.value = null;
   librarySection.value = 'foods';
+  scanRequested.value = false;
   foodsKind.value = 'ingredient';
 }

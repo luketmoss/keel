@@ -7,7 +7,7 @@ import { EatenHeader, EatenScreen } from '../eaten/eaten-screen';
 import { ImportSheet } from '../import/import-sheet';
 import { ReviewScreen } from '../import/review-screen';
 import { review } from '../import/review-state';
-import { addFoodRequested, librarySection } from '../library/foods-store';
+import { addFoodRequested, librarySection, scanRequested } from '../library/foods-store';
 import { newUsualRequested } from '../library/usuals-store';
 import { LibraryScreen } from '../library/library-screen';
 import { PlanScreen } from '../plan/plan-screen';
@@ -17,6 +17,7 @@ import { addRequested, shopTrip, tripMenuRequested } from '../shop/shop-store';
 import { Toast } from '../ui/toast';
 import { AccountMenu } from './account-menu';
 import { cookRoute, currentTab, syncFromHash } from './routes';
+import { CameraIcon } from './nav-icons';
 import { TabBar } from './tab-bar';
 import { TABS } from './tabs';
 
@@ -91,14 +92,26 @@ export function Shell() {
             </button>
           )}
           {tab.id === 'library' && librarySection.value === 'foods' && (
-            <button
-              type="button"
-              class="btn btn-primary"
-              onClick={() => (addFoodRequested.value = true)}
-              data-testid="add-food-btn"
-            >
-              Add food
-            </button>
+            <>
+              <button
+                type="button"
+                class="btn btn-primary scan-btn"
+                aria-label="Scan a barcode"
+                onClick={() => (scanRequested.value = true)}
+                data-testid="scan-btn"
+              >
+                <CameraIcon />
+                Scan
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onClick={() => (addFoodRequested.value = true)}
+                data-testid="add-food-btn"
+              >
+                Add food
+              </button>
+            </>
           )}
           {tab.id === 'library' && librarySection.value === 'usuals' && (
             <button

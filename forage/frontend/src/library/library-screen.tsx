@@ -12,6 +12,7 @@ import { FoodSheet } from './food-sheet';
 import { FoodsList } from './foods-list';
 import {
   addFoodRequested,
+  scanRequested,
   foodsKind,
   foodsState,
   keepFood,
@@ -132,7 +133,7 @@ const SORTS: { id: RecipeSort; label: string }[] = [
 export type LibraryOverlay = Overlay;
 type Overlay =
   | { kind: 'add' }
-  | { kind: 'barcode' }
+  | { kind: 'barcode'; camera?: boolean }
   | { kind: 'starter'; all: boolean }
   | { kind: 'form'; food: Partial<Food>; origin: FoodFormOrigin }
   | { kind: 'food'; id: string }
@@ -247,6 +248,13 @@ export function LibraryScreen({ api, empty, icon }: Props) {
       setOverlay({ kind: 'add' });
     }
   }, [addFoodRequested.value]);
+
+  useEffect(() => {
+    if (scanRequested.value) {
+      scanRequested.value = false;
+      setOverlay({ kind: 'barcode', camera: true });
+    }
+  }, [scanRequested.value]);
 
   const list = recipes.value;
   const notice = savedNotice.value ?? status ?? recipesNotice.value;
@@ -463,6 +471,7 @@ export function LibraryScreen({ api, empty, icon }: Props) {
       {overlay?.kind === 'barcode' && (
         <BarcodeSheet
           api={api}
+          startCamera={overlay.camera}
           onFound={(food: Partial<Food>, lookup: BarcodeLookup) =>
             setOverlay({ kind: 'form', food: { ...food, id: undefined }, origin: { lookup } })
           }

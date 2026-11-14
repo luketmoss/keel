@@ -354,6 +354,13 @@ p {
   opacity: 0.5;
 }
 
+.scan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
+}
+
 .btn-primary {
   background: var(--color-primary);
   border-color: var(--color-primary);

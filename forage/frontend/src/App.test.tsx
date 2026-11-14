@@ -41,20 +41,28 @@ afterEach(() => {
 });
 
 describe('the tab bar', () => {
-  it('is a nav labelled Forage with Plan, Shop, Eaten, Library in order', () => {
+  it('is a nav labelled Forage with Eaten, Library, Plan, Shop in order', () => {
     render(<App />);
     expect(screen.getByRole('navigation', { name: 'Forage' })).toBeDefined();
-    expect(tabs().map((a) => a.textContent)).toEqual(['Plan', 'Shop', 'Eaten', 'Library']);
-    expect(tabs().map((a) => a.getAttribute('href'))).toEqual(['#/plan', '#/shop', '#/eaten', '#/library']);
+    expect(tabs().map((a) => a.textContent)).toEqual(['Eaten', 'Library', 'Plan', 'Shop']);
+    expect(tabs().map((a) => a.getAttribute('href'))).toEqual(['#/eaten', '#/library', '#/plan', '#/shop']);
   });
 
-  it('opens Plan by default and rewrites the empty hash without a history entry', () => {
+  it('opens Eaten by default and rewrites the empty hash without a history entry', () => {
     const push = vi.spyOn(window.history, 'pushState');
     render(<App />);
-    expect(window.location.hash).toBe('#/plan');
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Plan');
-    expect(screen.getByTestId('tab-plan').getAttribute('aria-current')).toBe('page');
+    expect(window.location.hash).toBe('#/eaten');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Today');
+    expect(screen.getByTestId('tab-eaten').getAttribute('aria-current')).toBe('page');
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the query, so ?demo=true opens Eaten in demo mode', () => {
+    window.history.replaceState(null, '', '/?demo=true');
+    render(<App />);
+    expect(window.location.hash).toBe('#/eaten');
+    expect(window.location.search).toBe('?demo=true');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Today');
   });
 
   it.each(TABS.map((t) => [t.id, t.label]))('selecting %s shows its header and marks it current', (id, label) => {
@@ -74,8 +82,17 @@ describe('the tab bar', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Shop');
   });
 
-  it('an unknown hash opens Plan', () => {
-    window.history.replaceState(null, '', '/#/settings');
+  it('an unknown hash opens Eaten and is rewritten in place', () => {
+    const push = vi.spyOn(window.history, 'pushState');
+    window.history.replaceState(null, '', '/#/nope');
+    render(<App />);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Today');
+    expect(window.location.hash).toBe('#/eaten');
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('a bookmark to #/plan still opens Plan', () => {
+    window.history.replaceState(null, '', '/#/plan');
     render(<App />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Plan');
     expect(window.location.hash).toBe('#/plan');
@@ -83,7 +100,8 @@ describe('the tab bar', () => {
 
   it('back returns to the previous tab', () => {
     render(<App />);
-    go('#/eaten');
+    go('#/plan');
+    go('#/shop');
     go('#/plan');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Plan');
   });
@@ -91,9 +109,9 @@ describe('the tab bar', () => {
   it('tapping the current tab stays put and scrolls to the top', () => {
     const scroll = vi.spyOn(window, 'scrollTo');
     render(<App />);
-    const plan = screen.getByTestId('tab-plan');
+    const eaten = screen.getByTestId('tab-eaten');
     const event = new MouseEvent('click', { bubbles: true, cancelable: true });
-    plan.dispatchEvent(event);
+    eaten.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(scroll).toHaveBeenCalledWith({ top: 0 });
   });

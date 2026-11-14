@@ -11,7 +11,7 @@ import { addDays } from '../plan/dates';
 export const TAB_IDS = ['plan', 'shop', 'eaten', 'library'] as const;
 export type TabId = (typeof TAB_IDS)[number];
 
-export const DEFAULT_TAB: TabId = 'plan';
+export const DEFAULT_TAB: TabId = 'eaten';
 
 /** The tab a hash names, or null for anything else. */
 export function parseHash(hash: string): TabId | null {
@@ -86,7 +86,7 @@ export function setLeaveGuard(guard: (() => boolean) | null): void {
 }
 
 /**
- * Follow the hash. An unknown or missing one opens Plan and is rewritten in
+ * Follow the hash. An unknown or missing one opens Eaten and is rewritten in
  * place, adding no history entry.
  */
 export function syncFromHash(): void {

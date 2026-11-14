@@ -190,7 +190,7 @@ export const DEMO_FOODS: Food[] = [
     servings_json: [{ name: 'bar', g: 40 }],
     source: 'label',
     regular: true,
-    ...seven(5, 0, 0, 375, 7.5, 25, 20),
+    ...seven(5, 1.25, 0, 375, 7.5, 25, 20),
   }),
   food('fd_demo_yogurt', 'Plain yogurt', {
     kind: 'packaged',

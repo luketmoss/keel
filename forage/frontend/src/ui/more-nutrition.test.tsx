@@ -449,7 +449,7 @@ describe('demo mode', () => {
 
   it('has an amount sheet showing all seven for a logged food', async () => {
     await open('eaten');
-    fireEvent.click(screen.getAllByTestId('entry-row')[0]);
+    fireEvent.click(within(screen.getAllByTestId('entry-row')[0]).getByTestId('entry-open'));
     await settle();
     const sheet = screen.getByTestId('amount-sheet');
     fireEvent.click(within(sheet).getByRole('button', { name: /More nutrition/ }));

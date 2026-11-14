@@ -162,6 +162,7 @@ afterEach(() => {
 const kcal = () => screen.getByTestId('day-kcal').textContent;
 const card = (slot: string) =>
   screen.getAllByTestId('meal-card').find((c) => c.querySelector('h2')!.textContent === slot)!;
+const openOf = (row: HTMLElement) => within(row).getByTestId('entry-open');
 const entriesIn = (slot: string) => within(card(slot)).queryAllByTestId('entry-row');
 
 /** Open the Add sheet for a meal and wait for its lists. */
@@ -325,7 +326,7 @@ describe('the day view', () => {
       ['After dinner', 'Snacks'],
       ['Snacks', 'After dinner'],
     ]) {
-      fireEvent.click(entriesIn(from)[0]);
+      fireEvent.click(openOf(entriesIn(from)[0]));
       await settle();
       amount = screen.getByTestId('amount-sheet');
       expect(within(amount).getByRole('group', { name: 'Meal' }).textContent).toBe(
@@ -342,7 +343,7 @@ describe('the day view', () => {
     fireEvent.click(within(card('After dinner')).getByTestId('select-meal'));
     expect(within(card('After dinner')).getByTestId('select-cancel').textContent).toBe('Cancel');
     fireEvent.click(within(card('After dinner')).getByTestId('select-cancel'));
-    fireEvent.click(entriesIn('After dinner')[0]);
+    fireEvent.click(openOf(entriesIn('After dinner')[0]));
     await settle();
     fireEvent.click(screen.getByTestId('delete-entry'));
     expect(screen.getByTestId('confirm').textContent).toContain('Delete Greek yogurt from After dinner?');
@@ -497,7 +498,7 @@ describe('editing and deleting', () => {
       entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9, protein_g: 6, carbs_g: 9, fat_g: 0.4 }),
     );
     await open();
-    fireEvent.click(entriesIn('Breakfast')[0]);
+    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
     await settle();
     let amount = screen.getByTestId('amount-sheet');
     // The first preview is the entry itself: no dry run.
@@ -521,7 +522,7 @@ describe('editing and deleting', () => {
     expect(kcal()).toBe('300');
 
     // Only the meal: the stored numbers are kept and no preview is asked for.
-    fireEvent.click(entriesIn('Lunch')[0]);
+    fireEvent.click(openOf(entriesIn('Lunch')[0]));
     await settle();
     amount = screen.getByTestId('amount-sheet');
     const before = api.calls('updateLogEntry').length;
@@ -536,7 +537,7 @@ describe('editing and deleting', () => {
     ).toEqual([{ id: 'lg_1', changes: { slot: 'Snacks' } }]);
 
     // The unit: grams, from its default.
-    fireEvent.click(entriesIn('Snacks')[0]);
+    fireEvent.click(openOf(entriesIn('Snacks')[0]));
     await settle();
     amount = screen.getByTestId('amount-sheet');
     fireEvent.change(within(amount).getByTestId('log-unit'), { target: { value: 'g' } });
@@ -547,7 +548,7 @@ describe('editing and deleting', () => {
     expect(kcal()).toBe('61');
 
     // Delete, after a confirmation.
-    fireEvent.click(entriesIn('Snacks')[0]);
+    fireEvent.click(openOf(entriesIn('Snacks')[0]));
     await settle();
     fireEvent.click(screen.getByTestId('delete-entry'));
     const confirm = screen.getByTestId('confirm');
@@ -590,7 +591,7 @@ describe('the amount sheet: focus and the macro visual (#870)', () => {
       entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9, protein_g: 6, carbs_g: 9, fat_g: 0.4 }),
     );
     await open();
-    fireEvent.click(entriesIn('Breakfast')[0]);
+    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
     await settle();
     let amount = screen.getByTestId('amount-sheet');
     expect(document.activeElement).toBe(amount);
@@ -1246,14 +1247,14 @@ describe('a save shows at once (#785)', () => {
     );
     await open();
     api.answer('getFoodLog', offline);
-    fireEvent.click(entriesIn('Breakfast')[0]);
+    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
     await settle();
     fireEvent.click(within(screen.getByTestId('amount-sheet')).getByRole('button', { name: 'Lunch' }));
     fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
     await settle();
     expect(entriesIn('Breakfast')).toHaveLength(0);
     expect(entriesIn('Lunch')).toHaveLength(1);
-    fireEvent.click(entriesIn('Lunch')[0]);
+    fireEvent.click(openOf(entriesIn('Lunch')[0]));
     await settle();
     fireEvent.click(screen.getByTestId('delete-entry'));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -1437,7 +1438,7 @@ describe('a pass: several foods to one meal (#786)', () => {
     await addTo('Dinner');
     await pick('gnocchi');
     await logIt();
-    fireEvent.click(addedRows()[0]);
+    fireEvent.click(openOf(addedRows()[0]));
     await settle();
     const amount = screen.getByTestId('amount-sheet');
     expect(within(amount).getByTestId('log-it').textContent).toBe('Save');
@@ -1452,7 +1453,7 @@ describe('a pass: several foods to one meal (#786)', () => {
     expect(addedRows()[0].textContent).toContain('448 kcal');
     expect(screen.getByTestId('add-status').textContent).toBe("Saved Trader Joe's Potato gnocchi");
 
-    fireEvent.click(addedRows()[0]);
+    fireEvent.click(openOf(addedRows()[0]));
     await settle();
     fireEvent.click(screen.getByTestId('delete-entry'));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -1489,7 +1490,7 @@ describe('a pass: several foods to one meal (#786)', () => {
     api.foods.push(YOGURT);
     api.log.push(entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9 }));
     await open();
-    fireEvent.click(entriesIn('Breakfast')[0]);
+    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
     await settle();
     expect(within(screen.getByTestId('amount-sheet')).getByRole('button', { name: 'Lunch' })).toBeDefined();
   });

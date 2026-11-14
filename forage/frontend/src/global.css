@@ -2721,3 +2721,98 @@ a.text-btn {
   display: grid;
   gap: var(--space-sm);
 }
+
+/* === Inline amounts (#882): the chip on line two of an entry, and the editor under the row === */
+
+.entry-li {
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.entry-li .log-row-main {
+  min-height: 40px;
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.entry-amount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-bottom: var(--space-xs);
+}
+
+.amount-chip {
+  /* The visible chip is small; the hit area is padded to 44px. */
+  position: relative;
+  max-width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.amount-chip::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+
+.amount-chip-g {
+  color: var(--color-text-secondary);
+}
+
+.amount-chip.is-open {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.amount-chip.is-open .amount-chip-g {
+  color: inherit;
+}
+
+.amount-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.amount-editor-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.amount-editor-step .icon-btn {
+  border: 1px solid var(--color-border-strong);
+}
+
+.amount-editor-qty {
+  min-width: 3ch;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.amount-editor-unit {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.amount-editor .chip-row {
+  margin: 0;
+}
+
+.amount-editor-done {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -25,9 +25,11 @@ import { eatenHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
 import { AddSheet, type AddLists } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
-import { EntryRow } from './entry-row';
+import { EntryRow, type RowEditing } from './entry-row';
 import { SaveRecipeSheet } from './save-recipe-sheet';
 import {
+  afterEditor,
+  closeEditor,
   dayEntries,
   dayMeals,
   dayPlan,
@@ -66,7 +68,12 @@ export function EatenHeader({ api }: { api: ForageApi }) {
   const today = eatenToday.value;
   return (
     <div class="eaten-nav">
-      <button type="button" class="icon-btn" aria-label="Previous day" onClick={() => moveDay(api, -1)}>
+      <button
+        type="button"
+        class="icon-btn"
+        aria-label="Previous day"
+        onClick={() => afterEditor(api, () => moveDay(api, -1))}
+      >
         ‹
       </button>
       <div class="eaten-day">
@@ -77,7 +84,7 @@ export function EatenHeader({ api }: { api: ForageApi }) {
         type="button"
         class="icon-btn"
         aria-label="Next day"
-        onClick={() => moveDay(api, 1)}
+        onClick={() => afterEditor(api, () => moveDay(api, 1))}
         disabled={date >= today}
         data-testid="next-day"
       >
@@ -347,18 +354,30 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   useEffect(() => {
     void loadDay(api);
     const onVisible = () => {
-      if (document.visibilityState !== 'visible') return;
+      // #882: the app going to the background saves an editor's pending change.
+      if (document.visibilityState !== 'visible') {
+        void closeEditor(api);
+        return;
+      }
       leaveSelect();
       void loadDay(api);
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      // Leaving the tab saves a pending change too.
+      void closeEditor(api);
+    };
   }, [api]);
 
   const date = eatenDate.value;
   const today = eatenToday.value;
   // A day change leaves select mode with nothing saved.
-  useEffect(() => leaveSelect(), [date]);
+  useEffect(() => {
+    leaveSelect();
+    // A day the hash moved to leaves an open editor saved and closed (#882).
+    void closeEditor(api);
+  }, [date]);
   // #825: the hash follows the day on screen, rewritten in place; and a day the hash moved to is loaded here.
   useEffect(() => {
     const want = eatenHash(date, today);
@@ -407,6 +426,10 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   }
 
   function startPass(slot: Slot) {
+    afterEditor(api, () => beginPass(slot));
+  }
+
+  function beginPass(slot: Slot) {
     setPass({ slot, ids: [], lists: null, q: '', status: null, fresh: null });
     setOverlay({ kind: 'add', slot });
   }
@@ -450,6 +473,10 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   }
 
   function openEntry(e: FoodLogEntry) {
+    afterEditor(api, () => openSheet(e));
+  }
+
+  function openSheet(e: FoodLogEntry) {
     const target: LogTarget | null = e.food_id
       ? { kind: 'food', food: foods.find((f) => f.id === e.food_id) ?? removedFood(e.food_id) }
       : {
@@ -457,6 +484,13 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           recipe: recipes.find((r) => r.id === e.recipe_id) ?? ({ id: e.recipe_id, name: 'A removed recipe' } as never),
         };
     setOverlay({ kind: 'amount', slot: e.slot, target, entry: e });
+  }
+
+  /** The chip and inline editor (#882), for an entry whose food or recipe is still in the library. */
+  function rowEditing(e: FoodLogEntry): RowEditing | undefined {
+    if (e.recipe_id) return { api, food: null };
+    const food = foods.find((f) => f.id === e.food_id);
+    return food ? { api, food } : undefined;
   }
 
   function addNutrition(target: LogTarget, slot: Slot) {
@@ -478,8 +512,10 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   }
 
   function startSelect(slot: Slot) {
-    setSelecting(slot);
-    setTicked([]);
+    afterEditor(api, () => {
+      setSelecting(slot);
+      setTicked([]);
+    });
   }
 
   function savedRecipe(recipe: RecipeDetail) {
@@ -596,7 +632,13 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                       onToggle={() => toggle(e.id)}
                     />
                   ) : (
-                    <EntryRow key={e.id} entry={e} name={entryName(e, foods, recipes)} onOpen={() => openEntry(e)} />
+                    <EntryRow
+                      key={e.id}
+                      entry={e}
+                      name={entryName(e, foods, recipes)}
+                      onOpen={() => openEntry(e)}
+                      amount={rowEditing(e)}
+                    />
                   ),
                 )}
                 {!selectingHere &&
@@ -607,7 +649,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                       busy={busyPlan === p.id}
                       failed={failedPlan === p.id}
                       onLog={() => void logPlanned(p)}
-                      onNutrition={() => setOverlay({ kind: 'nutrition', recipeId: p.recipe_id })}
+                      onNutrition={() =>
+                        afterEditor(api, () => setOverlay({ kind: 'nutrition', recipeId: p.recipe_id }))
+                      }
                     />
                   ))}
               </ul>

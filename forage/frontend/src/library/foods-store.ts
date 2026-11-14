@@ -8,7 +8,7 @@ import { quietGate } from '../api/quiet-gate';
 import type { Food } from '../api/types';
 import type { LoadState } from './recipes-store';
 
-export type LibrarySection = 'recipes' | 'foods';
+export type LibrarySection = 'recipes' | 'foods' | 'usuals';
 export type FoodKind = 'ingredient' | 'packaged';
 
 export const librarySection = signal<LibrarySection>('recipes');

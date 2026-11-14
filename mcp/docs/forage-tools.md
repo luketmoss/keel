@@ -53,11 +53,15 @@ retried, carry the tool call's `call_id` so the API logs their rows for `forage_
 | `forage_log_food` | write | `logFood` | Exactly one of `food_id` and `recipe_id`, `qty`, `unit` (a serving name or `g`; recipes `serving`), `slot` (Breakfast, Lunch, Dinner, After dinner for anything eaten once dinner is over, or Snacks for between meals during the day; #826), `date` (default today). A dry run by default (`dry_run` true, `logFood`'s own `dry_run`): the entry and its macros as Forage would store them. `dry_run: false` logs it and answers its id. A food with no nutrition is logged as unknown. No `id`: a lost answer is checked with `forage_food_log`, not retried (#712) |
 | `forage_update_log` | write | `getFoodLog`, `updateLogEntry` | `id` and any of `qty`, `unit`, `slot`; an unknown id is refused before any write. A dry run by default: before and after. A new amount or unit recalculates from the food as it is now; a slot change keeps the stored numbers (#712) |
 | `forage_delete_log` | write | `getFoodLog`, `deleteLogEntry` | Deletes an entry, naming it; an unknown id is refused before any write. `forage_undo` brings it back with its stored numbers. `destructiveHint` (#712) |
+| `forage_list_usuals` | read | `getUsuals`, `getFoods` | Usuals (meals eaten on repeat with a part that varies), optionally for one `slot`, most recently used first: each line with food names, an Always line as `food_id`, `qty`, `unit`, a pick-one as `pick_one` (2 to 12 options, each with its own amount) and `last_pick`; `start` (nutrition as it starts, `partial` when a food has none), `used_count`, `last_used`. JSON (#877) |
+| `forage_get_usual` | read | `getUsual`, `getFoods` | One usual by `id`, as `forage_list_usuals` shows it (#877) |
+| `forage_save_usual` | write | `upsertUsual` | Creates a usual, or replaces `id` with all its lines: `name`, `slot`, `lines` (Always: `food_id`, `qty`, `unit`; pick-one: `options` with each option's own `food_id`, `qty`, `unit`, and `last_pick`); a `line_id` keeps a line's id. Refused, saving nothing, with the field named (#877) |
+| `forage_delete_usual` | write | `deleteUsual` | Deletes the usual and its lines; logged entries stay. `forage_undo` brings them back. `destructiveHint` (#877) |
 | `forage_undo` | write | `getChangeLog`, `undoCall` | No arguments: the last 20 calls. `call_id`: a dry run listing every row it would restore, remove or recreate. `confirm: true`: reverts, all or nothing. Refused when a row changed since, or when a row it would remove is now used elsewhere. `destructiveHint` |
 
 ## Adding a tool
 
-A Forage feature issue (#707 foods, #708 recipes and cooks, #709 plan, #710 trips, #711 walkthroughs, #712 food log)
+A Forage feature issue (#707 foods, #708 recipes and cooks, #709 plan, #710 trips, #711 walkthroughs, #712 food log, #877 usuals)
 that registers a tool, in the same PR:
 
 1. Registers it in `src/forage/tools.ts`, and adds it to `FORAGE_READ_TOOLS` if it only reads. Anything not in that set

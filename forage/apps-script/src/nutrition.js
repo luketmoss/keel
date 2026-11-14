@@ -280,3 +280,45 @@ function recipeEntryNutrition(nutrition, qty) {
   EXTRA_NUTRIENTS.forEach(function (x) { out[x.key] = times(per[x.key]); });
   return out;
 }
+
+/**
+ * The option of a pick-one line that counts: the one named by `last_pick` (a
+ * food id), or the first when it is blank or no longer one of them (#877).
+ */
+function usualPick(line) {
+  var options = Array.isArray(line.options) ? line.options : [];
+  var picked = options.filter(function (o) { return o.food_id === line.last_pick; })[0];
+  return picked || options[0] || null;
+}
+
+/**
+ * A usual as it starts (#877): its Always lines plus each pick-one's pick, as
+ * one serving, so the figures are `recipeNutrition`'s over the same foods and
+ * amounts. `lines` are a usual's lines as `getUsual` answers them. A line's
+ * amount is `qty` of a serving named exactly (or g), the way a log entry's is;
+ * a serving the food has since lost falls back to the conversion a recipe line
+ * gets, and is `no_weight` if that fails too. Answers `{ kcal, protein_g,
+ * carbs_g, fat_g, ...the seven, partial, missing, unknown }`: values null when
+ * nothing counted, `partial` as for a recipe.
+ */
+function usualNutrition(lines, foodsById) {
+  var counted = [];
+  lines.forEach(function (line) {
+    var pick = Array.isArray(line.options) ? usualPick(line) : line;
+    if (!pick) return;
+    var food = foodsById[pick.food_id] || null;
+    var serving = food ? foodServings(food).filter(function (s) { return s.name === pick.unit; })[0] : null;
+    var grams;
+    if (canonicalUnit(pick.unit) === 'g' && typeof pick.qty === 'number') grams = pick.qty;
+    else if (serving && typeof pick.qty === 'number') grams = pick.qty * serving.g;
+    else grams = gramsFor(pick.qty, pick.unit, food);
+    counted.push({ line_id: line.line_id, food_id: pick.food_id, grams: grams });
+  });
+  var n = recipeNutrition(counted, 1, foodsById);
+  var out = {};
+  Object.keys(n.per_serving).forEach(function (k) { out[k] = n.per_serving[k]; });
+  out.partial = n.partial;
+  out.missing = n.missing;
+  out.unknown = n.per_serving_unknown;
+  return out;
+}

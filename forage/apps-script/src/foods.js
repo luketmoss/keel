@@ -228,9 +228,9 @@ function validatePacks(value) {
 }
 
 /**
- * Delete a food no recipe line or trip item uses; otherwise refuse with code
- * `in_use`, naming the recipes and trips, and `uses: { recipes: [{id, name}],
- * trips: [id] }` for the app to word.
+ * Delete a food no recipe line, trip item or usual line or option (#877) uses;
+ * otherwise refuse with code `in_use`, naming the recipes, trips and usuals, and
+ * `uses: { recipes: [{id, name}], trips: [id], usuals: [{id, name}] }` for the app to word.
  */
 function deleteFood(payload) {
   var id = requireString('id', payload && payload.id);
@@ -238,15 +238,19 @@ function deleteFood(payload) {
   var recipes = recipesUsing(id);
   var trips = unique(listRecords('TripItems', function (t) { return t.food_id === id; })
     .map(function (t) { return t.trip_id; }));
-  if (recipes.length || trips.length) {
+  var usuals = usualsUsing(id);
+  if (recipes.length || trips.length || usuals.length) {
     var uses = [];
     if (recipes.length) {
       uses.push('recipes ' + recipes.map(function (r) { return r.name + ' (' + r.id + ')'; }).join(', '));
     }
     if (trips.length) uses.push('trips ' + trips.join(', '));
+    if (usuals.length) {
+      uses.push('usuals ' + usuals.map(function (u) { return u.name + ' (' + u.id + ')'; }).join(', '));
+    }
     var err = new Error('Food "' + id + '" is in use, so it was not deleted: ' + uses.join('; '));
     err.code = 'in_use';
-    err.extra = { uses: { recipes: recipes, trips: trips } };
+    err.extra = { uses: { recipes: recipes, trips: trips, usuals: usuals } };
     throw err;
   }
   deleteRecord('Foods', { id: id });

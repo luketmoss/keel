@@ -63,6 +63,8 @@ var CHANGE_LOGGED_ACTIONS = {
   deleteLogEntry: ['FoodLog'],
   upsertCook: ['Cooks'],
   deleteCook: ['Cooks'],
+  upsertUsual: ['Usuals', 'UsualLines'],
+  deleteUsual: ['Usuals', 'UsualLines'],
 };
 
 /** The write actions that are never logged, and why. */
@@ -86,6 +88,9 @@ var CHANGE_REFERENCES = {
     { tab: 'RecipeLines', field: 'food_id' },
     { tab: 'TripItems', field: 'food_id' },
     { tab: 'FoodLog', field: 'food_id' },
+    // #877: a usual's Always lines name the food in `food_id`, its pick-ones in `options_json`.
+    { tab: 'UsualLines', field: 'food_id' },
+    { tab: 'UsualLines', field: 'options_json', inList: 'food_id' },
   ],
   Recipes: [
     { tab: 'RecipeLines', field: 'recipe_id' },
@@ -103,6 +108,7 @@ var CHANGE_REFERENCES = {
     { tab: 'Plan', field: 'trip_id' },
     { tab: 'TripItems', field: 'trip_id' },
   ],
+  Usuals: [{ tab: 'UsualLines', field: 'usual_id' }],
 };
 
 /**

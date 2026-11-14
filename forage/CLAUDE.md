@@ -74,7 +74,7 @@ fields gets the missing header names appended, and one that is not is left
 alone and named.
 Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`; the
 plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
-`apps-script/src/plan.js` (#709); a trip's items, what the meals need, the default choices and the stale-line
+`apps-script/src/plan.js` (#709); a usual's starting nutrition only in `nutrition.js` (`usualNutrition`, #877); a trip's items, what the meals need, the default choices and the stale-line
 prune only in `apps-script/src/trips.js` (#718, behind `startTrip`, `setTripItem`, `closeTrip`, `discardTrip`,
 `getTrip`; #719 adds `addToTrip`, `removeTripItem`, `buy`, late meals and the last-buy write on close); and recipe import
 (reading pages, the ingredient line parser, matching lines to foods) only in
@@ -99,6 +99,8 @@ the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
 | **Cooks** | `id` | id, recipe_id, date, rating, note, plan_id, created |
 | **Config** | `key` | key, value, updated |
 | **MCPChangeLog** | — | logged_at, call_id, action, tab, row_key, before, after |
+| **Usuals** | `id` | id, name, slot, created, updated |
+| **UsualLines** | `usual_id` + `line_id` | usual_id, line_id, position, food_id, qty, unit, options_json, last_pick |
 
 What the columns mean:
 
@@ -184,9 +186,19 @@ What the columns mean:
   the seven makes anything partial.
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`), and `ingredient_aliases` (#706): a JSON
+- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`, `5` since #877's Usuals and UsualLines), and `ingredient_aliases` (#706): a JSON
   object from a normalised ingredient name to the `food_id` a saved import
   matched it to. Later issues add keys here, not tabs.
+- **Usuals** (#877). A meal eaten on repeat with a part that may vary, in `apps-script/src/usuals.js`
+  (`getUsuals` with `slot`, `getUsual`, `upsertUsual`, `deleteUsual`; the app's token may call all four, Thrive's none). `id`
+  is `us_` + 8 hex; `slot` is a Plan slot. **UsualLines**: `line_id` is `L1`, `L2`… stable like RecipeLines (a replace keeps
+  the ids sent, new lines are numbered after the highest used). An **Always** line has `food_id`, `qty` and `unit` and a blank
+  `options_json`; a **pick-one** has those three blank and `options_json` set, `[{"food_id","qty","unit"}]` of 2 to 12 distinct
+  foods, each with its own amount, and `last_pick` is the food id of the option picked last (blank is the first). A `unit` is
+  one of the food's serving names exactly, or `g`; `qty` is over 0. Reads add `start` (nutrition as it starts, from
+  `usualNutrition`), `used_count` and `last_used` (0 and null until #878's FoodLog `usual_id`). A usual's foods cannot be
+  deleted (`deleteFood` names the usual). `deleteUsual` leaves FoodLog rows alone; #878 clears their `usual_id` and
+  `usual_line_id` when it adds the columns. Logged for undo (`Usuals`, `UsualLines`).
 - **MCPChangeLog** (#713). One row per sheet row a key-caller write created,
   changed or deleted: `row_key` is its key fields as JSON, `before` and `after`
   the whole row (field to display text), blank for a row that did not exist.
@@ -194,7 +206,7 @@ What the columns mean:
 
 **Referential rules.** A write naming a food, recipe, plan entry or trip that
 does not exist is refused, naming the id. Deleting a food used by a recipe
-line or trip item is refused, listing the uses. Deleting a recipe deletes its
+line, trip item or usual line or option is refused, listing the uses. Deleting a recipe deletes its
 lines, steps, walkthrough and cooks (#708), and is refused while a plan or log entry uses it.
 
 **Callers.** The MCP Worker sends `key` (the `API_KEY` script property, held

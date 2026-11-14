@@ -40,6 +40,7 @@ var TOKEN_ACTIONS = [
   'getTrips', 'getTrip', 'startTrip', 'setTripItem', 'closeTrip', 'discardTrip', 'addToTrip', 'removeTripItem',
   'getFoodLog', 'getFoodLogTotals', 'logFood', 'updateLogEntry', 'deleteLogEntry',
   'getCooks', 'upsertCook', 'deleteCook',
+  'getUsuals', 'getUsual', 'upsertUsual', 'deleteUsual',
 ];
 
 /**

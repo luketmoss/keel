@@ -41,7 +41,20 @@ import {
 import { StarterSheet, starterNotice } from './starter-sheet';
 import { UsualEditor } from './usual-editor';
 import { UsualsList } from './usuals-list';
-import { createUsual, loadUsuals, newUsualRequested, usuals, usualsState } from './usuals-store';
+import {
+  createUsual,
+  freshUsualId,
+  keepUsual,
+  loadUsuals,
+  newUsualRequested,
+  usuals,
+  usualsState,
+} from './usuals-store';
+import { ComboSheet } from './combo-sheet';
+import { CombosSection } from './combos-section';
+import { dropCombo, loadCombos } from './combos-store';
+import { localDate } from '../cook/format';
+import type { Combo } from '../api/types';
 import { showToast } from '../ui/toast';
 
 interface Props {
@@ -170,12 +183,16 @@ export function LibraryScreen({ api, empty, icon }: Props) {
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   /** #887: the usual open in the editor, and whether it opens with the food search up (a new one). */
   const [editing, setEditing] = useState<{ id: string; search: boolean } | null>(null);
+  /** #888: the combo open in its sheet. */
+  const [combo, setCombo] = useState<Combo | null>(null);
   const section = librarySection.value;
 
   useEffect(() => {
+    freshUsualId.value = null;
     void loadRecipes(api);
     void loadFoods(api);
     void loadUsuals(api);
+    void loadCombos(api);
   }, [api]);
 
   // #887: the header's ＋ New usual.
@@ -363,13 +380,25 @@ export function LibraryScreen({ api, empty, icon }: Props) {
               )}
             </>
           ) : section === 'usuals' ? (
-            <UsualsList
-              onOpen={(id) => setEditing({ id, search: false })}
-              onRetry={() => {
-                usualsState.value = 'loading';
-                void loadUsuals(api);
-              }}
-            />
+            <>
+              <UsualsList
+                onOpen={(id) => setEditing({ id, search: false })}
+                onRetry={() => {
+                  usualsState.value = 'loading';
+                  void loadUsuals(api);
+                }}
+              />
+              <CombosSection
+                onOpen={setCombo}
+                onRetry={() => void loadCombos(api)}
+                onShowHidden={() => {
+                  api.unhideCombos().then(
+                    () => void loadCombos(api),
+                    () => showToast("Couldn't show them. Try again."),
+                  );
+                }}
+              />
+            </>
           ) : (
             <FoodsList
               icon={icon}
@@ -388,6 +417,37 @@ export function LibraryScreen({ api, empty, icon }: Props) {
         </>
       )}
 
+      {combo && (
+        <ComboSheet
+          api={api}
+          combo={combo}
+          foods={new Map(libraryFoods.value.map((f) => [f.id, f]))}
+          today={localDate()}
+          onSaved={(usual) => {
+            keepUsual(usual);
+            freshUsualId.value = usual.id;
+            dropCombo(combo.key);
+            setCombo(null);
+            void loadCombos(api);
+            showToast(`Saved ${usual.name} to your usuals`);
+          }}
+          onHidden={(c) => {
+            dropCombo(c.key);
+            setCombo(null);
+            void loadCombos(api);
+            showToast("Hidden. It won't be suggested again.", {
+              label: 'Undo',
+              run: () => {
+                api.unhideCombos([c.key]).then(
+                  () => void loadCombos(api),
+                  () => showToast("Couldn't undo. Try again."),
+                );
+              },
+            });
+          }}
+          onClose={() => setCombo(null)}
+        />
+      )}
       {doomed && (
         <ConfirmSheet
           title={`Delete ${doomed.name}?`}

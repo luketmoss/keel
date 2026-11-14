@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
-import type { Food, FoodLogEntry, RecipeSummary, Slot, Usual } from '../api/types';
+import type { Combo, Food, FoodLogEntry, RecipeSummary, Slot, Usual } from '../api/types';
+import { addSheetMeta, comboKcalText, comboMatches } from '../library/combos-store';
 import { FoodName } from '../library/food-name';
 import { displayName, hasNutrition } from '../library/food-math';
 import { foodsInShort, startKcalText } from '../library/usuals-store';
@@ -16,6 +17,8 @@ const RECENT_DAYS = 60;
 const RECENT_MAX = 10;
 const RESULTS_MAX = 20;
 const FALLBACK_RECIPES = 3;
+/** Combos shown before a search (#888). */
+const COMBOS_MAX = 3;
 
 /** A row of the Add sheet: a food or a recipe. */
 type Row = { key: string; target: LogTarget };
@@ -55,6 +58,10 @@ interface Props {
   loggingUsual?: string | null;
   /** A usual row tapped: the screen logs it with `logUsual`. */
   onLogUsual?: (usual: Usual) => void;
+  /** The combo being logged (#888), whose row is disabled. */
+  loggingCombo?: string | null;
+  /** A combo row tapped: the screen logs its foods as a group with `logGroup`. */
+  onLogCombo?: (combo: Combo) => void;
   /** A food or recipe that can be logged: the amount sheet opens for it. */
   onPick: (target: LogTarget) => void;
   /** One with no nutrition: #707's food form, or the recipe's Nutrition sheet. */
@@ -152,6 +159,59 @@ function UsualRows({
   );
 }
 
+/** The Combos section (#888): the top 3 before a search, every match with one. Renders nothing when none show. */
+function ComboRows({
+  combos,
+  q,
+  foods,
+  today,
+  logging,
+  onLog,
+}: {
+  combos: Combo[];
+  q: string;
+  foods: Food[];
+  today: string;
+  logging: string | null;
+  onLog: (c: Combo) => void;
+}) {
+  const rows = q ? combos.filter((c) => comboMatches(c, q)) : combos.slice(0, COMBOS_MAX);
+  if (!rows.length) return null;
+  const byId = new Map(foods.map((f) => [f.id, f]));
+  return (
+    <>
+      <p class="card-label" id="combos-label">
+        Combos you've logged
+      </p>
+      <ul class="plain-list" aria-labelledby="combos-label" data-testid="combos-list">
+        {rows.map((c) => {
+          const kcal = comboKcalText(c, byId);
+          const meta = addSheetMeta(c, today);
+          return (
+            <li key={c.key}>
+              <button
+                type="button"
+                class="log-row"
+                onClick={() => onLog(c)}
+                disabled={!!logging}
+                aria-busy={logging === c.key}
+                aria-label={`${c.name}, ${meta}${kcal ? `, ${kcal}` : ''}`}
+                data-testid="combo-result"
+              >
+                <span class="recipe-text">
+                  <span class="recipe-name usual-foods">{c.name}</span>
+                  <span class="recipe-meta">{meta}</span>
+                </span>
+                {kcal ? <span class="log-row-kcal tabular">{kcal}</span> : <span class="chip-flag">—</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
 function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => void; onAddNutrition: () => void }) {
   const t = row.target;
   const ok = loggable(t);
@@ -205,6 +265,8 @@ export function AddSheet({
   usuals = [],
   loggingUsual = null,
   onLogUsual,
+  loggingCombo = null,
+  onLogCombo,
   onPick,
   onAddNutrition,
   onAddFood,
@@ -212,6 +274,8 @@ export function AddSheet({
 }: Props) {
   const [q, setQ] = useState(initialQuery);
   const [failed, setFailed] = useState(false);
+  /** #888: the combos for this meal; empty until they load, and when that fails, so the sheet works without them. */
+  const [combos, setCombos] = useState<Combo[]>([]);
   const foods = lists?.foods ?? null;
   const recipes = lists?.recipes ?? [];
   const log = lists?.log ?? [];
@@ -227,6 +291,16 @@ export function AddSheet({
     if (!lists) load();
   }, [api]);
   useEffect(() => onQuery?.(q), [q]);
+  useEffect(() => {
+    let live = true;
+    api.getCombos({ slot }).then(
+      (r) => live && setCombos(r.combos),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, slot]);
 
   const meal = slot.toLowerCase();
   const text = q.trim();
@@ -262,10 +336,21 @@ export function AddSheet({
         onLog={(u) => onLogUsual?.(u)}
       />
     );
+    const comboRows = (
+      <ComboRows
+        combos={combos}
+        q={text}
+        foods={foods}
+        today={today}
+        logging={loggingCombo}
+        onLog={(c) => onLogCombo?.(c)}
+      />
+    );
     body =
-      rows.length || usualsFor(usuals, slot, text).length ? (
+      rows.length || usualsFor(usuals, slot, text).length || combos.some((c) => comboMatches(c, text)) ? (
         <>
           {usualRows}
+          {comboRows}
           {rows.length > 0 && (
             <ul class="plain-list" aria-label="Results">
               {rows.map((r) => (
@@ -298,6 +383,14 @@ export function AddSheet({
           foods={foods}
           logging={loggingUsual}
           onLog={(u) => onLogUsual?.(u)}
+        />
+        <ComboRows
+          combos={combos}
+          q=""
+          foods={foods}
+          today={today}
+          logging={loggingCombo}
+          onLog={(c) => onLogCombo?.(c)}
         />
         {added.length > 0 && (
           <>

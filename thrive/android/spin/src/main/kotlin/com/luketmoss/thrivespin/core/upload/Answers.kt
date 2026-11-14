@@ -26,8 +26,8 @@ sealed interface Answer {
     /** No network, a timeout, a non-2xx, or a body that is not the envelope. Never counts toward `stuck`. */
     data object Offline : Answer
 
-    /** Any other `success: false` (`Lock timeout`): counts toward `stuck`. */
-    data object ServerError : Answer
+    /** Any other `success: false` (`Lock timeout`): counts toward `stuck`. [text] is Thrive's `error`, or null when blank (#917). */
+    data class ServerError(val text: String?) : Answer
 }
 
 /**
@@ -65,7 +65,7 @@ object Answers {
         return when {
             error == ConnectionTest.KEY_REJECTED_MESSAGE || code?.endsWith("_forbidden") == true -> Answer.KeyRefused
             code == BAD_REQUEST -> Answer.Refused(error?.takeIf { it.isNotBlank() } ?: refusal)
-            else -> Answer.ServerError
+            else -> Answer.ServerError(error?.takeIf { it.isNotBlank() })
         }
     }
 }

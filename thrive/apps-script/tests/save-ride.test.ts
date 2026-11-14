@@ -374,8 +374,33 @@ describe('Drive permission', () => {
     api.sandbox.DriveApp.getRootFolder = () => { throw new Error('Authorization is required to perform that action.'); };
     const { res } = saveRide(api, makeRide());
     expect(res.success).toBe(false);
-    expect(res.error).toMatch(/re-authorize/);
+    expect(res.error).toMatch(/write to Drive/);
     expect(api.rows).toEqual([]);
+  });
+
+  // #917: the live failure. Reading Drive was granted, the full scope was not, so the
+  // first folder create threw. The answer names write access and the recovery, never
+  // drive.readonly, quotes nothing of Google's text, and is not a refusal.
+  it('names write access and the full drive scope when createFolder is refused', () => {
+    const { api, drive } = setup();
+    const root = api.sandbox.DriveApp.getRootFolder;
+    api.sandbox.DriveApp.getRootFolder = () => {
+      const folder = root();
+      folder.createFolder = () => {
+        throw new Error('You do not have permission to call DriveApp.Folder.createFolder. Required permissions: https://www.googleapis.com/auth/drive');
+      };
+      return folder;
+    };
+    const { res } = saveRide(api, makeRide());
+    expect(res.success).toBe(false);
+    expect(res.code).toBeUndefined();
+    expect(res.error).toBe(
+      'The script is not allowed to write to Drive: its owner must grant the full drive scope. ' +
+      'If running a function that writes to Drive in the editor shows no permission dialog, first remove ' +
+      'the script\'s access at myaccount.google.com/connections (apps-script/README.md, "Setup").');
+    expect(res.error).not.toMatch(/readonly|googleapis/);
+    expect(api.rows).toEqual([]);
+    expect(Object.keys(drive).filter((k) => k !== 'root')).toEqual([]);
   });
 
   it('SPIN_KEY is what the tests use', () => {

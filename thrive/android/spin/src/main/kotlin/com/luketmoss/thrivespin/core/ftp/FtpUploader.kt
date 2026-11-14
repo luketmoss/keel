@@ -56,7 +56,7 @@ class FtpUploader(
                     retry = true
                     queue.update(record.id) { it.copy(attempts = it.attempts + 1, lastTryUtc = isoSeconds(now()), serverErrors = 0) }
                 }
-                Answer.ServerError -> queue.update(record.id) {
+                is Answer.ServerError -> queue.update(record.id) {
                     val errors = it.serverErrors + 1
                     val stuck = errors >= STUCK_AFTER
                     if (!stuck) retry = true

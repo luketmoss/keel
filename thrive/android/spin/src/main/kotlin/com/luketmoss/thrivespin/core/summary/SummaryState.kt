@@ -175,6 +175,15 @@ object SummaryStates {
         return view(SummaryPhase.Ready, "", stage, ready?.fitBytes, ready?.block, ready?.summary?.sampleCount, upload, sending, nowMs, zone)
     }
 
+    /**
+     * Thrive's own words after a server error (#917), as the card's first extra line and in full: the step 3
+     * note stays one short line. Nothing when the last failure was not the server's, or it sent no text.
+     */
+    private fun serverSaid(upload: UploadState?, failure: Failure?): List<String> {
+        val text = upload?.message
+        return if (failure == Failure.Server && !text.isNullOrBlank()) listOf("Thrive said: $text") else emptyList()
+    }
+
     private fun view(
         phase: SummaryPhase,
         failedTitle: String,
@@ -259,7 +268,7 @@ object SummaryStates {
                     } else {
                         "sends when online"
                     },
-                    extraLines = if (sending) emptyList() else listOf(retryNote),
+                    extraLines = if (sending) emptyList() else serverSaid(upload, failure) + retryNote,
                     buttons = if (sending) CardButtons.None else CardButtons.SendNow,
                     progress = sending,
                     left = done,
@@ -291,7 +300,7 @@ object SummaryStates {
                 cardTitle = "Saved on phone, not yet in Thrive",
                 step3Label = "Thrive keeps answering with an error",
                 step3Mark = Mark.Problem,
-                extraLines = listOf("It stopped trying."),
+                extraLines = serverSaid(upload, Failure.Server) + "It stopped trying.",
                 buttons = CardButtons.TryAgain,
                 left = done,
                 right = noOpen,

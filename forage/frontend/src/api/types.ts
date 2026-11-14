@@ -79,6 +79,8 @@ export interface Food extends FoodExtras {
   source_ref?: string;
   verified?: boolean;
   barcode?: string;
+  /** #880: an optional label of up to 20 characters ("Crunchy PB") for tight places; blank or absent means none. */
+  short_name?: string;
 }
 
 /** `getFood`: the row plus the recipes whose lines use it. */
@@ -395,6 +397,12 @@ export interface FoodLogEntry extends Extras {
   logged_at: string;
   created: string;
   updated: string;
+  /** #878: entries added together share a `gr_` group id and its heading; all four are '' on an ungrouped entry. */
+  group_id?: string;
+  group_name?: string;
+  /** #878: set when the entry came from a usual, and the usual's line it filled. */
+  usual_id?: string;
+  usual_line_id?: string;
 }
 
 /** What `updateLogEntry` changes. Only an amount, unit or food change re-snapshots; a slot change keeps the numbers. */
@@ -402,6 +410,8 @@ export interface LogEntryChange {
   slot?: Slot;
   qty?: number;
   unit?: string;
+  /** #878: a swap. The entry keeps its group and its usual line; the snapshot is worked out again. */
+  food_id?: string;
 }
 
 /**
@@ -437,6 +447,144 @@ export interface FoodLogTotals {
   from: string | null;
   to: string | null;
   days: FoodLogDay[];
+}
+
+// ---- usuals, groups, copy and combos (epic #876). Shapes follow the API issues #877, #878 and #879.
+
+/** One food a pick-one line can log, with its own amount (#877). `unit` is one of the food's servings, or `g`. */
+export interface UsualOption {
+  food_id: string;
+  qty: number;
+  unit: string;
+}
+
+/**
+ * A usual's line (#877). An Always line has `food_id`, `qty` and `unit` and no `options`; a pick-one has `options`
+ * (2 to 12, distinct foods) and blank `food_id`, `qty` and `unit`. `last_pick` is the option logged last time, the
+ * default next time ('' means the first). `swaps` (#878) counts the foods that replaced this line in the log.
+ */
+export interface UsualLine {
+  line_id: string;
+  position: number;
+  food_id: string;
+  qty: number | null;
+  unit: string;
+  options: UsualOption[] | null;
+  last_pick: string;
+  swaps: { food_id: string; count: number }[];
+}
+
+/** The usual as it starts: Always lines plus each pick-one's `last_pick`, computed by the API. `partial` means a food lacks nutrition. */
+export interface UsualStart extends PerServing {
+  partial: boolean;
+}
+
+/** `getUsuals` and `getUsual` (#877): a usual with its lines, use counts and starting nutrition. */
+export interface Usual {
+  id: string;
+  name: string;
+  slot: Slot;
+  created: string;
+  updated: string;
+  lines: UsualLine[];
+  /** Distinct groups logged from it, and the latest date; 0 and null until used. */
+  used_count: number;
+  last_used: string | null;
+  start: UsualStart;
+}
+
+/** A line as `upsertUsual` takes it. A `line_id` sent is kept; a new line is numbered after the highest used. */
+export interface UsualLineInput {
+  line_id?: string;
+  food_id?: string;
+  qty?: number;
+  unit?: string;
+  options?: UsualOption[];
+  last_pick?: string;
+}
+
+/** `upsertUsual`: creates or replaces the usual and all its lines. The app sends its own `us_` id so a retry leaves one. */
+export interface UsualInput {
+  id?: string;
+  name: string;
+  slot: Slot;
+  lines: UsualLineInput[];
+}
+
+/** `logUsual` (#878): `picks` maps a pick-one line to the food chosen; absent means its `last_pick`. */
+export interface LogUsualInput {
+  usual_id: string;
+  date: string;
+  slot: Slot;
+  picks?: Record<string, string>;
+}
+
+/** `logGroup` (#878): 1 to 30 foods under a new group with no usual. */
+export interface LogGroupInput {
+  date: string;
+  slot: Slot;
+  name: string;
+  items: { food_id: string; qty: number; unit: string }[];
+}
+
+/** What `logUsual` and `logGroup` answer: the entries, in line order, and their shared group. */
+export interface LogGroupResult {
+  entries: FoodLogEntry[];
+  group_id: string;
+}
+
+/** `copyMeal` (#878): every entry of one meal, or only one group's, added after the target meal's. */
+export interface CopyMealInput {
+  from_date: string;
+  from_slot: Slot;
+  group_id?: string;
+  to_date: string;
+  to_slot: Slot;
+}
+
+/** `setLogGroup` (#878): `null` ungroups; an object groups under a new id, matching a usual's lines when `usual_id` is given. */
+export type LogGroupChange = null | { name: string; usual_id?: string };
+
+/** A combo line: one food, or a pick-one with its default (#879). */
+export type ComboLine =
+  | { food_id: string; qty: number; unit: string; options?: undefined }
+  | { options: { food_id: string; qty: number; unit: string }[]; default: string; food_id?: undefined };
+
+/** A food set found in the log (#879). Derived on every read, never stored. */
+export interface Combo {
+  /** Sorted fixed food ids joined with `+`, then `|` and the sorted option ids joined with `/`. */
+  key: string;
+  name: string;
+  slot: Slot;
+  meals: number;
+  last_date: string;
+  lines: ComboLine[];
+  meal_dates: { date: string; slot: Slot }[];
+}
+
+/** The count after each detection step, for the Library explainer (#879). */
+export interface ComboStats {
+  meals: number;
+  sets: number;
+  kept: number;
+  after_inner: number;
+  joined: number;
+  covered: number;
+  hidden: number;
+  returned: number;
+}
+
+/** `getCombos` (#879). */
+export interface CombosResult {
+  combos: Combo[];
+  stats: ComboStats;
+}
+
+/** `getCombos` filters: `days` defaults to 60 on the API. */
+export interface ComboQuery {
+  slot?: Slot;
+  days?: number;
+  limit?: number;
 }
 
 /** A RecipeLines row. */

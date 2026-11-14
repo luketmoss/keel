@@ -45,6 +45,8 @@ import {
   DEMO_STARTERS,
 } from './demo-data';
 import { createDemoTrips } from './demo-trips';
+import { createDemoUsuals, type GroupFields } from './demo-usuals';
+import { DEMO_USUAL_FOODS } from './demo-usuals-data';
 
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}_demo${(++seq).toString(16).padStart(4, '0')}`;
@@ -225,7 +227,7 @@ function seedCooks(now: number): Cook[] {
 const cookOrder = (a: Cook, b: Cook) => (b.date + b.created).localeCompare(a.date + a.created);
 
 export function createDemoApi(): ForageApi {
-  const foods: Food[] = DEMO_FOODS.map((f) => JSON.parse(JSON.stringify(f)));
+  const foods: Food[] = [...DEMO_FOODS, ...DEMO_USUAL_FOODS].map((f) => JSON.parse(JSON.stringify(f)));
   const now = Date.now();
   const recipes: RecipeDetail[] = seedRecipes(now);
   const cooks: Cook[] = seedCooks(now);
@@ -269,6 +271,9 @@ export function createDemoApi(): ForageApi {
     if (!p) throw new ApiError(`Plan entry "${id}" not found`, 'not_found');
     return p;
   }
+
+  // #881: usuals, groups, copy and combos.
+  const usuals = createDemoUsuals({ now, today, foods, log, nextId, snapshotOf, writeLog });
 
   const byName = (name: string) => foods.find((f) => f.name.toLowerCase() === name.trim().toLowerCase());
   const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -338,8 +343,17 @@ export function createDemoApi(): ForageApi {
     };
   }
 
+  /** The group fields an entry carries, or none (an ungrouped entry from before #878 has no such keys). */
+  function groupOf(e: FoodLogEntry): Partial<GroupFields> {
+    const out: Partial<GroupFields> = {};
+    for (const k of ['group_id', 'group_name', 'usual_id', 'usual_line_id'] as const) {
+      if (e[k] !== undefined) out[k] = e[k];
+    }
+    return out;
+  }
+
   /** logFood: the same id again replaces that entry; a dry run answers it and stores nothing. */
-  function writeLog(input: LogEntryInput, dryRun: boolean, keep?: FoodLogEntry): FoodLogEntry {
+  function writeLog(input: LogEntryInput, dryRun: boolean, keep?: FoodLogEntry, group?: GroupFields): FoodLogEntry {
     const id = input.id ?? nextId('lg');
     const existing = keep ?? log.find((e) => e.id === id);
     const isRecipe = 'recipe_id' in input;
@@ -375,6 +389,8 @@ export function createDemoApi(): ForageApi {
       logged_at: existing?.logged_at ?? now,
       created: existing?.created ?? now,
       updated: now,
+      // #878: an edit keeps the entry's group; a usual's or a copy's entries are given theirs.
+      ...(group ?? (existing ? groupOf(existing) : {})),
     };
     if (dryRun) return entry;
     const i = log.findIndex((e) => e.id === id);
@@ -501,7 +517,9 @@ export function createDemoApi(): ForageApi {
     getRecipes: async (query = {}) => search(query.q ?? '', query.sort ?? 'newest'),
     getFoods: async (q) => {
       const want = (q ?? '').trim().toLowerCase();
-      return clone(foods.filter((f) => !want || `${f.name} ${f.brand}`.toLowerCase().includes(want)));
+      return clone(
+        foods.filter((f) => !want || `${f.name} ${f.brand} ${f.short_name ?? ''}`.toLowerCase().includes(want)),
+      );
     },
     createFood: (name) => api.saveFood({ name, kind: 'ingredient', source: 'manual' }),
     deleteRecipe: async (id) => {
@@ -627,6 +645,11 @@ export function createDemoApi(): ForageApi {
             updated: now,
           } as Food);
       if (!next.name?.trim()) throw new ApiError('name is required');
+      // #880: a short name is trimmed, at most 20 characters, and blank means none.
+      if (next.short_name !== undefined) {
+        next.short_name = next.short_name.trim();
+        if (next.short_name.length > 20) throw new ApiError('short_name is over the 20 character limit');
+      }
       const clash = foods.find(
         (f) => f.id !== next.id && displayName(f).toLowerCase() === displayName(next).toLowerCase(),
       );
@@ -638,9 +661,10 @@ export function createDemoApi(): ForageApi {
     deleteFood: async (id) => {
       findFood(id);
       const users = recipes.filter((r) => r.lines.some((l) => l.food_id === id));
-      if (users.length) {
+      const inUsuals = usuals.usualsUsing(id);
+      if (users.length || inUsuals.length) {
         throw new ApiError(`Food "${id}" is in use, so it was not deleted`, 'in_use', {
-          uses: { recipes: users.map((r) => ({ id: r.id, name: r.name })), trips: [] },
+          uses: { recipes: users.map((r) => ({ id: r.id, name: r.name })), trips: [], usuals: inUsuals },
         });
       }
       foods.splice(foods.indexOf(findFood(id)), 1);
@@ -820,6 +844,18 @@ export function createDemoApi(): ForageApi {
     deleteLogEntry: async (id) => {
       log.splice(log.indexOf(findLog(id)), 1);
     },
+    getUsuals: usuals.getUsuals,
+    getUsual: usuals.getUsual,
+    upsertUsual: usuals.upsertUsual,
+    deleteUsual: usuals.deleteUsual,
+    logUsual: usuals.logUsual,
+    logGroup: usuals.logGroup,
+    copyMeal: usuals.copyMeal,
+    setLogGroup: usuals.setLogGroup,
+    deleteLogEntries: usuals.deleteLogEntries,
+    getCombos: usuals.getCombos,
+    hideCombo: usuals.hideCombo,
+    unhideCombos: usuals.unhideCombos,
     getPlan: async (from, to, day) => {
       const last = addDays(day, 7);
       const order = (a: PlanRow, b: PlanRow) =>

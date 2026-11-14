@@ -6,6 +6,9 @@ import type {
   AddToTripInput,
   AddToTripResult,
   BarcodeLookup,
+  ComboQuery,
+  CombosResult,
+  CopyMealInput,
   Cook,
   Food,
   FoodDetail,
@@ -14,6 +17,10 @@ import type {
   ImportInput,
   LogEntryChange,
   LogEntryInput,
+  LogGroupChange,
+  LogGroupInput,
+  LogGroupResult,
+  LogUsualInput,
   ImportPreview,
   NewRecipeInput,
   NewRecipeLine,
@@ -35,6 +42,9 @@ import type {
   TripItemChange,
   TripItemResult,
   TripSummary,
+  Usual,
+  UsualInput,
+  Slot,
 } from './types';
 
 /** A failed call. `code` is the API's (`blocked`, `duplicate`, `in_use`…), or `network` / `unconfigured`. */
@@ -92,6 +102,28 @@ export interface ForageApi {
   logEntry(entry: LogEntryInput, dryRun?: boolean): Promise<FoodLogEntry>;
   updateLogEntry(id: string, changes: LogEntryChange, dryRun?: boolean): Promise<FoodLogEntry>;
   deleteLogEntry(id: string): Promise<void>;
+  // #881: usuals, groups, copy and combos (epic #876). `dryRun` answers what would be written, writing nothing.
+  /** #877: every usual, most recently used first; `slot` narrows to the meal it is usually for. */
+  getUsuals(slot?: Slot): Promise<Usual[]>;
+  getUsual(id: string): Promise<Usual>;
+  /** Creates or replaces the usual and all its lines. */
+  upsertUsual(usual: UsualInput): Promise<Usual>;
+  /** Its logged entries stay, ungrouped from the usual but still in their group. */
+  deleteUsual(id: string): Promise<void>;
+  /** #878: one entry per line under a new group. */
+  logUsual(input: LogUsualInput, dryRun?: boolean): Promise<LogGroupResult>;
+  logGroup(input: LogGroupInput, dryRun?: boolean): Promise<LogGroupResult>;
+  /** The new entries, after the target meal's own. */
+  copyMeal(input: CopyMealInput): Promise<FoodLogEntry[]>;
+  /** `null` ungroups; the entries must share one date and slot. */
+  setLogGroup(ids: string[], group: LogGroupChange): Promise<FoodLogEntry[]>;
+  /** deleteLogEntry with `ids` (1 to 50): all or none. */
+  deleteLogEntries(ids: string[]): Promise<void>;
+  /** #879: food sets eaten together, found in the log; `slot` lists that meal's first. */
+  getCombos(query?: ComboQuery): Promise<CombosResult>;
+  hideCombo(key: string): Promise<void>;
+  /** The given keys, or every hidden combo when none are given. */
+  unhideCombos(keys?: string[]): Promise<void>;
   // #709: the meal plan. `today` is the device's, so the banner counts from the day the app shows.
   getPlan(from: string, to: string, today: string): Promise<PlanResult>;
   /** upsertPlanEntry with the app's own id. */
@@ -216,6 +248,32 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
       call<FoodLogEntry>('updateLogEntry', dryRun ? { id, changes, dry_run: true } : { id, changes }),
     deleteLogEntry: async (id) => {
       await call('deleteLogEntry', { id });
+    },
+    getUsuals: (slot) => call<Usual[]>('getUsuals', undefined, undefined, slot ? { slot } : {}),
+    getUsual: (id) => call<Usual>('getUsual', undefined, undefined, { id }),
+    upsertUsual: (usual) => call<Usual>('upsertUsual', usual),
+    deleteUsual: async (id) => {
+      await call('deleteUsual', { id });
+    },
+    logUsual: (input, dryRun = false) => call<LogGroupResult>('logUsual', dryRun ? { ...input, dry_run: true } : input),
+    logGroup: (input, dryRun = false) => call<LogGroupResult>('logGroup', dryRun ? { ...input, dry_run: true } : input),
+    copyMeal: (input) => call<FoodLogEntry[]>('copyMeal', input),
+    setLogGroup: (ids, group) => call<FoodLogEntry[]>('setLogGroup', { ids, group }),
+    deleteLogEntries: async (ids) => {
+      await call('deleteLogEntry', { ids });
+    },
+    getCombos: (query = {}) => {
+      const params: Record<string, string> = {};
+      if (query.slot) params.slot = query.slot;
+      if (query.days !== undefined) params.days = String(query.days);
+      if (query.limit !== undefined) params.limit = String(query.limit);
+      return call<CombosResult>('getCombos', undefined, undefined, params);
+    },
+    hideCombo: async (key) => {
+      await call('hideCombo', { key });
+    },
+    unhideCombos: async (keys) => {
+      await call('unhideCombos', keys ? { keys } : {});
     },
     getPlan: (from, to, today) => call<PlanResult>('getPlan', undefined, undefined, { from, to, today }),
     planMeal: (entry) => call<PlanEntry>('upsertPlanEntry', entry),

@@ -93,6 +93,7 @@ function doPost(e) {
  * against TOKEN_ACTIONS before anything runs.
  */
 function handleRequest(e) {
+  resetTabMemo();
   var params = (e && e.parameter) || {};
   var action = params.action;
   var result;

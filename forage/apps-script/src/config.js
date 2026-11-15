@@ -35,6 +35,7 @@ function setConfig(payload) {
 function ensureSchema() {
   return withScriptLock(function () {
     var ss = getSpreadsheet();
+    invalidateAllTabs();
     var created = [];
     var existing = [];
     var extended = [];

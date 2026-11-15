@@ -217,8 +217,26 @@ export function loadApi(options: ApiOptions = {}) {
         get: (k: string) => cache.get(k)?.value ?? null,
         put(k: string, value: string, ttl: number) {
           if (k.length > 250) throw new Error('Cache key over 250 characters');
+          if (value.length > 100 * 1024) throw new Error('Argument too large: value');
           cache.set(k, { value, ttl });
         },
+        getAll(keys: string[]) {
+          const out: Record<string, string> = {};
+          for (const k of keys) {
+            const hit = cache.get(k);
+            if (hit) out[k] = hit.value;
+          }
+          return out;
+        },
+        putAll(entries: Record<string, string>, ttl: number) {
+          for (const [k, v] of Object.entries(entries)) {
+            if (k.length > 250) throw new Error('Cache key over 250 characters');
+            if (v.length > 100 * 1024) throw new Error('Argument too large: value');
+            cache.set(k, { value: v, ttl });
+          }
+        },
+        remove: (k: string) => void cache.delete(k),
+        removeAll: (keys: string[]) => void keys.forEach((k) => cache.delete(k)),
       }),
     },
     Utilities: {

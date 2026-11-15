@@ -2,21 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact';
 import type { ForageApi } from '../api/client';
-import type { Combo } from '../api/types';
 import { createDemoApi } from '../demo/demo-api';
 import { EatenScreen } from '../eaten/eaten-screen';
 import { _resetEaten } from '../eaten/eaten-store';
 import { _resetLookback } from '../eaten/copy-meal';
 import { Toast, toastAction, toastText } from '../ui/toast';
-import {
-  _resetCombos,
-  comboKcalText,
-  groupItems,
-  joinLine,
-  lastText,
-  libraryMeta,
-  usualFromCombo,
-} from './combos-store';
+import { _resetCombos, comboKcalText, joinLine, lastText, libraryMeta, usualFromCombo } from './combos-store';
 import { _resetFoods, librarySection } from './foods-store';
 import { LibraryScreen } from './library-screen';
 import { _resetRecipes } from './recipes-store';
@@ -265,109 +256,116 @@ describe('the Add sheet', () => {
     await settle();
     return screen.getByTestId('add-sheet');
   }
-
-  /** The demo's combos plus more, so a search has more to find than the top 3. */
-  function manyCombos(api: ForageApi) {
-    const real = api.getCombos;
-    api.getCombos = vi.fn(async (...a) => {
-      const r = await real(...a);
-      const base = r.combos[0];
-      const extra: Combo[] = [1, 2, 3].map((i) => ({ ...base, key: `${base.key}-${i}`, name: `Extra apple mix ${i}` }));
-      return { ...r, combos: [...r.combos, ...extra] };
-    });
+  /** Open the collapsed Often eaten together row. */
+  async function expand(sheet: HTMLElement) {
+    fireEvent.click(within(sheet).getByTestId('together-toggle'));
+    await settle();
   }
 
-  it('shows Combos you’ve logged under Usuals: the top 3, the meal’s own first, with meals, when and kcal', async () => {
+  it('shows Often eaten together as one collapsed row after Recent, closed every time the sheet opens (#933)', async () => {
     const api = createDemoApi();
-    manyCombos(api);
     await mountEaten(api);
     const sheet = await openAdd('Lunch');
-    expect(within(sheet).getByText("Combos you've logged")).toBeTruthy();
+    const toggle = within(sheet).getByTestId('together-toggle');
+    expect(toggle.textContent).toContain('Often eaten together (');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(within(sheet).queryAllByTestId('combo-result')).toHaveLength(0);
+    // Under Usuals and Recent, above Not here? Add a food.
+    const usuals = within(sheet).queryByText('Usuals for lunch');
+    const recent = within(sheet).queryByText('Recent');
+    for (const before of [usuals, recent]) {
+      if (before) expect(before.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(
+      toggle.compareDocumentPosition(within(sheet).getByTestId('not-here')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await expand(sheet);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     const rows = within(sheet).getAllByTestId('combo-result');
-    expect(rows).toHaveLength(3);
     expect(rows[0].querySelector('.recipe-name')!.textContent).toMatch(/^Sourdough bread/);
-    expect(rows[0].querySelector('.recipe-meta')!.textContent).toBe('In 7 meals · last 4 days ago');
-    expect(rows[0].textContent).toMatch(/kcal$/);
-    const usuals = within(sheet).getByText('Usuals');
-    const combos = within(sheet).getByText("Combos you've logged");
-    expect(usuals.compareDocumentPosition(combos) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rows[0].querySelector('.recipe-meta')!.textContent).toMatch(/^7 times · last /);
+    expect(rows[0].textContent).toMatch(/kcal\+$/);
   });
 
-  it('with a search, shows every combo whose name matches', async () => {
+  it('does not search combos, and has no row with none (#933)', async () => {
     const api = createDemoApi();
-    manyCombos(api);
     await mountEaten(api);
-    const sheet = await openAdd('Snacks');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'apple' } });
+    const sheet = await openAdd('Lunch');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'sourdough' } });
     await settle();
-    expect(within(sheet).getAllByTestId('combo-result')).toHaveLength(4);
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'zzzz' } });
-    await settle();
-    expect(within(sheet).queryByText("Combos you've logged")).toBeNull();
+    expect(within(sheet).queryByTestId('together-toggle')).toBeNull();
+    expect(within(sheet).queryAllByTestId('combo-result')).toHaveLength(0);
   });
 
-  it('tapping a combo logs its foods as a group with no usual, and the toast offers Undo', async () => {
+  it('tapping a combo puts its foods in the tray as a group named for it; saving sends one logMeal with no usual', async () => {
     const api = createDemoApi();
+    const logMeal = vi.spyOn(api, 'logMeal');
     const logGroup = vi.spyOn(api, 'logGroup');
     await mountEaten(api);
     const sheet = await openAdd('Breakfast');
+    await expand(sheet);
     const row = within(sheet)
       .getAllByTestId('combo-result')
       .find((r) => r.textContent!.startsWith('Plain yogurt'))!;
     fireEvent.click(row);
     await settle();
-    expect(logGroup).toHaveBeenCalledTimes(1);
-    expect(logGroup.mock.calls[0][0]).toMatchObject({
+    expect(logMeal).not.toHaveBeenCalled();
+    expect(within(sheet).getByTestId('tray-group-name').textContent).toBe('Plain yogurt + Granola');
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
+    await settle();
+    expect(logMeal).toHaveBeenCalledTimes(1);
+    expect(logGroup).not.toHaveBeenCalled();
+    expect(logMeal.mock.calls[0][0]).toMatchObject({
       slot: 'Breakfast',
-      name: 'Plain yogurt + Granola',
       items: [
-        { food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup' },
-        { food_id: 'fd_demo_granola', qty: 0.5, unit: 'cup' },
+        { food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup', group: { name: 'Plain yogurt + Granola' } },
+        { food_id: 'fd_demo_granola', qty: 0.5, unit: 'cup', group: { name: 'Plain yogurt + Granola' } },
       ],
     });
+    expect(logMeal.mock.calls[0][0].items[0].group).not.toHaveProperty('usual_id');
     expect(screen.queryByTestId('add-sheet')).toBeNull();
     const group = within(card('Breakfast')).getByTestId('group');
     expect(group.textContent).toContain('Plain yogurt + Granola');
     expect(within(group).queryByText('Usual')).toBeNull();
-    expect(screen.getByTestId('toast').textContent).toContain('Added Plain yogurt + Granola');
+    expect(screen.getByTestId('toast').textContent).toContain('Added 2 to breakfast');
     fireEvent.click(screen.getByTestId('toast-action'));
     await settle();
     expect(within(card('Breakfast')).queryByTestId('group')).toBeNull();
+    expect(screen.getByTestId('toast').textContent).toBe('Removed 2 from breakfast');
   });
 
-  it('a pick-one logs its default', async () => {
+  it('a pick-one goes in at its default, with its options to change in the tray', async () => {
     const api = createDemoApi();
-    const logGroup = vi.spyOn(api, 'logGroup');
+    const logMeal = vi.spyOn(api, 'logMeal');
     await mountEaten(api);
     const sheet = await openAdd('Lunch');
+    await expand(sheet);
     fireEvent.click(within(sheet).getAllByTestId('combo-result')[0]);
     await settle();
-    const items = logGroup.mock.calls[0][0].items;
-    expect(items.map((i) => i.food_id)).toEqual(['fd_demo_bread', 'fd_demo_turkey', 'fd_demo_cheddar']);
+    const rows = within(sheet).getAllByTestId('tray-row');
+    expect(rows).toHaveLength(3);
+    fireEvent.click(rows[2]);
+    await settle();
+    expect(within(sheet).getAllByTestId('pick-option').length).toBeGreaterThan(1);
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
+    await settle();
+    expect(logMeal.mock.calls[0][0].items.map((i) => i.food_id)).toEqual([
+      'fd_demo_bread',
+      'fd_demo_turkey',
+      'fd_demo_cheddar',
+    ]);
   });
 
-  it('still works when combos fail: no section, and the foods are there', async () => {
+  it('still works when combos fail: no row, and the foods are there', async () => {
     const api = createDemoApi();
     api.getCombos = vi.fn(async () => {
       throw new Error('down');
     });
     await mountEaten(api);
     const sheet = await openAdd('Breakfast');
-    expect(within(sheet).queryByText("Combos you've logged")).toBeNull();
+    expect(within(sheet).queryByTestId('together-toggle')).toBeNull();
     expect(within(sheet).getAllByTestId('usual-result').length).toBeGreaterThan(0);
     expect(within(sheet).getByTestId('add-search')).toBeTruthy();
-  });
-
-  it('says it could not add when logging fails, and keeps the sheet', async () => {
-    const api = createDemoApi();
-    api.logGroup = vi.fn(async () => {
-      throw new Error('down');
-    });
-    await mountEaten(api);
-    const sheet = await openAdd('Breakfast');
-    fireEvent.click(within(sheet).getAllByTestId('combo-result')[0]);
-    await settle();
-    expect(screen.getByTestId('add-status').textContent).toBe("Couldn't add Plain yogurt + Granola. Try again.");
   });
 });
 
@@ -382,7 +380,6 @@ describe('the words and what a combo turns into', () => {
     const { combos } = await createDemoApi().getCombos();
     const c = combos.find((x) => x.name.startsWith('Sourdough'))!;
     expect(usualFromCombo(c, ' Sandwich ')).toMatchObject({ name: 'Sandwich', slot: 'Lunch' });
-    expect(groupItems(c)).toHaveLength(3);
     expect(libraryMeta(c, '2026-11-14')).toMatch(/^7 lunches · last /);
   });
 

@@ -66,9 +66,6 @@ export function lastText(date: string, today: string): string {
   return `${days} days ago`;
 }
 
-/** The Add sheet's sub-line: `In 7 meals · last yesterday`. */
-export const addSheetMeta = (c: Combo, today: string) => `In ${c.meals} meals · last ${lastText(c.last_date, today)}`;
-
 /** Library's sub-line: `9 breakfasts · last 4 days ago`. */
 export const libraryMeta = (c: Combo, today: string) =>
   `${c.meals} ${MEAL_PLURAL[c.slot]} · last ${lastText(c.last_date, today)}`;
@@ -122,13 +119,7 @@ export function comboKcalText(c: Combo, foods: Map<string, Food>): string | null
   return k ? `${k.partial ? 'about ' : ''}${Math.round(k.kcal)} kcal` : null;
 }
 
-/** Does the Add sheet's search text match the combo's name? Case-insensitive, anywhere in it. */
-export const comboMatches = (c: Combo, q: string) => c.name.toLowerCase().includes(q.trim().toLowerCase());
-
 // ---- what a combo turns into
-
-/** The foods `logGroup` takes: each pick-one at its default. */
-export const groupItems = (c: Combo) => c.lines.map(chosen);
 
 /** `upsertUsual`'s input: the combo's lines and slot, a pick-one keeping its default as `last_pick`. */
 export function usualFromCombo(c: Combo, name: string): UsualInput {

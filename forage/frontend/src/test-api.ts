@@ -325,6 +325,33 @@ export function fakeApi() {
         }
         return { success: true, data: out };
       }
+      case 'logMeal': {
+        // #930: the items in order, each with its own id (one already logged is answered as stored), groups by key.
+        const made: FoodLogEntry[] = [];
+        const group_ids: Record<string, string> = {};
+        for (const [i, item] of (payload.items as any[]).entries()) {
+          const had = item.id ? log.find((e) => e.id === item.id) : undefined;
+          if (had) {
+            made.push(had);
+            continue;
+          }
+          seq++;
+          const out = logEntry({ ...item, date: payload.date, slot: payload.slot });
+          if ('error' in out) return { success: false, error: `items[${i + 1}]: ${out.error}` };
+          if (item.group) {
+            group_ids[item.group.key] ??= `gr_${++seq}`;
+            Object.assign(out, {
+              group_id: group_ids[item.group.key],
+              group_name: item.group.name,
+              usual_id: item.group.usual_id ?? '',
+              usual_line_id: item.group.usual_line_id ?? '',
+            });
+          }
+          made.push(out);
+        }
+        if (!payload.dry_run) for (const e of made) if (!log.includes(e)) log.push(e);
+        return { success: true, data: { entries: made, group_ids } };
+      }
       case 'updateLogEntry': {
         const was = log.find((e) => e.id === payload.id);
         if (!was) return { success: false, error: `Log entry "${payload.id}" not found` };

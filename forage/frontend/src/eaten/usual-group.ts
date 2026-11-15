@@ -121,11 +121,6 @@ export function updatedUsual(entries: FoodLogEntry[], usual: Usual): UsualInput 
   return { id: usual.id, name: usual.name, slot: usual.slot, lines };
 }
 
-/** `Added Oatmeal · 4 items. Change anything below.` */
-export function addedToast(name: string, n: number): string {
-  return `Added ${name} · ${n === 1 ? '1 item' : `${n} items`}. Change anything below.`;
-}
-
 /** An option's kcal at its own amount, worked out from the food for the list; null when the food has no nutrition. */
 export function optionKcal(food: Food | undefined, o: UsualOption): number | null {
   if (!food || typeof food.kcal_100g !== 'number') return null;

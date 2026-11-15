@@ -375,7 +375,7 @@ describe('forage_import_recipe', () => {
 
 describe('the write limit', () => {
   it('refuses the 41st write in an hour with the Forage wording; dry runs are not counted and reads still work', async () => {
-    const e = envWith({ WRITE_BUDGET: fakeBudget({ now: T0 }).namespace })
+    const e = envWith({ WRITE_BUDGET: fakeBudget({ now: T0 }).namespace, MAX_WRITES_PER_HOUR: '40' })
     importApi()
     for (let i = 0; i < 5; i++) await call('forage_import_recipe', { text: 'Soup' }, e)
     for (let i = 0; i < 40; i++) {

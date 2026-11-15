@@ -227,18 +227,18 @@ describe('the hourly budget (#410)', () => {
 
   const write = (env: Env, i: number) => thrive(env, 'thrive_create_exercise', { name: `Move ${i}` })
 
-  it('refuses the 41st write call in an hour with the limit, the time and the reads note', async () => {
+  it('refuses the 121st write call in an hour with the limit, the time and the reads note', async () => {
     const { env } = envWith()
     const requests = ok()
-    for (let i = 1; i <= 40; i++) {
+    for (let i = 1; i <= 120; i++) {
       const r = await write(env, i)
       expect(r.isError, `call ${i}: ${r.content[0].text}`).toBeUndefined()
     }
     const before = writesOf(requests).length
-    const refused = await write(env, 41)
+    const refused = await write(env, 121)
     expect(refused.isError).toBe(true)
     expect(refused.content[0].text).toBe(
-      'Write limit reached for Thrive: 40 writes in the last hour. Writing resumes at 13:00 (America/Denver). Reads still work.',
+      'Write limit reached for Thrive: 120 writes in the last hour. Writing resumes at 13:00 (America/Denver). Reads still work.',
     )
     expect(writesOf(requests)).toHaveLength(before)
   })
@@ -334,9 +334,9 @@ describe('the hourly budget (#410)', () => {
   it('falls back to the defaults for a malformed var, never to unlimited', async () => {
     const { env } = envWith({ MAX_WRITES_PER_HOUR: 'lots' })
     const requests = ok()
-    for (let i = 1; i <= 40; i++) await write(env, i)
-    expect((await write(env, 41)).isError).toBe(true)
-    expect(requests.filter((r) => r.action === 'createExercise')).toHaveLength(40)
+    for (let i = 1; i <= 120; i++) await write(env, i)
+    expect((await write(env, 121)).isError).toBe(true)
+    expect(requests.filter((r) => r.action === 'createExercise')).toHaveLength(120)
   })
 
   it('refuses to serve a write endpoint that has no budget, and still serves the read endpoints', async () => {

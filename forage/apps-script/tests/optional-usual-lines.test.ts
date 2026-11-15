@@ -1,7 +1,7 @@
 // #942: optional usual lines. A line is every time (''), usually in ('in') or sometimes ('out').
 
 import { describe, expect, it } from 'vitest';
-import { loadApi, type Api } from './apps-script-sandbox';
+import { loadApi, makeSheet, type Api } from './apps-script-sandbox';
 
 function seed(api: Api) {
   const food = (id: string, name: string, kcal: number, servings: { name: string; g: number }[]) =>
@@ -118,5 +118,35 @@ describe('start nutrition and undo', () => {
       payload: { id: usual.id, name: 'Salad', slot: 'Lunch', lines: usual.lines.map((l: any) => ({ ...l, optional: '' })) },
     });
     expect(all.start.kcal).toBe(450 + 84);
+  });
+});
+
+describe('ensureSchema', () => {
+  it('on a Sheet at version 6 appends the optional header to UsualLines, keeps its rows, and sets version 7', () => {
+    const { api, usual } = loaded();
+    const old = api.ss.getSheetByName('UsualLines')!.rows.map((r) => r.slice(0, 8));
+    api.ss.sheets.set('UsualLines', makeSheet('UsualLines', old));
+    api.ok('setConfig', { payload: { key: 'schema_version', value: '6' } });
+    const data = api.ok('ensureSchema');
+    expect(data.extended).toEqual([{ tab: 'UsualLines', added: ['optional'] }]);
+    expect(data.schema_version).toBe('7');
+    expect(api.ss.getSheetByName('UsualLines')!.rows[0][8]).toBe('optional');
+    // A row from before reads as every time.
+    expect(api.ok('getUsual', { id: usual.id }).lines.map((l: any) => l.optional)).toEqual(['', '', '']);
+  });
+});
+
+describe('undo', () => {
+  it('a change to a line optional is logged and undoCall reverts it', () => {
+    const { api, usual } = loaded();
+    const lines = usual.lines.map((l: any) =>
+      l.options
+        ? { line_id: l.line_id, options: l.options, optional: 'out' }
+        : { line_id: l.line_id, food_id: l.food_id, qty: l.qty, unit: l.unit, optional: 'out' },
+    );
+    api.ok('upsertUsual', { payload: { id: usual.id, name: 'Salad', slot: 'Lunch', lines, call_id: 'save-1' } });
+    expect(api.ok('getUsual', { id: usual.id }).lines.map((l: any) => l.optional)).toEqual(['out', 'out', 'out']);
+    api.ok('undoCall', { payload: { call_id: 'save-1', confirm: true } });
+    expect(api.ok('getUsual', { id: usual.id }).lines.map((l: any) => l.optional)).toEqual(['', 'out', 'in']);
   });
 });

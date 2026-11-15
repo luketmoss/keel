@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact';
 import type { Food, FoodLogEntry, Usual } from '../api/types';
+import { readGlobalCss, rule } from '../test-css';
 import { createDemoApi } from '../demo/demo-api';
 import { draftFrom, foodsInShort, toInput } from '../library/usuals-store';
 import { liveItems, mealInput, removeItem, toggleChip, trayTotals, usualItems, type TrayItem } from './tray';
@@ -296,5 +297,14 @@ describe('the demo API', () => {
         lines: [{ food_id: 'fd_demo_feta', qty: 1, unit: 'oz', optional: 'x' as 'in' }],
       }),
     ).rejects.toThrow(/optional/);
+  });
+});
+
+describe('the stylesheet', () => {
+  it('keeps the chips and the How often pills at the 44px touch floor', () => {
+    const css = readGlobalCss();
+    expect(rule(css, '.tray-chip')).toContain('min-height: var(--touch-target)');
+    expect(rule(css, '.chip')).toContain('min-height: var(--touch-target)');
+    expect(rule(css, ".chip[aria-checked='true']")).toContain('border-color: var(--color-primary)');
   });
 });

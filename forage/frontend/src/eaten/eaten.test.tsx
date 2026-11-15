@@ -1507,6 +1507,8 @@ describe('the Add sheet tray (#933)', () => {
     await settle();
     expect(api.calls('deleteLogEntry').at(-1)!.payload).toEqual({ ids });
     expect(entriesIn('Dinner')).toHaveLength(0);
+    // Nothing is left of the pending meal to show again.
+    expect(within(card('Dinner')).queryAllByTestId('pending-row')).toHaveLength(0);
     expect(screen.getByTestId('toast').textContent).toBe('Removed 2 from dinner');
   });
 

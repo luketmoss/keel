@@ -210,8 +210,8 @@ A range or average change does not refetch what it already has: the app fetches 
 
 ## Data
 
-`getFoodLogTotals(from, to)` over the range, one call. `from` is omitted for **All** (the API treats a missing `from` as
-the start of the log). Days absent from `days` are gaps; the app adds nothing up except the average, the weekday means and the
+`getFoodLogTotals(from, to)` over the range, one call. For **All** the app passes a `from` before anything can be logged
+(the client's `from` is a string; the API treats a missing one as the start of the log, but the client has no open-ended form). Days absent from `days` are gaps; the app adds nothing up except the average, the weekday means and the
 weekly means, which are means over counted days. `entries`, `unknown_entries`, `kcal`, `partial` are the fields used.
 
 **No API change.** A range has no cap in `getFoodLogTotals` (the 31-day cap is the MCP tool's). A year of days is at most 365

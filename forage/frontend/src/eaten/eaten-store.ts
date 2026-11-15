@@ -3,7 +3,7 @@
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
-import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, LogMealInput, PlanEntry, Slot, Usual } from '../api/types';
+import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, LogMealInput, PlanEntry, Slot } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 import { showToast } from '../ui/toast';
@@ -17,7 +17,6 @@ import {
   heldRecipes,
   holdEntry,
   holdFood,
-  holdUsuals,
   landHeld,
   _resetAdd,
 } from './add-store';
@@ -47,32 +46,27 @@ export const dayTotals = signal<FoodLogDay | null>(null);
 export const dayMeals = signal<FoodLogMeal[]>([]);
 /** The day's planned recipe meals, in plan order, before the log hides any. */
 export const dayPlan = signal<PlanEntry[]>([]);
-/** The usuals (#885), for the Add sheet and for a group's pick-ones and changes; empty until they load or if that fails. */
-export const dayUsuals = signal<Usual[]>([]);
-
-/** Read the usuals. A failure leaves what is held, and the Add sheet simply has no Usuals section (#885). */
+/**
+ * Read the usuals into the Add sheet's held lists, the tab's one copy (#945), with any usual saved since put back over
+ * the answer. A failure leaves what is held, and the Add sheet simply has no Usuals section (#885).
+ */
 export async function loadDayUsuals(api: ForageApi): Promise<void> {
+  const load = beginHeld();
   try {
-    dayUsuals.value = await api.getUsuals();
-    holdUsuals(dayUsuals.value);
+    landHeld(load, { usuals: await api.getUsuals() });
   } catch {
     // Nothing to say: the foods work without them.
+  } finally {
+    endHeld(load);
   }
-}
-
-/** Put a saved usual into the held list, replacing the old copy. */
-export function keepDayUsual(usual: Usual): void {
-  dayUsuals.value = [...dayUsuals.value.filter((u) => u.id !== usual.id), usual];
-  holdUsuals(dayUsuals.value);
 }
 
 /**
  * Bind the Add sheet's held lists to the signed-in account (#931), `null` for the demo user. What the device kept for
- * the account seeds the usuals, so the sheet's first frame has them; a different account drops the last one's.
+ * the account, its usuals included, is what the sheet's first frame shows; a different account drops the last one's.
  */
 export function bindAccount(email: string | null): void {
-  const { changed, usuals } = bindAddAccount(email);
-  if (changed) dayUsuals.value = usuals ?? [];
+  bindAddAccount(email);
 }
 
 /**
@@ -436,7 +430,6 @@ export function _resetEaten(): void {
   dayTotals.value = null;
   dayMeals.value = [];
   dayPlan.value = [];
-  dayUsuals.value = [];
   pendingMeals.value = [];
   sending.clear();
 }

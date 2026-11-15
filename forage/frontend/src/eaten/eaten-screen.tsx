@@ -30,7 +30,16 @@ import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { eatenHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
-import { addLists, beginAddPass, heldFoods, heldRecipes, holdFood, holdRecipe } from './add-store';
+import {
+  addLists,
+  beginAddPass,
+  heldFoods,
+  heldRecipes,
+  heldUsuals,
+  holdFood,
+  holdRecipe,
+  holdUsual,
+} from './add-store';
 import { AddSheet } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
@@ -58,13 +67,11 @@ import {
   editing,
   dayEntries,
   dayMeals,
-  dayUsuals,
   dayPlan,
   dayState,
   dayTotals,
   eatenDate,
   eatenToday,
-  keepDayUsual,
   loadDay,
   loadDayUsuals,
   loadedDate,
@@ -537,7 +544,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const planned = unloggedPlan(dayPlan.value, entries);
   const foods = heldFoods.value;
   const recipes = heldRecipes.value;
-  const usuals = dayUsuals.value;
+  const usuals = heldUsuals.value;
   const foodMap = new Map(foods.map((f) => [f.id, f]));
   const pending = pendingMeals.value;
   const pendingFor = (slot: Slot): PendingMeal[] =>
@@ -746,7 +753,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     setGroupBusy(true);
     try {
       const saved = await api.upsertUsual(updatedUsual(group.entries, usual));
-      keepDayUsual(saved);
+      holdUsual(saved);
       try {
         const linked = await api.setLogGroup(
           group.entries.map((e) => e.id),
@@ -887,7 +894,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     if (groupBusy || !entry || !offer) return;
     setGroupBusy(true);
     try {
-      keepDayUsual(await api.upsertUsual(pickOneInput(usual, entry)));
+      holdUsual(await api.upsertUsual(pickOneInput(usual, entry)));
       setOverlay(null);
       showToast(pickOneToast(usual.name, offer.from, offer.to));
     } catch {
@@ -899,7 +906,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   /** The usual saved from a meal (#886): the entries are its first group, or only the usual exists when grouping failed. */
   function usualSaved(usual: Usual, grouped: FoodLogEntry[] | null) {
-    keepDayUsual(usual);
+    holdUsual(usual);
     for (const e of grouped ?? []) upsertEntry(e);
     void refreshDay(api);
     void loadDayUsuals(api);

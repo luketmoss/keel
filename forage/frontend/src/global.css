@@ -3601,3 +3601,135 @@ a.text-btn {
     animation: none;
   }
 }
+
+/* === Trends: Macros and Nutrients (#914) === */
+
+.chart-bar-outline {
+  fill: var(--color-surface);
+  stroke: var(--chart-bar);
+  stroke-width: 2;
+}
+
+.legend-atleast {
+  border: 2px solid var(--chart-bar);
+  background: var(--color-surface);
+}
+
+.chart-seg-protein {
+  fill: var(--color-macro-protein);
+}
+
+.chart-seg-carbs {
+  fill: var(--color-macro-carbs);
+}
+
+.chart-seg-fat {
+  fill: var(--color-macro-fat);
+}
+
+.legend .macro-protein,
+.legend .macro-carbs,
+.legend .macro-fat {
+  border-radius: var(--radius-sm);
+}
+
+.macro-rows {
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.macro-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-target);
+}
+
+.macro-row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.macro-row-grams {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.macro-row-share {
+  min-width: 7.5em;
+  text-align: right;
+}
+
+.nut-rows {
+  margin: var(--space-sm) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nut-item {
+  border-top: 1px solid var(--color-border-light);
+}
+
+.nut-item:first-child {
+  border-top: 0;
+}
+
+.nut-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-xs) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nut-name {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nut-title {
+  font-size: var(--text-base);
+}
+
+.nut-note {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.spark {
+  flex: none;
+  width: 72px;
+  height: 24px;
+}
+
+.spark-bar {
+  fill: var(--chart-bar);
+}
+
+.nut-avg {
+  flex: none;
+  min-width: 5.5em;
+  max-width: 9em;
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-align: right;
+}
+
+.nut-panel {
+  padding: 0 0 var(--space-md);
+}
+
+.nut-panel-title {
+  margin: 0 0 var(--space-xs);
+  font-weight: 700;
+}

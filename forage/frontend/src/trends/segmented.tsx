@@ -8,9 +8,19 @@ interface Props<T extends string> {
   onChange: (value: T) => void;
   disabled?: boolean;
   describedBy?: string;
+  /** What each option reads as, when it is not the id. */
+  labels?: Partial<Record<T, string>>;
 }
 
-export function Segmented<T extends string>({ label, options, value, onChange, disabled, describedBy }: Props<T>) {
+export function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  disabled,
+  describedBy,
+  labels,
+}: Props<T>) {
   const root = useRef<HTMLDivElement>(null);
 
   function onKeyDown(e: KeyboardEvent) {
@@ -49,7 +59,7 @@ export function Segmented<T extends string>({ label, options, value, onChange, d
           disabled={disabled}
           onClick={() => onChange(o)}
         >
-          {o}
+          {labels?.[o] ?? o}
         </button>
       ))}
     </div>

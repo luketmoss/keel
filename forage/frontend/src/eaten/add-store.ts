@@ -7,7 +7,8 @@
 // The held foods and recipes are the Eaten tab's only copy of the library (#939): the day's rows are named and their
 // amounts worked out from `heldFoods` / `heldRecipes`, the day load's answer lands here, and a food or recipe created,
 // edited or deleted anywhere is one `holdFood` / `holdRecipe` / `dropHeldFood` call. Each list is held on its own, so a
-// day load can fill the foods before the Add sheet has ever asked for the log.
+// day load can fill the foods before the Add sheet has ever asked for the log. The usuals are held the same way, the
+// tab's only copy of them too (#945): `heldUsuals`, landed by the Eaten tab's read and changed by `holdUsual`.
 import { computed, signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import type { Combo, Food, FoodLogEntry, RecipeSummary, Slot, Usual } from '../api/types';
@@ -30,19 +31,23 @@ interface Held {
   foods: Food[] | null;
   recipes: RecipeSummary[] | null;
   log: FoodLogEntry[] | null;
+  usuals: Usual[] | null;
 }
+
+/** The lists kept under `lists` on the device; the usuals are kept beside them. */
+type KeptLists = Omit<Held, 'usuals'>;
 
 /** Version 1 of what is kept on the device, under `forage_add:<email>`. A list not held yet is null (#939). */
 interface Kept {
   v: 1;
-  lists: Held | null;
+  lists: KeptLists | null;
   combos: Partial<Record<Slot, Combo[]>>;
   usuals: Usual[] | null;
 }
 
 const PREFIX = 'forage_add:';
 
-const EMPTY: Held = { foods: null, recipes: null, log: null };
+const EMPTY: Held = { foods: null, recipes: null, log: null, usuals: null };
 const held = signal<Held>(EMPTY);
 
 /** The held lists, or null until all three are held (a load answered, or the device kept them). */
@@ -54,13 +59,14 @@ export const addLists = computed<AddLists | null>(() => {
 export const heldFoods = computed<Food[]>(() => held.value.foods ?? []);
 /** The library's recipes, for the day's rows and the Add sheet; empty until a load answers. */
 export const heldRecipes = computed<RecipeSummary[]>(() => held.value.recipes ?? []);
+/** The usuals (#885), for the Add sheet and a group's pick-ones and changes; empty until a read answers or the device kept them. */
+export const heldUsuals = computed<Usual[]>(() => held.value.usuals ?? []);
 /** The held combos for each meal; a meal with none held has no entry. */
 export const addCombos = signal<Partial<Record<Slot, Combo[]>>>({});
 /** The first load failed with nothing held: the sheet says so and offers Try again. A failed refresh over held lists never sets it. */
 export const addFailed = signal(false);
 
 let account: string | null = null;
-let usuals: Usual[] | null = null;
 /** This open's refresh has been started: a return to the sheet from the amount sheet or a form does not start another. */
 let refreshed = false;
 /** Counts the entries, foods and recipes patched in by a write, so a refresh that began before one can't undo it. */
@@ -99,8 +105,13 @@ function save(): void {
   queueMicrotask(() => {
     saveQueued = false;
     if (!account) return;
-    const h = held.value;
-    const kept: Kept = { v: 1, lists: h.foods || h.recipes || h.log ? h : null, combos: addCombos.value, usuals };
+    const { usuals, ...lists } = held.value;
+    const kept: Kept = {
+      v: 1,
+      lists: lists.foods || lists.recipes || lists.log ? lists : null,
+      combos: addCombos.value,
+      usuals,
+    };
     try {
       window.localStorage.setItem(keyFor(account), JSON.stringify(kept));
     } catch {
@@ -115,28 +126,25 @@ function forget(): void {
   out.clear();
   addCombos.value = {};
   addFailed.value = false;
-  usuals = null;
   refreshed = false;
   patches = 0;
 }
 
 /**
  * Bind the held lists to the signed-in account: the first call, or a different account, drops what memory holds and
- * reads that account's copy from the device. `email` is null for the demo user and when signed out, which keeps the
- * lists in memory only and never touches a real account's copy. Answers the usuals held for the account.
+ * reads that account's copy from the device, usuals included. `email` is null for the demo user and when signed out,
+ * which keeps the lists in memory only and never touches a real account's copy.
  */
-export function bindAddAccount(email: string | null): { changed: boolean; usuals: Usual[] | null } {
+export function bindAddAccount(email: string | null): void {
   const next = email ? email.toLowerCase() : null;
-  if (next === account) return { changed: false, usuals };
+  if (next === account) return;
   account = next;
   forget();
   const kept = next ? read(next) : null;
   if (kept) {
-    held.value = kept.lists ?? EMPTY;
+    held.value = { ...EMPTY, ...kept.lists, usuals: kept.usuals };
     addCombos.value = kept.combos;
-    usuals = kept.usuals;
   }
-  return { changed: true, usuals };
 }
 
 /** Sign-out: drop what is held and remove every copy from the device. */
@@ -223,12 +231,6 @@ export function refreshAdd(api: ForageApi, slot: Slot, today: string, force = fa
   return Promise.all([lists, combos]).then(() => {});
 }
 
-/** The usuals as the screen has them, kept for the device. */
-export function holdUsuals(list: Usual[]): void {
-  usuals = list;
-  save();
-}
-
 /** Apply a write to what is held, and keep it to put back over any load that is out. A list not held stays so. */
 function patch(change: (h: Held) => Held): void {
   patches++;
@@ -263,6 +265,14 @@ export function holdRecipe(recipe: RecipeSummary): void {
         }
       : h,
   );
+}
+
+/**
+ * A usual saved: the old copy replaced, at the end, as the list has always had it. With no usuals held yet (the read
+ * failed, and the device kept none) it is held as a list of one, so the Add sheet shows it (#945).
+ */
+export function holdUsual(usual: Usual): void {
+  patch((h) => ({ ...h, usuals: [...(h.usuals ?? []).filter((u) => u.id !== usual.id), usual] }));
 }
 
 /** A recipe deleted. */

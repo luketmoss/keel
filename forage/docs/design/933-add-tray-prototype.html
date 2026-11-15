@@ -1,0 +1,569 @@
+<title>Add to Meal Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: phone mock on the left, notes column on the right; stacks on narrow screens. */
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --raised: #f7f8f9;
+  --border: #dadce0;
+  --border-light: #e8eaed;
+  --text: #1f1f1f;
+  --text-2: #5f6368;
+  --muted: #606b76;
+  --primary: #357a38;
+  --primary-hover: #2a632d;
+  --primary-light: #e6f2e6;
+  --on-primary: #ffffff;
+  --protein: #2b6cb0;
+  --carbs: #b87400;
+  --fat: #6b2e68;
+  --warn-bg: #fff4e0;
+  --warn-fg: #7a4b00;
+  --scrim: rgba(0,0,0,.38);
+  --shadow: 0 10px 30px rgba(0,0,0,.12);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --border-light: #2a2a30;
+  --text: #e8eaed; --text-2: #9aa0a6; --muted: #868e98;
+  --primary: #66bb6a; --primary-hover: #81c784; --primary-light: #1e3320; --on-primary: #121212;
+  --protein: #6fa8e8; --carbs: #f0b429; --fat: #a85aa4; --warn-bg: #3a2c10; --warn-fg: #f0c674;
+  --scrim: rgba(0,0,0,.6); --shadow: 0 10px 30px rgba(0,0,0,.5); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121212; --surface: #1a1a1e; --raised: #252528; --border: #3c3c3c; --border-light: #2a2a30;
+  --text: #e8eaed; --text-2: #9aa0a6; --muted: #868e98;
+  --primary: #66bb6a; --primary-hover: #81c784; --primary-light: #1e3320; --on-primary: #121212;
+  --protein: #6fa8e8; --carbs: #f0b429; --fat: #a85aa4; --warn-bg: #3a2c10; --warn-fg: #f0c674;
+  --scrim: rgba(0,0,0,.6); --shadow: 0 10px 30px rgba(0,0,0,.5); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.4;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } }
+
+header.top { max-width: 1100px; margin: 0 auto 18px; }
+header.top h1 { font-size: 22px; margin: 0 0 4px; text-wrap: balance; }
+header.top p { margin: 0; color: var(--text-2); max-width: 70ch; }
+
+.controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; border: 0; background: transparent; padding: 8px 6px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+.toggle input { accent-color: var(--primary); width: 18px; height: 18px; }
+
+/* The phone */
+.phone { position: relative; width: 100%; max-width: 400px; height: 760px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 28px; overflow: hidden; box-shadow: var(--shadow); }
+.day { height: 100%; overflow-y: auto; padding: 16px 14px 80px; display: flex; flex-direction: column; gap: 12px; }
+.day-head { display: flex; justify-content: space-between; align-items: baseline; }
+.day-head h2 { margin: 0; font-size: 18px; }
+.day-total { background: var(--surface); border-radius: 14px; padding: 14px; display: flex; justify-content: space-between; align-items: baseline; }
+.day-total b { font-size: 26px; }
+.meal { background: var(--surface); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.meal-head { display: flex; justify-content: space-between; font-weight: 700; }
+.meal-head span { font-weight: 500; color: var(--text-2); }
+.entry { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border-light); font-size: 14px; transition: opacity .3s; }
+.entry small { color: var(--text-2); display: block; }
+.entry.saving { opacity: .55; }
+.entry .saving-tag { font-size: 11px; color: var(--muted); }
+.add-row { margin-top: 4px; border: 1px dashed var(--border); background: transparent; border-radius: 10px; padding: 9px; color: var(--primary); font-weight: 600; }
+
+/* The sheet */
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 28px; background: var(--surface); border-radius: 20px 20px 0 0;
+  display: flex; flex-direction: column; overflow: hidden; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 8px; gap: 8px; }
+.sheet-head h3 { margin: 0; font-size: 17px; }
+.icon-btn { border: 0; background: var(--raised); width: 36px; height: 36px; border-radius: 50%; font-size: 18px; line-height: 1; }
+.btn { border: 0; border-radius: 10px; padding: 9px 14px; font-weight: 600; background: var(--raised); }
+.btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-primary:disabled { opacity: .45; cursor: default; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 0 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+.search { position: relative; }
+.search input { width: 100%; padding: 11px 36px 11px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--raised); color: var(--text); font: inherit; }
+.search .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--muted); font-size: 18px; width: 30px; height: 30px; }
+.label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); margin: 12px 2px 2px; display: flex; justify-content: space-between; }
+.label span { letter-spacing: 0; text-transform: none; font-weight: 500; }
+.list { list-style: none; margin: 0; padding: 0; }
+.row { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: transparent; padding: 9px 2px; border-bottom: 1px solid var(--border-light); min-height: 48px; }
+.row:disabled { opacity: .5; cursor: progress; }
+.row .txt { flex: 1; min-width: 0; }
+.row .nm { display: block; font-weight: 600; }
+.row .meta { display: block; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .end { font-size: 13px; color: var(--text-2); }
+.plus { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-light); color: var(--primary); font-weight: 700; flex: none; }
+.row.in .plus { background: var(--primary); color: var(--on-primary); }
+.tag { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--raised); color: var(--text-2); margin-left: 6px; vertical-align: 1px; }
+.skel { height: 44px; border-radius: 8px; background: var(--raised); margin: 6px 0; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } .flash { animation: none !important; } }
+.status { min-height: 18px; font-size: 12.5px; color: var(--primary); margin: 4px 2px 0; }
+.note-flag { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 6px 9px; font-size: 12px; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Today's amount sheet */
+.amount { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+.big-num { font-size: 34px; font-weight: 700; }
+.stepper { display: flex; align-items: center; gap: 8px; }
+.stepper button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); font-size: 18px; }
+.stepper output { min-width: 44px; text-align: center; font-weight: 700; font-size: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--border); background: var(--surface); padding: 5px 10px; border-radius: 999px; font-size: 13px; }
+.chip[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+/* The tray */
+.tray { background: var(--primary-light); border-radius: 12px; padding: 4px 10px 6px; margin-top: 8px; }
+.tray .label { margin-top: 8px; color: var(--primary); }
+.titem { border-top: 1px solid color-mix(in srgb, var(--primary) 18%, transparent); }
+.titem:first-of-type { border-top: 0; }
+.titem-row { width: 100%; display: flex; gap: 8px; align-items: center; border: 0; background: transparent; padding: 8px 0; text-align: left; }
+.titem-row .txt { flex: 1; min-width: 0; }
+.titem-row .nm { font-weight: 600; display: block; }
+.titem-row .meta { font-size: 12.5px; color: var(--text-2); }
+.amt-pill { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 13px; white-space: nowrap; }
+.group-name { font-size: 12px; font-weight: 700; color: var(--primary); padding-top: 8px; display: flex; justify-content: space-between; }
+.group-name button { border: 0; background: transparent; color: var(--text-2); font-size: 12px; }
+.editor { padding: 2px 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.macros { display: flex; gap: 12px; font-size: 12.5px; color: var(--text-2); }
+.macros .p { color: var(--protein); } .macros .c { color: var(--carbs); } .macros .f { color: var(--fat); }
+.editor-foot { display: flex; justify-content: space-between; align-items: center; }
+.link { border: 0; background: transparent; color: var(--primary); font-weight: 600; padding: 4px 0; }
+.link.danger { color: var(--text-2); }
+.flash { animation: flash .9s ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, var(--primary) 30%, transparent); } to { background: transparent; } }
+.foot { border-top: 1px solid var(--border); padding: 10px 14px 14px; background: var(--surface); }
+.foot .btn { width: 100%; padding: 13px; font-size: 15px; }
+.collapse { width: 100%; border: 0; background: transparent; display: flex; justify-content: space-between; padding: 10px 2px; color: var(--text-2); font-size: 13px; border-top: 1px solid var(--border-light); margin-top: 8px; }
+.toast { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--surface); padding: 9px 14px; border-radius: 10px; font-size: 13.5px; white-space: nowrap; }
+
+/* Notes */
+.notes { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.card { background: var(--surface); border-radius: 14px; padding: 16px 18px; }
+.card h2 { font-size: 15px; margin: 0 0 8px; }
+.card p, .card li { color: var(--text); max-width: 70ch; }
+.card ul, .card ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.card .sub { color: var(--text-2); font-size: 13.5px; margin: 0 0 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.tbl { overflow-x: auto; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+th { color: var(--text-2); font-weight: 600; font-size: 12px; }
+td.n { white-space: nowrap; font-variant-numeric: tabular-nums; }
+code { font-size: 12.5px; background: var(--raised); padding: 1px 5px; border-radius: 4px; }
+</style>
+
+<header class="top">
+  <h1>Adding to a meal</h1>
+  <p>A clickable mock of the Add sheet. Switch between how it works today and two proposals. All foods and numbers are made-up examples.</p>
+</header>
+
+<div class="wrap">
+  <div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Version">
+        <button type="button" data-variant="today">Today</button>
+        <button type="button" data-variant="tray" aria-pressed="true">Proposed · Tray</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="real-delays" checked> Play real delays (today: ~5 s nutrition, ~2.5 s per add)</label>
+    </div>
+    <div class="phone" id="phone"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(() => {
+/* ---------- Example data ---------- */
+const FOODS = {
+  yog:   { name: 'Greek yogurt, nonfat', k: 59, p: 10.3, c: 3.6, f: 0.4, units: [['container', 170], ['cup', 245]], last: [1, 'container'] },
+  blu:   { name: 'Blueberries', k: 57, p: 0.7, c: 14.5, f: 0.3, units: [['cup', 148]], last: [0.5, 'cup'] },
+  str:   { name: 'Strawberries', k: 32, p: 0.7, c: 7.7, f: 0.3, units: [['cup', 152]], last: [0.5, 'cup'] },
+  gra:   { name: 'Granola', k: 471, p: 10, c: 64, f: 20, units: [['cup', 120]], last: [0.25, 'cup'] },
+  ban:   { name: 'Banana', k: 89, p: 1.1, c: 22.8, f: 0.3, units: [['medium', 118]], last: [1, 'medium'] },
+  egg:   { name: 'Egg', k: 143, p: 12.6, c: 0.7, f: 9.5, units: [['large', 50]], last: [2, 'large'] },
+  toast: { name: 'Sourdough toast', k: 272, p: 10.8, c: 51.9, f: 2.4, units: [['slice', 50]], last: [1, 'slice'] },
+  but:   { name: 'Butter', k: 717, p: 0.9, c: 0.1, f: 81, units: [['tbsp', 14]], last: [0.5, 'tbsp'] },
+  pb:    { name: 'Peanut butter', k: 588, p: 25, c: 20, f: 50, units: [['tbsp', 16]], last: [1, 'tbsp'] },
+  cof:   { name: 'Coffee with milk', k: 18, p: 1, c: 1.5, f: 0.9, units: [['mug', 350]], last: [1, 'mug'] },
+  oat:   { name: 'Oatmeal, cooked', k: 71, p: 2.5, c: 12, f: 1.5, units: [['cup', 234]], last: [1, 'cup'] },
+  hon:   { name: 'Honey', k: 304, p: 0.3, c: 82, f: 0, units: [['tbsp', 21]], last: [1, 'tbsp'] },
+  oj:    { name: 'Orange juice', k: 45, p: 0.7, c: 10.4, f: 0.2, units: [['cup', 248]], last: [1, 'cup'] },
+  saus:  { name: 'Turkey sausage', k: 196, p: 18, c: 1.5, f: 13, units: [['link', 28]], last: [2, 'link'] },
+  avo:   { name: 'Avocado', k: 160, p: 2, c: 8.5, f: 14.7, units: [['half', 68]], last: [0.5, 'half'] },
+  // A recipe: one unit, "serving", at the servings logged last time.
+  ono:   { name: 'Overnight oats', recipe: true, k: 160, p: 6, c: 24, f: 4.5, units: [['serving', 250]], last: [1.5, 'serving'] },
+};
+const RECENT = ['cof', 'ban', 'ono', 'yog', 'gra', 'blu', 'egg', 'toast', 'pb', 'oj'];
+const USUALS = [
+  { id: 'u1', name: 'Yogurt bowl', lines: [{ f: 'yog' }, { f: 'gra' }, { pick: ['blu', 'str'], def: 'blu' }] },
+  { id: 'u2', name: 'Eggs and toast', lines: [{ f: 'egg' }, { f: 'toast' }, { f: 'but' }] },
+];
+const COMBOS = [
+  { id: 'c1', name: 'Toast · Peanut butter · Banana', foods: ['toast', 'pb', 'ban'], meals: 6, last: 'Thursday' },
+  { id: 'c2', name: 'Oatmeal · Honey · Blueberries', foods: ['oat', 'hon', 'blu'], meals: 4, last: 'Nov 6' },
+  { id: 'c3', name: 'Coffee with milk · Banana', foods: ['cof', 'ban'], meals: 9, last: 'yesterday' },
+];
+
+/* ---------- Math (what the app would do from the food it already has) ---------- */
+const grams = (fid, qty, unit) => unit === 'g' ? qty : qty * (FOODS[fid].units.find(u => u[0] === unit) || [0, 0])[1];
+function nut(fid, qty, unit) {
+  const g = grams(fid, qty, unit), F = FOODS[fid], r = g / 100;
+  return { k: Math.round(F.k * r), p: Math.round(F.p * r), c: Math.round(F.c * r), f: Math.round(F.f * r) };
+}
+const fmtQty = q => { const m = { 0.25: '¼', 0.5: '½', 0.75: '¾', 1.5: '1½', 2.5: '2½' }; return m[q] || String(Math.round(q * 100) / 100); };
+const amtText = (qty, unit) => `${fmtQty(qty)} ${unit}`;
+const stepFor = unit => unit === 'g' ? 10 : (['cup', 'tbsp', 'half'].includes(unit) ? 0.25 : 0.5);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- State ---------- */
+const S = {
+  variant: 'tray',
+  real: true,
+  day: { Breakfast: [], Lunch: [] },
+  sheet: null,      // { slot }
+  toast: null,
+  // today's sheet
+  t: null,
+  // tray sheet
+  tray: [], q: '', open: null, flash: null, tab: 'recent', together: false, nextId: 1,
+};
+const d = (real, fast) => S.real ? real : fast;
+let timers = [];
+const later = (ms, fn) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
+function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+function showToast(msg) { S.toast = msg; render(); later(2200, () => { S.toast = null; render(); }); }
+
+/* ---------- Day screen ---------- */
+function dayHtml() {
+  const all = [...S.day.Breakfast, ...S.day.Lunch];
+  const total = all.reduce((s, e) => s + e.k, 0);
+  const meal = slot => {
+    const es = S.day[slot];
+    const k = es.reduce((s, e) => s + e.k, 0);
+    return `<section class="meal" aria-label="${slot}">
+      <div class="meal-head">${slot}<span class="tabular">${es.length ? k + ' kcal' : ''}</span></div>
+      ${es.map(e => `<div class="entry ${e.saving ? 'saving' : ''}"><div>${esc(e.name)}<small>${esc(e.amt)}</small></div>
+        <div class="tabular">${e.saving ? '<span class="saving-tag">Saving…</span> ' : ''}${e.k}</div></div>`).join('')}
+      <button type="button" class="add-row" data-act="open" data-slot="${slot}">+ Add to ${slot.toLowerCase()}</button>
+    </section>`;
+  };
+  return `<div class="day">
+    <div class="day-head"><h2>Today</h2><span style="color:var(--text-2);font-size:13px">Sun, Nov 15</span></div>
+    <div class="day-total"><span>Eaten</span><span><b class="tabular">${total}</b> kcal</span></div>
+    ${meal('Breakfast')}${meal('Lunch')}
+    <p style="color:var(--text-2);font-size:12.5px;margin:4px 2px">Tap “Add to breakfast” to try the selected version.</p>
+  </div>`;
+}
+
+/* ---------- TODAY's sheet (a reproduction of the current order and waits) ---------- */
+function openToday(slot) {
+  S.t = { screen: 'loading', added: [], combos: false, status: '', q: '', picked: null, busy: null };
+  later(d(1800, 300), () => { S.t.screen = 'list'; render(); fetchCombos(); });
+}
+function fetchCombos() {
+  // The sheet refetches combos every time it mounts, and they arrive after the rest, above the Added list.
+  S.t.combos = false; render();
+  later(d(1400, 250), () => { if (S.t) { S.t.combos = true; render(); } });
+}
+function todaySheet(slot) {
+  const t = S.t, meal = slot.toLowerCase();
+  if (t.screen === 'amount') return todayAmount(slot);
+  let body;
+  if (t.screen === 'loading') body = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+  else {
+    const usualRows = USUALS.map(u => `<li><button type="button" class="row" data-act="t-usual" data-id="${u.id}" ${t.busy ? 'disabled' : ''}>
+      <span class="txt"><span class="nm">${esc(u.name)}</span><span class="meta">${u.lines.map(l => FOODS[l.f || l.def].name).join(', ')}</span></span>
+      <span class="end tabular">${usualKcal(u)} kcal</span></button></li>`).join('');
+    const comboRows = t.combos ? COMBOS.map(c => `<li><button type="button" class="row" data-act="t-combo" data-id="${c.id}" ${t.busy ? 'disabled' : ''}>
+      <span class="txt"><span class="nm">${esc(c.name)}</span><span class="meta">${c.meals} meals · last ${c.last}</span></span>
+      <span class="end tabular">${comboKcal(c)} kcal</span></button></li>`).join('') : '';
+    const added = t.added.length ? `<p class="label">Added to ${meal}</p><ul class="list">${t.added.map(a =>
+      `<li class="entry"><div>${esc(a.name)}<small>${esc(a.amt)}</small></div><div class="tabular">${a.k}</div></li>`).join('')}</ul>` : '';
+    const recent = RECENT.map(fid => `<li><button type="button" class="row" data-act="t-pick" data-id="${fid}">
+      <span class="txt"><span class="nm">${esc(FOODS[fid].name)}</span><span class="meta">${FOODS[fid].k} kcal / 100 g</span></span>
+      <span class="plus">+</span></button></li>`).join('');
+    body = `<p class="label">Usuals</p><ul class="list">${usualRows}</ul>
+      ${t.combos ? `<p class="label">Combos you've logged</p><ul class="list">${comboRows}</ul>` : ''}
+      ${added}
+      <p class="label">Recent</p><ul class="list">${recent}</ul>`;
+  }
+  return `<div class="sheet-head"><h3>Add to ${meal}</h3>
+      ${t.added.length ? '<button type="button" class="btn" data-act="close">Done</button>' : '<button type="button" class="icon-btn" aria-label="Close" data-act="close">×</button>'}</div>
+    <div class="sheet-body">
+      <div class="search"><input type="search" placeholder="Search foods and recipes" aria-label="Search foods and recipes" id="t-search"></div>
+      <p class="status">${t.busy ? '<span class="spinner"></span> Logging…' : esc(t.status)}</p>
+      ${body}
+      <button type="button" class="btn" style="margin-top:10px">Not here? Add a food</button>
+    </div>`;
+}
+function todayAmount(slot) {
+  const t = S.t, p = t.picked, F = FOODS[p.fid];
+  const n = p.ready ? nut(p.fid, p.qty, p.unit) : null;
+  return `<div class="sheet-head"><button type="button" class="icon-btn" aria-label="Back" data-act="t-back">‹</button><h3>${esc(F.name)}</h3><span style="width:36px"></span></div>
+    <div class="sheet-body"><div class="amount">
+      <div>${n ? `<div class="big-num tabular">${n.k} kcal</div><div class="macros"><span class="p">P ${n.p} g</span><span class="c">C ${n.c} g</span><span class="f">F ${n.f} g</span></div>`
+        : `<div class="big-num" style="color:var(--muted)">— kcal</div><div class="macros"><span class="spinner"></span> Asking the server for the numbers…</div>`}</div>
+      <div class="stepper"><button type="button" data-act="t-step" data-by="-1" aria-label="Less">−</button><output class="tabular">${fmtQty(p.qty)}</output><button type="button" data-act="t-step" data-by="1" aria-label="More">+</button></div>
+      <div class="chips">${F.units.map(u => `<button type="button" class="chip" aria-pressed="${u[0] === p.unit}">${u[0]}</button>`).join('')}<button type="button" class="chip" aria-pressed="false">g</button></div>
+      <button type="button" class="btn btn-primary" data-act="t-add" ${!p.ready || p.saving ? 'disabled' : ''}>${p.saving ? '<span class="spinner"></span> Adding…' : `Add to ${slot.toLowerCase()}`}</button>
+      ${p.saving ? '<p class="note-flag">This is writing to the Sheet right now. Each item is saved the moment you tap Add.</p>' : ''}
+    </div></div>`;
+}
+function todayPreview() {
+  const p = S.t.picked; p.ready = false; render();
+  const mine = p.seq = (p.seq || 0) + 1;
+  later(d(4800, 500), () => { if (S.t && S.t.picked === p && p.seq === mine) { p.ready = true; render(); } });
+}
+function usualKcal(u) { return u.lines.reduce((s, l) => { const f = l.f || l.def; return s + nut(f, ...FOODS[f].last).k; }, 0); }
+function comboKcal(c) { return c.foods.reduce((s, f) => s + nut(f, ...FOODS[f].last).k, 0); }
+function todayLogMany(fids, label) {
+  const t = S.t; t.busy = label; render();
+  later(d(3000, 400), () => {
+    fids.forEach(f => { const [q, u] = FOODS[f].last; const e = { name: FOODS[f].name, amt: amtText(q, u), k: nut(f, q, u).k }; t.added.push(e); S.day[S.sheet.slot].push(e); });
+    t.busy = null; t.status = `Logged ${label}`; render();
+  });
+}
+
+/* ---------- PROPOSAL: the tray ---------- */
+function openTray() { S.tray = []; S.q = ''; S.open = null; S.flash = null; S.together = false; S.tab = 'recent'; }
+const inTray = fid => S.tray.filter(i => i.fid === fid && !i.group);
+function addFood(fid, group) {
+  const [qty, unit] = FOODS[fid].last;
+  const item = { id: S.nextId++, fid, qty, unit, group: group || null };
+  S.tray.push(item); S.flash = item.id;
+  return item;
+}
+function addUsual(u) {
+  const g = { name: u.name, gid: 'g' + S.nextId++ };
+  u.lines.forEach(l => { const it = addFood(l.f || l.def, g); if (l.pick) { it.pick = l.pick; } });
+}
+function addCombo(c) { const g = { name: c.name.replace(/ · /g, ', '), gid: 'g' + S.nextId++ }; c.foods.forEach(f => addFood(f, g)); }
+function trayTotal() { return S.tray.reduce((s, i) => s + nut(i.fid, i.qty, i.unit).k, 0); }
+
+function trayItemHtml(i) {
+  const F = FOODS[i.fid], n = nut(i.fid, i.qty, i.unit), open = S.open === i.id;
+  return `<div class="titem ${S.flash === i.id ? 'flash' : ''}">
+    <button type="button" class="titem-row" data-act="tr-open" data-id="${i.id}" aria-expanded="${open}">
+      <span class="txt"><span class="nm">${esc(F.name)}</span><span class="meta tabular">${n.k} kcal</span></span>
+      <span class="amt-pill tabular">${amtText(i.qty, i.unit)} ▾</span>
+    </button>
+    ${open ? `<div class="editor">
+      ${i.pick ? `<div class="chips" aria-label="Pick one">${i.pick.map(f => `<button type="button" class="chip" data-act="tr-pick" data-id="${i.id}" data-f="${f}" aria-pressed="${f === i.fid}">${esc(FOODS[f].name)}</button>`).join('')}</div>` : ''}
+      <div class="stepper"><button type="button" data-act="tr-step" data-id="${i.id}" data-by="-1" aria-label="Less">−</button><output class="tabular">${fmtQty(i.qty)}</output><button type="button" data-act="tr-step" data-id="${i.id}" data-by="1" aria-label="More">+</button>
+        ${F.recipe ? '<span style="margin-left:6px;color:var(--text-2);font-size:13px">servings</span>' : `<div class="chips" style="margin-left:6px">${F.units.map(u => `<button type="button" class="chip" data-act="tr-unit" data-id="${i.id}" data-u="${u[0]}" aria-pressed="${u[0] === i.unit}">${u[0]}</button>`).join('')}<button type="button" class="chip" data-act="tr-unit" data-id="${i.id}" data-u="g" aria-pressed="${i.unit === 'g'}">g</button></div>`}</div>
+      <div class="editor-foot"><div class="macros tabular"><span class="p">P ${n.p} g</span><span class="c">C ${n.c} g</span><span class="f">F ${n.f} g</span></div>
+        <button type="button" class="link danger" data-act="tr-remove" data-id="${i.id}">Remove</button></div>
+    </div>` : ''}
+  </div>`;
+}
+function trayHtml(meal) {
+  if (!S.tray.length) return '';
+  let html = '', lastG = null;
+  S.tray.forEach(i => {
+    const gid = i.group ? i.group.gid : null;
+    if (gid !== lastG && gid) html += `<div class="group-name">${esc(i.group.name)}<button type="button" data-act="tr-ungroup" data-g="${gid}">Remove all</button></div>`;
+    lastG = gid; html += trayItemHtml(i);
+  });
+  return `<div class="tray" aria-label="Going into ${meal}"><p class="label">Going into ${meal}<span class="tabular">${S.tray.length} · ${trayTotal()} kcal</span></p>${html}</div>`;
+}
+function foodRow(fid, sub) {
+  const n = inTray(fid).length, F = FOODS[fid], [q, u] = F.last;
+  return `<li><button type="button" class="row ${n ? 'in' : ''}" data-act="tr-add" data-id="${fid}">
+    <span class="txt"><span class="nm">${esc(F.name)}${F.recipe ? '<span class="tag">Recipe</span>' : ''}</span><span class="meta tabular">${sub || `${amtText(q, u)}${F.recipe && q !== 1 ? 's' : ''} · ${nut(fid, q, u).k} kcal`}</span></span>
+    <span class="plus" aria-label="${n ? 'In the meal, add another' : 'Add'}">${n ? (n > 1 ? '×' + n : '✓') : '+'}</span></button></li>`;
+}
+function mealRow(kind, m) {
+  const foods = kind === 'usual' ? m.lines.map(l => FOODS[l.f || l.def].name) : m.foods.map(f => FOODS[f].name);
+  const k = kind === 'usual' ? usualKcal(m) : comboKcal(m);
+  const meta = kind === 'usual' ? foods.join(', ') : `${m.meals} times · last ${m.last}`;
+  return `<li><button type="button" class="row" data-act="tr-${kind}" data-id="${m.id}">
+    <span class="txt"><span class="nm">${esc(kind === 'usual' ? m.name : foods.join(', '))}${kind === 'combo' ? '' : ''}</span><span class="meta">${esc(meta)}</span></span>
+    <span class="end tabular">${k}</span><span class="plus">+</span></button></li>`;
+}
+function traySheet(slot) {
+  const meal = slot.toLowerCase(), q = S.q.trim().toLowerCase();
+  let body = '';
+  if (q) {
+    const foods = Object.keys(FOODS).filter(f => FOODS[f].name.toLowerCase().includes(q));
+    const usuals = USUALS.filter(u => u.name.toLowerCase().includes(q) || u.lines.some(l => FOODS[l.f || l.def].name.toLowerCase().includes(q)));
+    body += foods.length ? `<p class="label">Foods</p><ul class="list">${foods.map(f => foodRow(f)).join('')}</ul>` : `<p class="label">No foods match “${esc(S.q)}”</p>`;
+    if (usuals.length) body += `<p class="label">Usuals with ${esc(S.q)}</p><ul class="list">${usuals.map(u => mealRow('usual', u)).join('')}</ul>`;
+  } else if (S.variant === 'tabs') {
+    body += `<div class="seg" role="tablist" style="margin-top:10px">
+      ${[['recent', 'Recent'], ['usuals', 'Usuals'], ['together', 'Often together']].map(([k, l]) => `<button type="button" role="tab" data-act="tr-tab" data-tab="${k}" aria-pressed="${S.tab === k}">${l}</button>`).join('')}</div>`;
+    if (S.tab === 'recent') body += `<ul class="list">${RECENT.map(f => foodRow(f)).join('')}</ul>`;
+    if (S.tab === 'usuals') body += `<ul class="list">${USUALS.map(u => mealRow('usual', u)).join('')}</ul>`;
+    if (S.tab === 'together') body += `<p class="hint" style="font-size:12.5px;color:var(--text-2);margin:8px 2px">Foods you've eaten together at ${meal} 3+ times. Each one can become a usual.</p><ul class="list">${COMBOS.map(c => mealRow('combo', c)).join('')}</ul>`;
+  } else {
+    body += `<p class="label">Usuals for ${meal}</p><ul class="list">${USUALS.map(u => mealRow('usual', u)).join('')}</ul>`;
+    body += `<p class="label">Recent</p><ul class="list">${RECENT.map(f => foodRow(f)).join('')}</ul>`;
+    body += `<button type="button" class="collapse" data-act="tr-together" aria-expanded="${S.together}"><span>Often eaten together (${COMBOS.length})</span><span>${S.together ? '▴' : '▾'}</span></button>`;
+    if (S.together) body += `<ul class="list">${COMBOS.map(c => mealRow('combo', c)).join('')}</ul>`;
+  }
+  const n = S.tray.length;
+  return `<div class="sheet-head"><h3>Add to ${meal}</h3><button type="button" class="icon-btn" aria-label="Close without adding" data-act="close">×</button></div>
+    <div class="sheet-body">
+      <div class="search"><input type="search" id="tr-search" placeholder="Search foods, recipes, usuals" aria-label="Search" value="${esc(S.q)}">${S.q ? '<button type="button" class="clear" aria-label="Clear search" data-act="tr-clear">×</button>' : ''}</div>
+      ${trayHtml(meal)}
+      ${body}
+      <button type="button" class="btn" style="margin-top:12px">Not here? Add a food</button>
+    </div>
+    <div class="foot"><button type="button" class="btn btn-primary" data-act="tr-commit" ${n ? '' : 'disabled'}>${n ? `Add ${n} to ${meal} · ${trayTotal()} kcal` : 'Tap foods to add them'}</button></div>
+    ${S.confirm ? `<div class="scrim" style="border-radius:20px 20px 0 0"></div>
+      <div role="alertdialog" aria-label="Add the tray?" style="position:absolute;left:16px;right:16px;top:30%;background:var(--surface);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px">
+        <b style="font-size:16px">Add ${n} ${n === 1 ? 'item' : 'items'} to ${meal}?</b>
+        <span style="color:var(--text-2);font-size:13.5px">They're in the tray but not saved yet.</span>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button type="button" class="btn" data-act="tr-discard">Discard</button>
+          <button type="button" class="btn" data-act="tr-keep">Keep adding</button>
+          <button type="button" class="btn btn-primary" data-act="tr-commit">Add ${n}</button>
+        </div>
+      </div>` : ''}`;
+}
+function commitTray() {
+  const slot = S.sheet.slot, made = S.tray.map(i => ({ name: FOODS[i.fid].name, amt: amtText(i.qty, i.unit), k: nut(i.fid, i.qty, i.unit).k, saving: true }));
+  S.day[slot].push(...made);
+  const n = made.length;
+  S.sheet = null; S.tray = []; S.confirm = false;
+  showToast(`Added ${n} to ${slot.toLowerCase()}`);
+  later(d(2600, 500), () => { made.forEach(e => e.saving = false); render(); });
+}
+
+/* ---------- Render ---------- */
+const phone = document.getElementById('phone');
+function render() {
+  const active = document.activeElement, focusId = active && active.id, caret = active && active.selectionStart;
+  let html = dayHtml();
+  if (S.sheet) html += `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-label="Add to ${S.sheet.slot}">${S.variant === 'today' ? todaySheet(S.sheet.slot) : traySheet(S.sheet.slot)}</div>`;
+  if (S.toast) html += `<div class="toast" role="status">${esc(S.toast)}</div>`;
+  const scroller = phone.querySelector('.sheet-body'), top = scroller ? scroller.scrollTop : 0;
+  phone.innerHTML = html;
+  const ns = phone.querySelector('.sheet-body'); if (ns) ns.scrollTop = top;
+  if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); if (caret != null && el.setSelectionRange) el.setSelectionRange(caret, caret); } }
+  document.querySelectorAll('[data-variant]').forEach(b => b.setAttribute('aria-pressed', b.dataset.variant === S.variant));
+}
+
+phone.addEventListener('input', e => {
+  if (e.target.id === 'tr-search') { S.q = e.target.value; render(); }
+});
+phone.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  const item = () => S.tray.find(i => i.id === +id);
+  switch (act) {
+    case 'open':
+      S.sheet = { slot: el.dataset.slot };
+      if (S.variant === 'today') openToday(); else openTray();
+      break;
+    case 'close':
+      if (S.variant !== 'today' && S.tray.length) { S.confirm = true; break; }
+      if (S.variant === 'today' && S.t && S.t.added.length) showToast(`Logged ${S.t.added.length} items`);
+      S.sheet = null; S.t = null; break;
+    case 'tr-discard': S.confirm = false; S.tray = []; S.sheet = null; break;
+    case 'tr-keep': S.confirm = false; break;
+    // today
+    case 't-pick': S.t.picked = { fid: id, qty: FOODS[id].last[0], unit: FOODS[id].last[1] }; S.t.screen = 'amount'; render(); todayPreview(); return;
+    case 't-back': S.t.screen = 'list'; S.t.picked = null; fetchCombos(); return;
+    case 't-step': { const p = S.t.picked; p.qty = Math.max(stepFor(p.unit), p.qty + (+el.dataset.by) * stepFor(p.unit)); todayPreview(); return; }
+    case 't-add': {
+      const p = S.t.picked; p.saving = true; render();
+      later(d(2500, 400), () => {
+        const e = { name: FOODS[p.fid].name, amt: amtText(p.qty, p.unit), k: nut(p.fid, p.qty, p.unit).k };
+        S.t.added.push(e); S.day[S.sheet.slot].push(e);
+        S.t.status = `Logged ${FOODS[p.fid].name}`; S.t.screen = 'list'; S.t.picked = null; fetchCombos();
+      });
+      return;
+    }
+    case 't-usual': { const u = USUALS.find(x => x.id === id); todayLogMany(u.lines.map(l => l.f || l.def), u.name); return; }
+    case 't-combo': { const c = COMBOS.find(x => x.id === id); todayLogMany(c.foods, c.name); return; }
+    // tray
+    case 'tr-add': {
+      const existing = inTray(id);
+      if (existing.length) { S.open = existing[0].id; S.flash = existing[0].id; }
+      else { addFood(id); }
+      if (S.q) { S.q = ''; const s = document.getElementById('tr-search'); if (s) s.focus(); }
+      break;
+    }
+    case 'tr-usual': addUsual(USUALS.find(x => x.id === id)); S.q = ''; break;
+    case 'tr-combo': addCombo(COMBOS.find(x => x.id === id)); break;
+    case 'tr-open': S.open = S.open === +id ? null : +id; S.flash = null; break;
+    case 'tr-step': { const i = item(); i.qty = Math.max(stepFor(i.unit), Math.round((i.qty + (+el.dataset.by) * stepFor(i.unit)) * 100) / 100); S.flash = null; break; }
+    case 'tr-unit': { const i = item(), g = grams(i.fid, i.qty, i.unit), u = el.dataset.u;
+      if (u === 'g') i.qty = Math.round(g); else { const ug = FOODS[i.fid].units.find(x => x[0] === u)[1]; i.qty = Math.max(0.25, Math.round(g / ug * 4) / 4); }
+      i.unit = u; S.flash = null; break; }
+    case 'tr-pick': { const i = item(); i.fid = el.dataset.f; i.unit = FOODS[i.fid].last[1]; i.qty = FOODS[i.fid].last[0]; S.flash = null; break; }
+    case 'tr-remove': S.tray = S.tray.filter(i => i.id !== +id); S.open = null; break;
+    case 'tr-ungroup': S.tray = S.tray.filter(i => !i.group || i.group.gid !== el.dataset.g); break;
+    case 'tr-clear': S.q = ''; break;
+    case 'tr-tab': S.tab = el.dataset.tab; break;
+    case 'tr-together': S.together = !S.together; break;
+    case 'tr-commit': commitTray(); return;
+  }
+  render();
+});
+
+document.querySelectorAll('[data-variant]').forEach(b => b.addEventListener('click', () => {
+  clearTimers(); S.variant = b.dataset.variant; S.sheet = null; S.t = null; S.toast = null; render();
+}));
+document.getElementById('real-delays').addEventListener('change', e => { S.real = e.target.checked; });
+
+/* ---------- Notes ---------- */
+document.getElementById('notes').innerHTML = `
+  <div class="card">
+    <h2>What's actually happening today</h2>
+    <ul>
+      <li><b>Nothing is staged.</b> Each tap of Add writes that entry to the Sheet right away. The “Added to breakfast” list shows entries already saved, and Done only closes the sheet. That's the 2–3 s after every Add.</li>
+      <li><b>The ~5 s on the amount screen</b> is a dry-run <code>logFood</code> call to Apps Script, made only to show the kcal. The app already has every number it needs (per-100 g values and serving weights come with the foods), so it could work this out instantly.</li>
+      <li><b>Combos pop in late and push the list down.</b> They're fetched again every time you return from the amount screen, they load after everything else, and they render <i>above</i> “Added to breakfast”, so the list jumps.</li>
+      <li><b>Every open reloads three lists</b> (all foods, all recipes, 60 days of log) plus usuals and combos. Nothing carries over from the last time you opened Add.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>What the tray changes</h2>
+    <ul>
+      <li><b>One tap adds a food</b> at the amount you had last time. No amount screen. Tap the item in the tray to change the amount or unit; the numbers update as you tap. Recipes work the same way, at the servings you had last time (1 if never logged).</li>
+      <li><b>Closing with items in the tray asks first:</b> Add, Keep adding, or Discard.</li>
+      <li><b>The tray sits right under the search</b>, above all suggestions, with a running total. Nothing is saved until the button at the bottom.</li>
+      <li><b>One save for the whole meal.</b> The sheet closes as soon as you tap it; the entries show on the day as “Saving…” and settle a moment later.</li>
+      <li><b>A usual drops its foods into the tray</b> as a group, so you can pick the berries or change an amount before it's logged.</li>
+      <li><b>Combos move down</b> into a collapsed “Often eaten together” row at the bottom, and load once per open, so nothing jumps.</li>
+      <li>Searching shows foods first, then usuals that contain the word.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>Speed: what's possible</h2>
+    <p class="sub">Apps Script calls take roughly 1–3 s each and we can't change that much. The win is making fewer of them and not waiting on the ones left.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Change</th><th>Removes</th><th>Size</th></tr></thead>
+      <tbody>
+        <tr><td>Work out the preview numbers in the app instead of a dry-run call. Share <code>nutrition.js</code>'s math with the frontend so there's still one formula.</td><td class="n">~5 s per item</td><td>S–M</td></tr>
+        <tr><td>Stage in the app, save once: a batch log action (one write for N entries).</td><td class="n">~2.5 s × N → one</td><td>M</td></tr>
+        <tr><td>Optimistic close: show the entries as “Saving…” and don't make you wait on the write.</td><td class="n">the last wait</td><td>S</td></tr>
+        <tr><td>Keep foods, recipes, recent log, usuals and combos across opens (in memory, plus saved on the device), refreshing quietly in the background.</td><td class="n">~2 s per open</td><td>S–M</td></tr>
+        <tr><td>Fetch combos once per open, not on every return to the list.</td><td class="n">the list jump</td><td>XS</td></tr>
+        <tr><td>Server side: cache the Foods tab in Apps Script's CacheService so reads don't scan the sheet each time.</td><td class="n">some of each call</td><td>M</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>Decided</h2>
+    <ul>
+      <li>Layout A: tray under the search, combos collapsed at the bottom.</li>
+      <li>One tap adds at the last amount; recipes at the last servings.</li>
+      <li>Closing with items in the tray asks first.</li>
+      <li>All four speed changes are in.</li>
+    </ul>
+  </div>`;
+
+render();
+})();
+</script>

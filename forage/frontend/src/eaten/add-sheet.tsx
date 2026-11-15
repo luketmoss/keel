@@ -19,6 +19,7 @@ import {
   comboWhen,
   footerText,
   lastEntries,
+  liveItems,
   looseItem,
   newItem,
   pickOption,
@@ -29,6 +30,7 @@ import {
   setAmount,
   targetId,
   targetName,
+  toggleChip,
   trayTotals,
   usualItems,
   usualsMatching,
@@ -313,7 +315,8 @@ export function AddSheet({
 
   const meal = slot.toLowerCase();
   const text = q.trim();
-  const full = items.length >= TRAY_MAX;
+  const count = liveItems(items).length;
+  const full = count >= TRAY_MAX;
   const totals = trayTotals(items);
 
   // Recent is worked out once, when the lists first show, and not again while the sheet is open.
@@ -349,17 +352,35 @@ export function AddSheet({
 
   function addGroup(made: TrayItem[], name: string) {
     if (!made.length) return;
-    if (items.length + made.length > TRAY_MAX) {
+    if (count + liveItems(made).length > TRAY_MAX) {
       say(TRAY_FULL);
       return;
     }
     onItems((prev) => [...prev, ...made]);
     setFresh(made[0].id);
-    say(made.length === 1 ? `Added ${name}` : `Added ${name}, ${made.length} items`);
+    const shown = liveItems(made).length;
+    say(shown === 1 ? `Added ${name}` : `Added ${name}, ${shown} items`);
     if (text) {
       setQ('');
       search.current?.focus();
     }
+  }
+
+  /** #942: an optional line's chip: its item comes in at its home amount, or goes out. */
+  function toggle(id: string) {
+    const item = items.find((i) => i.id === id);
+    if (!item || !item.optional) return;
+    if (item.off && full) {
+      say(TRAY_FULL);
+      return;
+    }
+    onItems((prev) => (item.off && liveItems(prev).length >= TRAY_MAX ? prev : toggleChip(prev, id)));
+    setOpen(null);
+    setPickOpen(null);
+    if (item.off) setFresh(id);
+    say(
+      `${item.off ? 'Added' : 'Removed'} ${targetName(item.home ? { kind: 'food', food: item.home.food } : item.target)}`,
+    );
   }
 
   function remove(id: string) {
@@ -379,11 +400,11 @@ export function AddSheet({
   }
 
   function requestClose() {
-    if (items.length) setConfirming(true);
+    if (count) setConfirming(true);
     else onClose();
   }
 
-  const groupFits = (n: number) => items.length + n <= TRAY_MAX;
+  const groupFits = (n: number) => count + n <= TRAY_MAX;
   const rowFor = (target: LogTarget) => (
     <ResultRow
       key={`${target.kind}:${targetId(target)}`}
@@ -488,14 +509,8 @@ export function AddSheet({
   }
 
   const footer = (
-    <button
-      type="button"
-      class="btn btn-primary btn-block"
-      onClick={onSave}
-      disabled={!items.length}
-      data-testid="tray-save"
-    >
-      {items.length ? footerText(totals, slot) : 'Tap foods to add them'}
+    <button type="button" class="btn btn-primary btn-block" onClick={onSave} disabled={!count} data-testid="tray-save">
+      {count ? footerText(totals, slot) : 'Tap foods to add them'}
     </button>
   );
 
@@ -537,6 +552,8 @@ export function AddSheet({
             onPick={(id, option) => onItems((prev) => pickOption(prev, id, option, foodMap))}
             onRemove={remove}
             onRemoveGroup={removeAll}
+            onToggle={toggle}
+            full={full}
           />
         )}
         {body}
@@ -551,7 +568,7 @@ export function AddSheet({
       </Sheet>
       {confirming && (
         <Sheet
-          title={closePromptTitle(items.length, slot)}
+          title={closePromptTitle(count, slot)}
           onClose={() => setConfirming(false)}
           closable={false}
           alert
@@ -571,7 +588,7 @@ export function AddSheet({
               Keep adding
             </button>
             <button type="button" class="btn btn-primary" onClick={onSave} data-autofocus data-testid="prompt-add">
-              Add {items.length}
+              Add {count}
             </button>
           </div>
         </Sheet>

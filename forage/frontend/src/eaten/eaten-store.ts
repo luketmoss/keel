@@ -23,7 +23,15 @@ import {
 } from './add-store';
 import { newLogId } from './format';
 import { previewFood, previewRecipe, type EntryNutrition } from './preview';
-import { addedMealToast, mealInput, provisionalEntries, removedMealToast, targetName, type TrayItem } from './tray';
+import {
+  addedMealToast,
+  liveItems,
+  mealInput,
+  provisionalEntries,
+  removedMealToast,
+  targetName,
+  type TrayItem,
+} from './tray';
 
 export type DayState = 'loading' | 'ready' | 'error';
 
@@ -348,7 +356,8 @@ function patchPending(id: string, change: Partial<PendingMeal>): void {
 }
 
 /** Save the tray: its rows go on the day at once, muted, and one `logMeal` goes out. The caller closes the sheet. */
-export function saveMeal(api: ForageApi, date: string, slot: Slot, items: TrayItem[]): void {
+export function saveMeal(api: ForageApi, date: string, slot: Slot, tray: TrayItem[]): void {
+  const items = liveItems(tray); // #942: an optional line that is off is not saved
   if (!items.length) return;
   const id = newLogId();
   const entries = provisionalEntries(id, date, slot, items);

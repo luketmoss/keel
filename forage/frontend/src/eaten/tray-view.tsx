@@ -3,6 +3,7 @@
 import { useEffect } from 'preact/hooks';
 import type { Food, UsualOption } from '../api/types';
 import { FoodName } from '../library/food-name';
+import { labelOf } from '../library/usuals-store';
 import { fractionQty, maxQty } from './amount-edit';
 import { sheetGrams, wholeKcal } from './format';
 import { PickOne } from './group-view';
@@ -11,6 +12,7 @@ import {
   atMinimum,
   itemFigures,
   labelFigures,
+  liveItems,
   stepItem,
   switchedAmount,
   targetName,
@@ -35,6 +37,10 @@ interface Props {
   onPick: (id: string, option: UsualOption) => void;
   onRemove: (id: string) => void;
   onRemoveGroup: (key: string) => void;
+  /** #942: an optional line's chip: turn its item on or off. */
+  onToggle: (id: string) => void;
+  /** The tray holds 30 live items, so an off chip cannot turn on. */
+  full: boolean;
 }
 
 type Section = { kind: 'item'; item: TrayItem } | { kind: 'group'; key: string; name: string; items: TrayItem[] };
@@ -53,6 +59,9 @@ function sections(items: TrayItem[]): Section[] {
   }
   return out;
 }
+
+/** A group's items, the loose ones' sections aside: only the live ones are rows; an optional line has a chip. */
+const rowsOf = (items: TrayItem[]) => liveItems(items);
 
 const macro = (g: number | null | undefined) => (typeof g === 'number' ? sheetGrams(g) : '—');
 
@@ -95,12 +104,49 @@ export function TrayView(p: Props) {
                 </button>
               </div>
               <ul class="plain-list" aria-labelledby={`tray-group-${s.key}`}>
-                {s.items.map(row)}
+                {rowsOf(s.items).map(row)}
               </ul>
+              <OptionalChips usual={s.name} items={s.items} foods={p.foods} full={p.full} onToggle={p.onToggle} />
             </li>
           ),
         )}
       </ul>
+    </div>
+  );
+}
+
+/** #942: a usual's optional lines, one on/off chip each, under the group's last item. */
+function OptionalChips(p: {
+  usual: string;
+  items: TrayItem[];
+  foods: Map<string, Food>;
+  full: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const chips = p.items.filter((i) => i.optional);
+  if (!chips.length) return null;
+  return (
+    <div class="chip-row tray-optional" role="group" aria-label={`Optional in ${p.usual}`} data-testid="tray-optional">
+      {chips.map((i) => {
+        const food = i.target.kind === 'food' ? i.target.food : undefined;
+        const disabled = !!i.off && p.full;
+        return (
+          <button
+            key={i.id}
+            type="button"
+            class={i.off ? 'chip tray-chip is-off' : 'chip tray-chip is-on'}
+            aria-pressed={!i.off}
+            aria-disabled={disabled ? 'true' : undefined}
+            onClick={() => {
+              if (!disabled) p.onToggle(i.id);
+            }}
+            data-testid="tray-chip"
+          >
+            <span aria-hidden="true">{i.off ? '+ ' : '✓ '}</span>
+            {labelOf(food)}
+          </button>
+        );
+      })}
     </div>
   );
 }

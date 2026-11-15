@@ -2,7 +2,7 @@
 // through `upsertUsual`, debounced; a short name saves to the food. The API's reply gives the numbers card.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { type ForageApi } from '../api/client';
-import type { Food, Slot, Usual, UsualOption } from '../api/types';
+import type { Food, Slot, Usual, UsualOptional, UsualOption } from '../api/types';
 import { SLOTS } from '../api/types';
 import { fractionQty, stepQty } from '../eaten/amount-edit';
 import { MacroBar } from '../ui/macro-bar';
@@ -102,6 +102,60 @@ export function FoodSearchSheet({
         </ul>
       )}
     </Sheet>
+  );
+}
+
+const HOW_OFTEN: { value: UsualOptional; label: string }[] = [
+  { value: '', label: 'Every time' },
+  { value: 'in', label: 'Usually' },
+  { value: 'out', label: 'Sometimes' },
+];
+
+/** #942: how often a line is eaten: every time, usually (in by default) or sometimes (out by default). */
+function HowOften({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: UsualOptional;
+  onChange: (value: UsualOptional) => void;
+}) {
+  function onKey(e: KeyboardEvent) {
+    const at = HOW_OFTEN.findIndex((o) => o.value === value);
+    const to =
+      e.key === 'ArrowRight' || e.key === 'ArrowDown'
+        ? at + 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+          ? at - 1
+          : null;
+    if (to === null) return;
+    e.preventDefault();
+    const next = HOW_OFTEN[(to + HOW_OFTEN.length) % HOW_OFTEN.length];
+    onChange(next.value);
+    const group = (e.currentTarget as HTMLElement).closest('[role="radiogroup"]');
+    requestAnimationFrame(() => group?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
+  }
+  return (
+    <div class="usual-how-often">
+      <span class="hint">How often</span>
+      <div class="chip-row" role="radiogroup" aria-label={`How often ${label}`} data-testid="how-often">
+        {HOW_OFTEN.map((o) => (
+          <button
+            key={o.value || 'always'}
+            type="button"
+            role="radio"
+            class="chip"
+            aria-checked={value === o.value}
+            tabIndex={value === o.value ? 0 : -1}
+            onClick={() => onChange(o.value)}
+            onKeyDown={onKey}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -535,6 +589,13 @@ export function UsualEditor({ api, id, openSearch, onBack, onDeleted }: Props) {
                   <span>Pick each time</span>
                   <input type="checkbox" role="switch" checked={pick} onChange={() => togglePick(line)} />
                 </label>
+              )}
+              {!gone && (
+                <HowOften
+                  label={pick ? `${labelOf(food)} or another` : name}
+                  value={line.optional ?? ''}
+                  onChange={(optional) => patchLine(line.key, (l) => ({ ...l, optional }))}
+                />
               )}
             </li>
           );

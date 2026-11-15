@@ -14,7 +14,7 @@ var TIMEZONE = 'America/Denver';
 /** A `payload` longer than this is refused, which keeps a cell under Sheets' 50,000 limit. */
 var MAX_PAYLOAD_CHARS = 45000;
 
-var SCHEMA_VERSION = '6';
+var SCHEMA_VERSION = '7';
 
 var FOOD_FIELDS = [
   'id', 'name', 'kind', 'brand', 'category',
@@ -60,7 +60,7 @@ var FOOD_LOG_FIELDS = [
 /** #877: a usual, and its lines. A line is Always (food, qty, unit) or a pick-one (`options_json`). */
 var USUAL_FIELDS = ['id', 'name', 'slot', 'created', 'updated'];
 
-var USUAL_LINE_FIELDS = ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick'];
+var USUAL_LINE_FIELDS = ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick', 'optional'];
 
 var COOK_FIELDS = ['id', 'recipe_id', 'date', 'rating', 'note', 'plan_id', 'created'];
 

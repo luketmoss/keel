@@ -2452,8 +2452,11 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         'fruit is around. Each has a slot (the meal it is usually for) and lines. An Always line is one food at an ' +
         'amount. A pick-one line is a choice of 2 to 12 foods, each option with its own amount (brands and fruits ' +
         'come in different units); last_pick is the option picked last time, the default next time, and blank means ' +
-        'the first. Each usual also has start, its nutrition as it starts (Always lines plus each last_pick; partial ' +
-        'when a food has no nutrition), used_count and last_used. Newest use first. Answers JSON.',
+        'the first. A line can be optional: optional "in" (how_often "usually in") is logged unless left out, and ' +
+        '"sometimes" (optional "out") is left out unless brought in; a line with neither is eaten every time. Each ' +
+        'usual also has start, its nutrition as it starts (every-time and usually-in lines, plus each last_pick; ' +
+        'sometimes lines left out; partial when a food has no nutrition), used_count and last_used. Newest use ' +
+        'first. Answers JSON.',
       inputSchema: { slot: z.enum(SLOTS).optional().describe('Only usuals for this meal') },
       annotations: READ,
     },
@@ -2474,7 +2477,8 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
       description:
         'One Forage usual by id, as forage_list_usuals shows it: its lines in order with line_id, each Always line ' +
         'as food, qty and unit, each pick-one line as its options (every option with its own food, qty and unit) and ' +
-        'last_pick, then start (nutrition as it starts), used_count and last_used. Answers JSON.',
+        'last_pick, then start (nutrition as it starts), used_count and last_used. A line that is optional shows ' +
+        'optional "in" (usually in) or "out" (sometimes), with how_often spelling it out. Answers JSON.',
       inputSchema: { id: z.string().describe('The usual id (us_...)') },
       annotations: READ,
     },
@@ -2496,7 +2500,10 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
         'is a meal eaten on repeat with a part that may vary. A line is either Always (food_id, qty and unit) or a ' +
         'pick-one (options only: 2 to 12 options of distinct foods, each with its own food_id, qty and unit, because ' +
         'brands and fruits come in different units, e.g. 1.25 cup of one cereal and 1 cup of another; optionally ' +
-        'last_pick, the food_id of the option to start with, default the first). A unit is a serving name exactly as ' +
+        'last_pick, the food_id of the option to start with, default the first). Either kind of line can also be ' +
+        'optional: "in" (usually in: logged unless left out, like a fruit on oatmeal that is not always there) or ' +
+        '"out" (sometimes: left out unless brought in, like a salad topping); leave it out for a line eaten every ' +
+        'time. A unit is a serving name exactly as ' +
         'forage_get_food lists the food\'s weights, or g; qty is over 0. Replacing sends every line: send a line_id ' +
         '(L1, L2...) to keep a line\'s id, and lines left out are removed. Refused, saving nothing, with the field ' +
         'named. Undo with forage_undo.',
@@ -2522,6 +2529,10 @@ export function registerForageTools(server: McpServer, cfg: ForageConfig, mode: 
                 .optional()
                 .describe('Pick-one line: 2 to 12 options of distinct foods; leave food_id, qty and unit out'),
               last_pick: z.string().optional().describe('Pick-one line: the food_id of the option picked last'),
+              optional: z
+                .enum(['', 'in', 'out'])
+                .optional()
+                .describe('Either kind: "in" = usually in (logged unless left out), "out" = sometimes (left out unless brought in), blank = every time'),
             }),
           )
           .describe('Every line, in order'),
@@ -2661,6 +2672,9 @@ Undo with forage_undo, call ${currentCallId()}`)
         "Log a usual to Forage's food log: one entry per line, in order, grouped under the usual's name. A line " +
         'that is Always logs its food and amount; a pick-one logs the option in picks (line_id to food_id) or, ' +
         "without one, the option picked last (or the first), at that option's own amount, and remembers it. " +
+        'A line that is optional is logged unless it is "sometimes" (optional "out"), and picks can change that: ' +
+        "null leaves an optional line out (its last pick is kept), and an optional single-food line's own food_id " +
+        'brings it in. Null for a line that is not optional is refused, and so is leaving every line out. ' +
         'A dry run by default: it shows the entries and their calories, and logs nothing. Call again with ' +
         'dry_run: false to log them. Only log what the user said they ate. On the write connector; undo with forage_undo.',
       inputSchema: {
@@ -2668,9 +2682,11 @@ Undo with forage_undo, call ${currentCallId()}`)
         slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
         date: z.string().optional().describe("YYYY-MM-DD, 'today' or '-1d'. Default today"),
         picks: z
-          .record(z.string(), z.string())
+          .record(z.string(), z.string().nullable())
           .optional()
-          .describe('A pick-one line_id (L3) to the food_id of the option eaten; leave a line out for its last pick'),
+          .describe(
+            'A pick-one line_id (L3) to the food_id of the option eaten; leave a line out for its last pick. For an optional line: null leaves it out, and its own food_id brings in a sometimes single-food line',
+          ),
         dry_run: z.boolean().optional().describe('Default true: preview only. false logs them'),
       },
       annotations: WRITE,
@@ -2924,11 +2940,19 @@ function compactUsual(u: any, names: Map<string, string>) {
             line_id: l.line_id,
             pick_one: ((l.options ?? []) as any[]).map((o) => ({ ...named(o.food_id), qty: o.qty, unit: o.unit })),
             last_pick: l.last_pick,
+            ...howOften(l),
           }
-        : { line_id: l.line_id, ...named(l.food_id), qty: l.qty, unit: l.unit },
+        : { line_id: l.line_id, ...named(l.food_id), qty: l.qty, unit: l.unit, ...howOften(l) },
     ),
     start: u.start,
     used_count: u.used_count,
     last_used: u.last_used,
   }
+}
+
+/** A usual line's `optional` (#942), shown only when set: "in" is usually in, "out" is sometimes. */
+function howOften(l: any): { optional?: string; how_often?: string } {
+  if (l.optional === 'in') return { optional: 'in', how_often: 'usually in' }
+  if (l.optional === 'out') return { optional: 'out', how_often: 'sometimes' }
+  return {}
 }

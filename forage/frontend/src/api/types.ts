@@ -471,8 +471,13 @@ export interface UsualLine {
   unit: string;
   options: UsualOption[] | null;
   last_pick: string;
+  /** #942: blank = every time, `in` = usually (on by default), `out` = sometimes (off by default). */
+  optional?: UsualOptional;
   swaps: { food_id: string; count: number }[];
 }
+
+/** How often a usual's line is eaten (#942). */
+export type UsualOptional = '' | 'in' | 'out';
 
 /** The usual as it starts: Always lines plus each pick-one's `last_pick`, computed by the API. `partial` means a food lacks nutrition. */
 export interface UsualStart extends PerServing {
@@ -501,6 +506,7 @@ export interface UsualLineInput {
   unit?: string;
   options?: UsualOption[];
   last_pick?: string;
+  optional?: UsualOptional;
 }
 
 /** `upsertUsual`: creates or replaces the usual and all its lines. The app sends its own `us_` id so a retry leaves one. */
@@ -516,7 +522,7 @@ export interface LogUsualInput {
   usual_id: string;
   date: string;
   slot: Slot;
-  picks?: Record<string, string>;
+  picks?: Record<string, string | null>;
 }
 
 /** `logGroup` (#878): 1 to 30 foods under a new group with no usual. */

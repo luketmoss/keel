@@ -42,6 +42,12 @@ export interface TrayItem {
   lineId?: string;
   /** A pick-one's options (a usual's or a combo's); the item is one of them. */
   options?: UsualOption[];
+  /** #942: a usual's optional line: `in` starts on, `out` starts off. Its chip turns the item on and off. */
+  optional?: 'in' | 'out';
+  /** An optional line that is off holds its place here, so its chip shows; it is not counted, shown or saved. */
+  off?: boolean;
+  /** Where an optional line comes in when its chip turns it on: its Always food, or its last pick (else first option). */
+  home?: { food: Food; qty: number; unit: string };
 }
 
 /** The tray as the screen holds it while the Add sheet is open or a sheet over it is. */
@@ -80,7 +86,11 @@ export interface TrayTotals {
   plus: boolean;
 }
 
-export function trayTotals(items: TrayItem[]): TrayTotals {
+/** The items that are in the meal: an optional line that is off is not one. */
+export const liveItems = (items: TrayItem[]) => items.filter((i) => !i.off);
+
+export function trayTotals(allItems: TrayItem[]): TrayTotals {
+  const items = liveItems(allItems);
   let kcal: number | null = null;
   let plus = false;
   for (const item of items) {
@@ -180,6 +190,7 @@ export function usualItems(usual: Usual, foods: Map<string, Food>): TrayItem[] {
     if (!food) continue;
     const qty = start ? start.qty : (line.qty ?? 1);
     const unit = start ? start.unit : line.unit;
+    const optional = line.optional === 'in' || line.optional === 'out' ? line.optional : undefined;
     out.push({
       id: newLogId(),
       target: { kind: 'food', food },
@@ -188,6 +199,7 @@ export function usualItems(usual: Usual, foods: Map<string, Food>): TrayItem[] {
       group,
       lineId: line.line_id,
       options: line.options ? line.options.map((o) => ({ ...o })) : undefined,
+      ...(optional ? { optional, home: { food, qty, unit }, ...(optional === 'out' ? { off: true } : {}) } : {}),
     });
   }
   return out;
@@ -215,7 +227,22 @@ export function comboItems(combo: Combo, foods: Map<string, Food>): TrayItem[] {
 
 // ---- editing the tray
 
-export const removeItem = (items: TrayItem[], id: string) => items.filter((i) => i.id !== id);
+/** Removing an optional line's item turns it off and keeps its chip (#942); any other item is gone. */
+export const removeItem = (items: TrayItem[], id: string) =>
+  items.flatMap((i): TrayItem[] => (i.id !== id ? [i] : i.optional ? [turned(i, false)] : []));
+
+/** An optional line's item on or off, at its home amount: what a chip tap does (#942). */
+export function turned(item: TrayItem, on: boolean): TrayItem {
+  const { off: _off, ...rest } = item;
+  const home = item.home;
+  const base = home
+    ? { ...rest, target: { kind: 'food' as const, food: home.food }, qty: home.qty, unit: home.unit }
+    : rest;
+  return on ? base : { ...base, off: true };
+}
+
+export const toggleChip = (items: TrayItem[], id: string) =>
+  items.map((i) => (i.id === id && i.optional ? turned(i, !!i.off) : i));
 export const removeGroup = (items: TrayItem[], key: string) => items.filter((i) => i.group?.key !== key);
 
 export function setAmount(items: TrayItem[], id: string, qty: number, unit: string): TrayItem[] {
@@ -258,7 +285,7 @@ export function mealInput(date: string, slot: Slot, items: TrayItem[]): LogMealI
   return {
     date,
     slot,
-    items: items.map((i): LogMealItem => {
+    items: liveItems(items).map((i): LogMealItem => {
       const group = i.group
         ? {
             group: {
@@ -279,7 +306,7 @@ export function mealInput(date: string, slot: Slot, items: TrayItem[]): LogMealI
 /** The entries the day shows while the write is out: the figures worked out here, the group heading, `Saving…`. */
 export function provisionalEntries(callId: string, date: string, slot: Slot, items: TrayItem[]): FoodLogEntry[] {
   const at = new Date().toISOString();
-  return items.map((i) => {
+  return liveItems(items).map((i) => {
     const f = itemFigures(i);
     const recipe = i.target.kind === 'recipe';
     return {

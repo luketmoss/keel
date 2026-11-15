@@ -2,7 +2,7 @@
 // list's words, the editor's draft and the debounced save. Every figure (the starting kcal and macros) is the API's.
 import { signal } from '@preact/signals';
 import { type ForageApi } from '../api/client';
-import type { Food, Slot, Usual, UsualInput, UsualLineInput, UsualOption } from '../api/types';
+import type { Food, Slot, Usual, UsualInput, UsualLineInput, UsualOptional, UsualOption } from '../api/types';
 import { dayTitle } from '../eaten/format';
 import type { LoadState } from './recipes-store';
 
@@ -102,16 +102,27 @@ export function startOption(options: UsualOption[], lastPick: string): UsualOpti
   return options.find((o) => o.food_id === lastPick) ?? options[0];
 }
 
-/** A usual's foods in short, ` · `-separated: a pick-one `A / B / C` as buttons, else `<last pick> or <n> more`. */
+/**
+ * A usual's foods in short, ` · `-separated: a pick-one `A / B / C` as buttons, else `<last pick> or <n> more`. The
+ * sometimes lines (#942) follow after ` · sometimes `, comma-separated.
+ */
 export function foodsInShort(usual: Usual, foods: Map<string, Food>): string {
-  return usual.lines
-    .map((l) => {
-      if (!l.options) return labelOf(foods.get(l.food_id));
-      const opts = l.options;
-      if (pickLayout(opts, foods).kind === 'buttons') return opts.map((o) => labelOf(foods.get(o.food_id))).join(' / ');
-      return `${labelOf(foods.get(startOption(opts, l.last_pick).food_id))} or ${opts.length - 1} more`;
-    })
+  const say = (l: Usual['lines'][number]) => {
+    if (!l.options) return labelOf(foods.get(l.food_id));
+    const opts = l.options;
+    if (pickLayout(opts, foods).kind === 'buttons') return opts.map((o) => labelOf(foods.get(o.food_id))).join(' / ');
+    return `${labelOf(foods.get(startOption(opts, l.last_pick).food_id))} or ${opts.length - 1} more`;
+  };
+  const main = usual.lines
+    .filter((l) => l.optional !== 'out')
+    .map(say)
     .join(' · ');
+  const sometimes = usual.lines
+    .filter((l) => l.optional === 'out')
+    .map(say)
+    .join(', ');
+  if (!sometimes) return main;
+  return main ? `${main} · sometimes ${sometimes}` : `sometimes ${sometimes}`;
 }
 
 /** `Mon 2 Nov`, or `today` / `yesterday`. */
@@ -146,6 +157,8 @@ export interface DraftLine {
   unit: string;
   options: UsualOption[] | null;
   last_pick: string;
+  /** How often (#942): '' every time, `in` usually, `out` sometimes. */
+  optional: UsualOptional;
 }
 
 export interface Draft {
@@ -169,6 +182,7 @@ export function draftFrom(usual: Usual): Draft {
       unit: l.unit,
       options: l.options ? l.options.map((o) => ({ ...o })) : null,
       last_pick: l.last_pick,
+      optional: l.optional ?? '',
     })),
   };
 }
@@ -180,13 +194,21 @@ export function defaultAmount(food: Food): UsualOption {
 }
 
 export function alwaysLine(opt: UsualOption): DraftLine {
-  return { key: newKey(), food_id: opt.food_id, qty: opt.qty, unit: opt.unit, options: null, last_pick: '' };
+  return {
+    key: newKey(),
+    food_id: opt.food_id,
+    qty: opt.qty,
+    unit: opt.unit,
+    options: null,
+    last_pick: '',
+    optional: '',
+  };
 }
 
 /** What `upsertUsual` takes. A pick-one with one option is saved as an Always line of it. */
 export function toInput(id: string, draft: Draft): UsualInput {
   const lines: UsualLineInput[] = draft.lines.map((l) => {
-    const base = l.line_id ? { line_id: l.line_id } : {};
+    const base = { ...(l.line_id ? { line_id: l.line_id } : {}), ...(l.optional ? { optional: l.optional } : {}) };
     if (l.options && l.options.length >= 2) {
       const last = l.options.some((o) => o.food_id === l.last_pick) ? l.last_pick : '';
       return { ...base, options: l.options.map((o) => ({ ...o })), last_pick: last };

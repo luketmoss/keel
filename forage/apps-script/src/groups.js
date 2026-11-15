@@ -15,9 +15,13 @@ var MAX_GROUP_ITEMS = 30;
 /**
  * Log a usual: one entry per line in position order, sharing a new group named
  * for the usual. Payload `{ usual_id, date, slot, picks?: { <line_id>:
- * <food_id> }, dry_run? }`. A pick-one logs the picked option, else its
+ * <food_id> | null }, dry_run? }`. A pick-one logs the picked option, else its
  * `last_pick`, else its first option, at that option's own amount, and its
- * `last_pick` becomes what was logged. Answers `{ entries, group_id }`.
+ * `last_pick` becomes what was logged. An optional line (#942) is logged unless
+ * `optional` is `out` or its pick is `null` (a line left out keeps its
+ * `last_pick`); an optional single-food line is brought in by naming its own
+ * food. `null` for a line that is not optional is refused, and so is a usual
+ * with every line left out. Answers `{ entries, group_id }`.
  */
 function logUsual(payload, caller) {
   if (!payload || typeof payload !== 'object') throw new Error('payload must be a usual to log');
@@ -30,35 +34,50 @@ function logUsual(payload, caller) {
   if (!lines.length) throw new Error('Usual "' + usual.name + '" has no lines to log');
 
   var picks = payload.picks === undefined || payload.picks === null ? {} : payload.picks;
-  if (typeof picks !== 'object' || Array.isArray(picks)) throw new Error('picks must map a line_id to a food_id');
+  if (typeof picks !== 'object' || Array.isArray(picks)) throw new Error('picks must map a line_id to a food_id, or null to leave an optional line out');
   var byLine = {};
   lines.forEach(function (l) { byLine[l.line_id] = l; });
   Object.keys(picks).forEach(function (lineId) {
     var line = byLine[lineId];
     if (!line) throw new Error('picks.' + lineId + ' is not a line of "' + usual.name + '"');
-    if (!Array.isArray(line.options_json)) throw new Error('picks.' + lineId + ' is an Always line: it has nothing to pick');
-    if (!optionFor(line, cell(picks[lineId]).trim())) {
-      throw new Error('picks.' + lineId + ' "' + cell(picks[lineId]) + '" is not one of that line\'s options');
+    var optional = !!line.optional;
+    if (picks[lineId] === null) {
+      if (!optional) throw new Error('picks.' + lineId + ' is null, but that line is not optional: only a line set to "in" or "out" can be left out');
+      return;
+    }
+    if (Array.isArray(line.options_json)) {
+      if (!optionFor(line, cell(picks[lineId]).trim())) {
+        throw new Error('picks.' + lineId + ' "' + cell(picks[lineId]) + '" is not one of that line\'s options');
+      }
+    } else if (!optional) {
+      throw new Error('picks.' + lineId + ' is an Always line: it has nothing to pick');
+    } else if (cell(picks[lineId]).trim() !== line.food_id) {
+      throw new Error('picks.' + lineId + ' "' + cell(picks[lineId]) + '" is not that line\'s food (' + line.food_id + '): name it to bring the line in, or null to leave it out');
     }
   });
 
   var groupId = newId(ID_PREFIXES.group);
   var chosen = {};
-  var entries = lines.map(function (line) {
+  var entries = [];
+  lines.forEach(function (line) {
+    var picked = has(picks, line.line_id);
+    // An optional line: left out by a null pick, or with no pick when it is "out".
+    if (line.optional && (picked ? picks[line.line_id] === null : line.optional === 'out')) return;
     var amount;
     if (Array.isArray(line.options_json)) {
-      var pick = has(picks, line.line_id) ? cell(picks[line.line_id]).trim() : line.last_pick;
+      var pick = picked ? cell(picks[line.line_id]).trim() : line.last_pick;
       amount = optionFor(line, pick) || line.options_json[0];
       chosen[line.line_id] = amount.food_id;
     } else {
       amount = line;
     }
-    return writeLogEntry(null, {
+    entries.push(writeLogEntry(null, {
       date: date, slot: slot, food_id: amount.food_id, qty: amount.qty, unit: amount.unit,
     }, newId(ID_PREFIXES.log), caller, true, {
       group: { group_id: groupId, group_name: usual.name, usual_id: usual.id, usual_line_id: line.line_id },
-    });
+    }));
   });
+  if (!entries.length) throw new Error('Every line of "' + usual.name + '" is left out, so nothing would be logged');
   if (isDryRun(payload)) return { entries: entries, group_id: groupId };
 
   return withScriptLock(function () {

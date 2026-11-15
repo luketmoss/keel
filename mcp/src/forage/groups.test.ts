@@ -77,6 +77,12 @@ describe('the group tools', () => {
     expect(text(r)).not.toContain(REMINDER)
   })
 
+  it('forage_log_usual passes a null pick through, to leave an optional line out (#942)', async () => {
+    const sent = api({ logUsual: ok(GROUP), getFoods: ok(FOODS), getRecipes: ok([]) })
+    await call('forage_log_usual', { usual_id: 'us_1', slot: 'Breakfast', date: '2026-11-01', picks: { L2: null, L3: 'fd_bran' } })
+    expect(sent.find((s) => s.action === 'logUsual')!.payload.picks).toEqual({ L2: null, L3: 'fd_bran' })
+  })
+
   it('forage_log_usual with dry_run false logs, names the undo call and carries the reminder', async () => {
     const sent = api({ logUsual: ok(GROUP), getFoods: ok(FOODS), getRecipes: ok([]) })
     const r = await call('forage_log_usual', { usual_id: 'us_1', slot: 'Breakfast', date: '2026-11-01', dry_run: false })

@@ -82,11 +82,12 @@ describe('the Add sheet', () => {
     await mount(createDemoApi());
     const sheet = await openAdd('Breakfast');
     const rows = within(sheet).getAllByTestId('usual-result');
-    // Breakfast's two (most recently used first), then After dinner's.
+    // Breakfast's two (most recently used first), then the other meals' (After dinner's, then Lunch's).
     expect(rows.map((r) => r.querySelector('.recipe-name')!.textContent)).toEqual([
       'Oatmeal',
       'Yogurt bowl',
       'After dinner cereal',
+      'Side salad',
     ]);
     expect(within(sheet).getByText('Usuals for breakfast')).toBeTruthy();
     expect(rows[0].querySelector('.recipe-meta')!.textContent).toBe(

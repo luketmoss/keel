@@ -93,7 +93,7 @@ import {
   wholeGrams,
   wholeKcal,
 } from './format';
-import { TRAY_MAX, couldntSave, lastEntries, looseItem, newItem, type Pass, type TrayItem } from './tray';
+import { TRAY_MAX, couldntSave, lastEntries, liveItems, looseItem, newItem, type Pass, type TrayItem } from './tray';
 import {
   dayItems,
   fromUsual,
@@ -582,7 +582,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   /** The footer's save (#933): the day shows the rows at once, `logMeal` goes out, and the sheet is gone. */
   function savePass() {
-    if (!pass || !pass.items.length || sentPass.current) return;
+    if (!pass || !liveItems(pass.items).length || sentPass.current) return;
     sentPass.current = true;
     saveMeal(api, pass.date, pass.slot, pass.items);
     endPass();
@@ -596,7 +596,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   function addToTray(target: LogTarget) {
     const last = lastEntries(addLists.value?.log ?? []);
     changeTray((items) =>
-      items.length >= TRAY_MAX || looseItem(items, target) ? items : [...items, newItem(target, last)],
+      liveItems(items).length >= TRAY_MAX || looseItem(items, target) ? items : [...items, newItem(target, last)],
     );
   }
 

@@ -9,10 +9,10 @@ const today = localDate(new Date());
 const yesterday = addDays(today, -1);
 
 describe('the demo usuals (#881)', () => {
-  it('getUsuals answers the three usuals with start nutrition and use counts', async () => {
+  it('getUsuals answers the four usuals with start nutrition and use counts', async () => {
     const api = createDemoApi();
     const list = await api.getUsuals();
-    expect(list.map((u) => u.name).sort()).toEqual(['After dinner cereal', 'Oatmeal', 'Yogurt bowl']);
+    expect(list.map((u) => u.name).sort()).toEqual(['After dinner cereal', 'Oatmeal', 'Side salad', 'Yogurt bowl']);
     for (const u of list) {
       expect(u.start.kcal).toBeGreaterThan(0);
       expect(u.start.partial).toBe(false);
@@ -21,7 +21,7 @@ describe('the demo usuals (#881)', () => {
     }
     expect((await api.getUsuals('After dinner')).map((u) => u.name)).toEqual(['After dinner cereal']);
     // Most recently used first, then by name.
-    expect(list.map((u) => u.name)).toEqual(['After dinner cereal', 'Oatmeal', 'Yogurt bowl']);
+    expect(list.map((u) => u.name)).toEqual(['After dinner cereal', 'Oatmeal', 'Side salad', 'Yogurt bowl']);
   });
 
   it('a pick-one carries an amount per option', async () => {
@@ -240,7 +240,7 @@ describe('the demo usuals (#881)', () => {
     await expect(bad({ lines: [{ options: [one, one] }] })).rejects.toThrow(/options/);
     const two = { food_id: 'fd_demo_almond', qty: 1, unit: 'serving' };
     await expect(bad({ lines: [{ options: [one, two], last_pick: 'fd_demo_bread' }] })).rejects.toThrow(/last_pick/);
-    expect((await api.getUsuals()).length).toBe(3);
+    expect((await api.getUsuals()).length).toBe(4);
   });
 
   it('deleteUsual keeps its logged entries and their group, and a food a usual uses cannot be deleted', async () => {

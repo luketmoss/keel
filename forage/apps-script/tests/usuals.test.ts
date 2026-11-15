@@ -49,7 +49,7 @@ function loaded() {
 }
 
 describe('ensureSchema (AC 1)', () => {
-  it('on a Sheet at version 4 creates Usuals and UsualLines, sets version 6, and a second run changes nothing', () => {
+  it('on a Sheet at version 4 creates Usuals and UsualLines, sets version 7, and a second run changes nothing', () => {
     const api = loadApi({ empty: true });
     api.ok('ensureSchema');
     api.ss.sheets.delete('Usuals');
@@ -57,10 +57,10 @@ describe('ensureSchema (AC 1)', () => {
     api.ok('setConfig', { payload: { key: 'schema_version', value: '4' } });
     const data = api.ok('ensureSchema');
     expect(data.created).toEqual(['Usuals', 'UsualLines']);
-    expect(data.schema_version).toBe('6');
+    expect(data.schema_version).toBe('7');
     expect(api.ss.getSheetByName('Usuals')!.rows).toEqual([['id', 'name', 'slot', 'created', 'updated']]);
     expect(api.ss.getSheetByName('UsualLines')!.rows).toEqual([
-      ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick'],
+      ['usual_id', 'line_id', 'position', 'food_id', 'qty', 'unit', 'options_json', 'last_pick', 'optional'],
     ]);
     const before = JSON.stringify([...api.ss.sheets.entries()].map(([n, s]) => [n, s.rows]));
     const again = api.ok('ensureSchema');

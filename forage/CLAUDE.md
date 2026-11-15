@@ -100,7 +100,7 @@ the starter list is `starter.js`, about 75 USDA SR Legacy foods **generated** by
 | **Config** | `key` | key, value, updated |
 | **MCPChangeLog** | — | logged_at, call_id, action, tab, row_key, before, after |
 | **Usuals** | `id` | id, name, slot, created, updated |
-| **UsualLines** | `usual_id` + `line_id` | usual_id, line_id, position, food_id, qty, unit, options_json, last_pick |
+| **UsualLines** | `usual_id` + `line_id` | usual_id, line_id, position, food_id, qty, unit, options_json, last_pick, optional |
 
 What the columns mean:
 
@@ -210,7 +210,7 @@ What the columns mean:
   and `unhideCombos` (`keys`, or all) edit the JSON array in `Config.hidden_combos`; both are logged for undo (`Config`).
 - **Cooks.** `rating` is 1–5, or blank when not rated. `plan_id` is set when
   the cook was the plan's meal.
-- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`, `5` since #877's Usuals and UsualLines, `6` since #878's FoodLog group columns), and `ingredient_aliases` (#706): a JSON
+- **Config.** `schema_version` (`2` since #713's MCPChangeLog, `3` since #755's nutrient columns, `4` since #880's `short_name`, `5` since #877's Usuals and UsualLines, `6` since #878's FoodLog group columns, `7` since #942's UsualLines `optional`), and `ingredient_aliases` (#706): a JSON
   object from a normalised ingredient name to the `food_id` a saved import
   matched it to. Later issues add keys here, not tabs.
 - **Usuals** (#877). A meal eaten on repeat with a part that may vary, in `apps-script/src/usuals.js`
@@ -218,7 +218,7 @@ What the columns mean:
   is `us_` + 8 hex; `slot` is a Plan slot. **UsualLines**: `line_id` is `L1`, `L2`… stable like RecipeLines (a replace keeps
   the ids sent, new lines are numbered after the highest used). An **Always** line has `food_id`, `qty` and `unit` and a blank
   `options_json`; a **pick-one** has those three blank and `options_json` set, `[{"food_id","qty","unit"}]` of 2 to 12 distinct
-  foods, each with its own amount, and `last_pick` is the food id of the option picked last (blank is the first). A `unit` is
+  foods, each with its own amount, and `last_pick` is the food id of the option picked last (blank is the first). `optional` (#942, appended) is on either kind: blank is eaten every time, `in` is usually (logged unless left out) and `out` is sometimes (left out unless brought in); anything else is refused naming `lines[n].optional`, and a usual's `start` leaves `out` lines out. `logUsual`'s `picks` takes `null` to leave an optional line out (its `last_pick` is kept; refused for a line that is not optional) and an optional single-food line's own food to bring it in, and a usual with every line left out is refused. A `unit` is
   one of the food's serving names exactly, or `g`; `qty` is over 0. Reads add `start` (nutrition as it starts, from
   `usualNutrition`), `used_count` (distinct groups logged from it), `last_used` and, per line, `swaps` (#878: `[{food_id, count}]`, the foods logged
   for that line that are neither its food nor one of its options, most first). A usual's foods cannot be

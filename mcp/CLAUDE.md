@@ -122,7 +122,7 @@ value falls back to the default, never to "unlimited" (`parseLimits` in
 | What | Var | Default | When it is hit |
 |---|---|---|---|
 | Rows in one call (Thrive's bulk tools) | `MAX_ROWS_PER_CALL` | 200 | The call is previewed, nothing written: `CAP — nothing written. This would write N rows, over the 200-row limit for one call.`, then the summary a success would give, then `Call again with confirm: true to write them.` |
-| Write calls per rolling 60 minutes | `MAX_WRITES_PER_HOUR` | 40 | Every write tool for that app is refused until the window moves on: `Write limit reached for Thrive: 40 writes in the last hour. Writing resumes at HH:MM (America/Denver). Reads still work.` |
+| Write calls per rolling 60 minutes | `MAX_WRITES_PER_HOUR` | 120 | Every write tool for that app is refused until the window moves on: `Write limit reached for Thrive: 120 writes in the last hour. Writing resumes at HH:MM (America/Denver). Reads still work.` |
 | Rows per rolling 60 minutes | `MAX_ROWS_PER_HOUR` | 600 | The same refusal, naming rows |
 
 - **Per-call ceiling.** `thrive_schedule_workout`, `thrive_schedule_week`,

@@ -16,7 +16,7 @@
 
 export const DEFAULT_LIMITS = Object.freeze({
   maxRowsPerCall: 200,
-  maxWritesPerHour: 40,
+  maxWritesPerHour: 120,
   maxRowsPerHour: 600,
 });
 

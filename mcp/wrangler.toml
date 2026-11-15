@@ -14,7 +14,7 @@ GITHUB_CLIENT_ID = "Ov23lieyNEsMK4XTtE7m"
 # Rows one call may write before it is held for `confirm: true` (Thrive's four bulk tools).
 MAX_ROWS_PER_CALL = "200"
 # Per app, over a rolling 60 minutes: write calls, or rows, whichever comes first.
-MAX_WRITES_PER_HOUR = "40"
+MAX_WRITES_PER_HOUR = "120"
 MAX_ROWS_PER_HOUR = "600"
 
 # No id: wrangler creates the namespace on first deploy and records it.

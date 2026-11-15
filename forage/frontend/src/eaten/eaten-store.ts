@@ -3,22 +3,24 @@
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
-import type {
-  Food,
-  FoodLogDay,
-  FoodLogEntry,
-  FoodLogMeal,
-  LogMealInput,
-  PlanEntry,
-  RecipeSummary,
-  Slot,
-  Usual,
-} from '../api/types';
+import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, LogMealInput, PlanEntry, Slot, Usual } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 import { showToast } from '../ui/toast';
 import { switchUnit, type UnitOption } from './amount-edit';
-import { bindAddAccount, dropHeldEntry, holdEntry, holdFood, holdUsuals, _resetAdd } from './add-store';
+import {
+  beginHeld,
+  bindAddAccount,
+  dropHeldEntry,
+  endHeld,
+  heldFoods,
+  heldRecipes,
+  holdEntry,
+  holdFood,
+  holdUsuals,
+  landHeld,
+  _resetAdd,
+} from './add-store';
 import { newLogId } from './format';
 import { previewFood, previewRecipe, type EntryNutrition } from './preview';
 import { addedMealToast, mealInput, provisionalEntries, removedMealToast, targetName, type TrayItem } from './tray';
@@ -37,9 +39,6 @@ export const dayTotals = signal<FoodLogDay | null>(null);
 export const dayMeals = signal<FoodLogMeal[]>([]);
 /** The day's planned recipe meals, in plan order, before the log hides any. */
 export const dayPlan = signal<PlanEntry[]>([]);
-/** The library, for the entries' names and the Add sheet. */
-export const logFoods = signal<Food[]>([]);
-export const logRecipes = signal<RecipeSummary[]>([]);
 /** The usuals (#885), for the Add sheet and for a group's pick-ones and changes; empty until they load or if that fails. */
 export const dayUsuals = signal<Usual[]>([]);
 
@@ -107,10 +106,10 @@ export function openEditor(entry: FoodLogEntry): void {
  */
 function figuresFor(entry: FoodLogEntry, qty: number, unit: string): EntryNutrition | null {
   if (entry.recipe_id) {
-    const recipe = logRecipes.value.find((r) => r.id === entry.recipe_id);
+    const recipe = heldRecipes.value.find((r) => r.id === entry.recipe_id);
     return recipe ? previewRecipe(recipe, qty) : null;
   }
-  const food = logFoods.value.find((f) => f.id === entry.food_id);
+  const food = heldFoods.value.find((f) => f.id === entry.food_id);
   return food ? previewFood(food, qty, unit, entry) : null;
 }
 
@@ -234,6 +233,9 @@ export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = fa
   const everything = !quiet || fullOut;
   const withRecipes = everything || wantRecipes;
   wantRecipes = false;
+  // The foods and recipes land in the Add sheet's held lists, the tab's one copy (#939), with any write made since
+  // put back over them.
+  const library = withRecipes ? beginHeld() : null;
   try {
     const [entries, totals, plan, foods, recipes] = await Promise.all([
       api.getFoodLog(date, date),
@@ -243,19 +245,20 @@ export async function loadDay(api: ForageApi, date = eatenDate.value, quiet = fa
       withRecipes ? api.getRecipes() : null,
     ]);
     if (seq !== latest) return;
+    if (library && (foods || recipes)) landHeld(library, { ...(foods && { foods }), ...(recipes && { recipes }) });
     if (quiet && patches !== before) return;
     dayEntries.value = entries;
     const day = totals.days.find((d) => d.date === date) ?? null;
     dayTotals.value = day;
     dayMeals.value = day?.meals ?? [];
     if (plan) dayPlan.value = plan.entries.filter((p) => p.date === date && p.recipe_id);
-    if (foods) logFoods.value = foods;
-    if (recipes) logRecipes.value = recipes;
     if (everything) fullOut = false;
     dayState.value = 'ready';
   } catch {
     if (seq !== latest || quiet) return;
     dayState.value = 'error';
+  } finally {
+    if (library) endHeld(library);
   }
 }
 
@@ -279,12 +282,6 @@ export function upsertEntry(entry: FoodLogEntry): void {
   // The order a reload gives: by when each was logged.
   dayEntries.value = next.sort((a, b) => a.logged_at.localeCompare(b.logged_at));
   patches++;
-}
-
-/** A food the day's rows may name, as the screen has it now: a food added moments ago isn't in `logFoods` yet. */
-export function knowFood(food: Food): void {
-  holdFood(food);
-  logFoods.value = [...logFoods.value.filter((f) => f.id !== food.id), food];
 }
 
 /** Take a deleted entry out of the day. */
@@ -380,7 +377,7 @@ export async function sendMeal(api: ForageApi, id: string): Promise<void> {
   try {
     const { entries } = await api.logMeal(meal.input);
     // The stored entries replace the pending rows in one update; the totals catch up quietly (#785).
-    for (const f of meal.foods) if (!logFoods.value.some((x) => x.id === f.id)) knowFood(f);
+    for (const f of meal.foods) if (!heldFoods.value.some((x) => x.id === f.id)) holdFood(f);
     for (const e of entries) upsertEntry(e);
     pendingMeals.value = pendingMeals.value.filter((p) => p.id !== id);
     void refreshDay(api);
@@ -430,8 +427,6 @@ export function _resetEaten(): void {
   dayTotals.value = null;
   dayMeals.value = [];
   dayPlan.value = [];
-  logFoods.value = [];
-  logRecipes.value = [];
   dayUsuals.value = [];
   pendingMeals.value = [];
   sending.clear();

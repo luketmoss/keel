@@ -95,14 +95,14 @@ The last element of every food card in a **chart** view: a link row after the pl
 
 | Card | Opens |
 |---|---|
-| Calories | `https://luketmoss.github.io/keel/forage/#/eaten/trends?tab=energy&metric=kcal&range=<R>` |
-| Protein | `...?tab=macros&metric=protein&range=<R>` |
-| Carbs | `...?tab=macros&metric=carbs&range=<R>` |
-| Fat | `...?tab=macros&metric=fat&range=<R>` |
+| Calories | `https://luketmoss.github.io/keel/forage/#/eaten/trends?metric=kcal&range=<R>` |
+| Protein | `...?metric=protein&range=<R>` |
+| Carbs | `...?metric=carbs&range=<R>` |
+| Fat | `...?metric=fat&range=<R>` |
 
-`<R>` is the Range control's current key, `1W`, `1M`, `3M`, `6M`, `1Y` or `All`, which are also #913's. `tab` and `metric` are #913's contract (`metric=kcal`; unknown or unbuilt values open Energy at the range, its stated fallback), so until #914 builds Macros the three macro links land on Energy. **The macro values (`tab=macros`, `metric=protein|carbs|fat`) are this note's assumption and #914's note should confirm them**; if it names others, only this table changes. The base is `FORAGE_EATEN_URL` with `/trends` after `#/eaten` (`api/forage-food.ts`).
+`<R>` is the Range control's current key, `1W`, `1M`, `3M`, `6M`, `1Y` or `All`, which are also #913's. `metric` names a chart and implies its tab, as `forage/docs/design/913-trends-screen.md` §The route specifies: `kcal` is Energy, and #914 adds `protein`, `carbs` and `fat` (Macros). A metric whose tab is not built yet opens Energy at the range, #913's stated fallback, so until #914 ships the three macro links land on Energy. No `tab` is sent. The base is `FORAGE_EATEN_URL` with `/trends` after `#/eaten` (`api/forage-food.ts`).
 
-- **Accessible name:** "Explore Calories in Forage" (the visible text plus the card's name, which contains "Explore in Forage").
+- **Accessible name:** "Explore Calories in Forage" (the visible text with the card's name added, so the four links differ).
 - **If #913 has not shipped, there is no link.** `/develop` checks that #913 is closed. If it is not, the cards end at the plot, nothing else here changes, the PR says the link is deferred, and a one-line follow-up issue adds it. It is a constant with the URL, not a feature flag read at runtime.
 - **States (#404):** the link takes the Day card's "Open Forage" treatment, `.food-link`, which is already in the Quiet buttons row of `404-interaction-states.md` (`interaction-states.test.ts` enforces that table, so a second class would have to be added to it): rest, hover under `@media (hover: hover)`, pressed, the global focus ring. No selected or disabled state. The class is the existing one reused or its rule shared, not a second copy.
 

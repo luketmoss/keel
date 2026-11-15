@@ -10,6 +10,7 @@ import App from '../App';
 import { _resetDemoApi } from '../api/use-api';
 import { _resetDemoModeCache } from '../demo/is-demo-mode';
 import { _resetRecipes } from '../library/recipes-store';
+import { beginHeld, endHeld, heldRecipes, landHeld, _resetAdd } from '../eaten/add-store';
 import { fakeApi, previewOf, READ_PREVIEW } from '../test-api';
 import { review, savedNotice } from './review-state';
 
@@ -257,6 +258,20 @@ describe('AC: the review screen', () => {
     expect(screen.getByTestId('recipe-row').textContent).toContain('Weeknight Lentil Soup');
     expect(screen.getByTestId('recipe-row').textContent).toContain('Not rated · never cooked · partial');
     expect(screen.getByText('Saved Weeknight Lentil Soup')).toBeDefined();
+  });
+
+  it('the saved recipe is in the Eaten tab’s held recipes at once, exactly once (#941)', async () => {
+    _resetAdd();
+    // The Add sheet has loaded its recipes before: none.
+    const load = beginHeld();
+    landHeld(load, { recipes: [] });
+    endHeld(load);
+    fakeApi();
+    await readLink();
+    fireEvent.click(screen.getByTestId('save-recipe'));
+    await settle();
+    expect(heldRecipes.value.map((r) => r.name)).toEqual(['Weeknight Lentil Soup']);
+    _resetAdd();
   });
 
   it('it cannot be saved without servings, nor with every line removed', async () => {

@@ -3,7 +3,7 @@ import type { ForageApi } from '../api/client';
 import { ApiError } from '../api/client';
 import { isDemoMode } from '../demo/is-demo-mode';
 import { DemoBanner } from '../demo/demo-banner';
-import { loadRecipes } from '../library/recipes-store';
+import { addRecipe, loadRecipes } from '../library/recipes-store';
 import { ConfirmSheet } from '../ui/sheet';
 import { FoodChooser } from './food-chooser';
 import { LineEdit } from './line-edit';
@@ -175,8 +175,9 @@ export function ReviewScreen({ api }: { api: ForageApi }) {
   async function save() {
     const current = review.value!;
     patchReview({ saving: true, saveError: null });
+    let saved;
     try {
-      await api.saveImport(toStructured(current), current.allowDuplicate);
+      saved = await api.saveImport(toStructured(current), current.allowDuplicate);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'duplicate') {
         patchReview({
@@ -189,6 +190,8 @@ export function ReviewScreen({ api }: { api: ForageApi }) {
       patchReview({ saving: false, saveError: saveErrorText(err, current) });
       return;
     }
+    // The saved recipe goes into the Library's list and the Eaten tab's held recipes at once (#941).
+    addRecipe(saved);
     closeReview();
     savedNotice.value = `Saved ${current.name.trim()}`;
     setTimeout(() => {

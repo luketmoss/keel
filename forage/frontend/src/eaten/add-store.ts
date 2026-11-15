@@ -265,6 +265,11 @@ export function holdRecipe(recipe: RecipeSummary): void {
   );
 }
 
+/** A recipe deleted. */
+export function dropHeldRecipe(id: string): void {
+  patch((h) => (h.recipes ? { ...h, recipes: h.recipes.filter((r) => r.id !== id) } : h));
+}
+
 /** An entry logged or changed, so Recent includes it. One older than the 60 days is not in a refresh either. */
 export function holdEntry(entry: FoodLogEntry): void {
   if (entry.date < addDays(localDate(), -RECENT_DAYS)) return;

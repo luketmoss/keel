@@ -3,12 +3,25 @@
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
-import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSummary, Usual } from '../api/types';
+import type {
+  Food,
+  FoodLogDay,
+  FoodLogEntry,
+  FoodLogMeal,
+  LogMealInput,
+  PlanEntry,
+  RecipeSummary,
+  Slot,
+  Usual,
+} from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
+import { showToast } from '../ui/toast';
 import { switchUnit, type UnitOption } from './amount-edit';
 import { bindAddAccount, dropHeldEntry, holdEntry, holdFood, holdUsuals, _resetAdd } from './add-store';
+import { newLogId } from './format';
 import { previewFood, previewRecipe, type EntryNutrition } from './preview';
+import { addedMealToast, mealInput, provisionalEntries, removedMealToast, targetName, type TrayItem } from './tray';
 
 export type DayState = 'loading' | 'ready' | 'error';
 
@@ -311,6 +324,94 @@ export function unloggedPlan(plan: PlanEntry[], entries: FoodLogEntry[]): PlanEn
   });
 }
 
+/**
+ * A meal the tray saved (#933) whose `logMeal` is out or failed: the day shows its rows muted with `Saving…`, or under
+ * `Couldn't save N items.` The call is the same on every retry, ids included, so a write that landed but lost its
+ * answer is not doubled.
+ */
+export interface PendingMeal {
+  id: string;
+  date: string;
+  slot: Slot;
+  input: LogMealInput;
+  /** The entries as the app worked them out, named, until the write answers. */
+  rows: { entry: FoodLogEntry; name: string }[];
+  /** The foods in it, for the day's names before a refresh knows them. */
+  foods: Food[];
+  /** A usual is among them: its last pick and use count moved. */
+  usual: boolean;
+  failed: boolean;
+}
+export const pendingMeals = signal<PendingMeal[]>([]);
+
+const sending = new Set<string>();
+
+function patchPending(id: string, change: Partial<PendingMeal>): void {
+  pendingMeals.value = pendingMeals.value.map((p) => (p.id === id ? { ...p, ...change } : p));
+}
+
+/** Save the tray: its rows go on the day at once, muted, and one `logMeal` goes out. The caller closes the sheet. */
+export function saveMeal(api: ForageApi, date: string, slot: Slot, items: TrayItem[]): void {
+  if (!items.length) return;
+  const id = newLogId();
+  const entries = provisionalEntries(id, date, slot, items);
+  pendingMeals.value = [
+    ...pendingMeals.value,
+    {
+      id,
+      date,
+      slot,
+      input: mealInput(date, slot, items),
+      rows: items.map((item, i) => ({ entry: entries[i], name: targetName(item.target) })),
+      foods: items.flatMap((i) => (i.target.kind === 'food' ? [i.target.food] : [])),
+      usual: items.some((i) => !!i.group?.usualId),
+      failed: false,
+    },
+  ];
+  void sendMeal(api, id);
+}
+
+/** Send a pending meal, or send it again with the same ids. A second call while one is out does nothing. */
+export async function sendMeal(api: ForageApi, id: string): Promise<void> {
+  const meal = pendingMeals.value.find((p) => p.id === id);
+  if (!meal || sending.has(id)) return;
+  sending.add(id);
+  patchPending(id, { failed: false });
+  try {
+    const { entries } = await api.logMeal(meal.input);
+    // The stored entries replace the pending rows in one update; the totals catch up quietly (#785).
+    for (const f of meal.foods) if (!logFoods.value.some((x) => x.id === f.id)) knowFood(f);
+    for (const e of entries) upsertEntry(e);
+    pendingMeals.value = pendingMeals.value.filter((p) => p.id !== id);
+    void refreshDay(api);
+    if (meal.usual) void loadDayUsuals(api);
+    const ids = entries.map((e) => e.id);
+    showToast(addedMealToast(meal.rows, meal.slot), { label: 'Undo', run: () => void undoMeal(api, meal, ids) });
+  } catch {
+    patchPending(id, { failed: true });
+  } finally {
+    sending.delete(id);
+  }
+}
+
+/** Discard a meal that failed: its rows leave the day. */
+export function discardMeal(id: string): void {
+  pendingMeals.value = pendingMeals.value.filter((p) => p.id !== id);
+}
+
+/** Undo deletes exactly the entries the write stored. */
+async function undoMeal(api: ForageApi, meal: PendingMeal, ids: string[]): Promise<void> {
+  try {
+    await api.deleteLogEntries(ids);
+    for (const id of ids) removeEntry(id);
+    void refreshDay(api);
+    if (meal.usual) void loadDayUsuals(api);
+    showToast(removedMealToast(meal.rows, meal.slot));
+  } catch {
+    showToast("Couldn't undo. The items are still there.");
+  }
+}
+
 /** Forget what was loaded (tests and sign-out). */
 export function _resetEaten(): void {
   _resetAdd();
@@ -332,4 +433,6 @@ export function _resetEaten(): void {
   logFoods.value = [];
   logRecipes.value = [];
   dayUsuals.value = [];
+  pendingMeals.value = [];
+  sending.clear();
 }

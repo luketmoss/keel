@@ -18,6 +18,10 @@ interface Props {
   tall?: boolean;
   /** #779: leave focus on the panel itself, so no field takes it and no keyboard opens; the content may focus a control later. */
   focusPanel?: boolean;
+  /** #933: a button pinned to the bottom of the sheet, under the scrolling body. */
+  footer?: ComponentChildren;
+  /** #933: a prompt that must be answered is an `alertdialog`. */
+  alert?: boolean;
 }
 
 /**
@@ -35,6 +39,8 @@ export function Sheet({
   headerEnd,
   tall,
   focusPanel,
+  footer,
+  alert,
 }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -83,8 +89,8 @@ export function Sheet({
     <div class="sheet-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={panel}
-        class={tall ? 'sheet sheet-tall' : 'sheet'}
-        role="dialog"
+        class={`${tall ? 'sheet sheet-tall' : 'sheet'}${footer ? ' sheet-has-footer' : ''}`}
+        role={alert ? 'alertdialog' : 'dialog'}
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
@@ -101,6 +107,7 @@ export function Sheet({
           )}
         </header>
         <div class="sheet-body">{children}</div>
+        {footer && <div class="sheet-footer">{footer}</div>}
       </div>
     </div>
   );

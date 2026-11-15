@@ -7,10 +7,10 @@ import { isDemoMode } from '../demo/is-demo-mode';
 import type { ForageApi } from '../api/client';
 import {
   SLOTS,
-  type Combo,
   type CopyMealInput,
   type Food,
   type RecipeDetail,
+  type RecipeSummary,
   type FoodLogDay,
   type FoodLogEntry,
   type FoodLogMeal,
@@ -21,7 +21,6 @@ import {
   type UsualOption,
 } from '../api/types';
 import { BarcodeSheet } from '../library/barcode-sheet';
-import { groupItems } from '../library/combos-store';
 import { FoodForm, type FoodFormOrigin } from '../library/food-form';
 import { hasNutrition } from '../library/food-math';
 import { keepFood } from '../library/foods-store';
@@ -31,7 +30,7 @@ import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { eatenHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
-import { beginAddPass, holdFood, holdRecipe } from './add-store';
+import { addLists, beginAddPass, holdFood, holdRecipe } from './add-store';
 import { AddSheet } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
@@ -73,8 +72,13 @@ import {
   logFoods,
   logRecipes,
   moveDay,
+  pendingMeals,
+  type PendingMeal,
   refreshDay,
   removeEntry,
+  saveMeal,
+  sendMeal,
+  discardMeal,
   unloggedPlan,
   upsertEntry,
 } from './eaten-store';
@@ -88,11 +92,12 @@ import {
   mealMg,
   newLogId,
   nothingLogged,
+  recipeLoggable,
   wholeGrams,
   wholeKcal,
 } from './format';
+import { TRAY_MAX, couldntSave, lastEntries, looseItem, newItem, type Pass, type TrayItem } from './tray';
 import {
-  addedToast,
   dayItems,
   fromUsual,
   groupChanges,
@@ -348,14 +353,80 @@ function PlannedRow({ plan, busy, failed, onLog, onNutrition }: PlannedProps) {
   );
 }
 
+/**
+ * A meal the tray saved, while its write is out (#933): its rows muted with `Saving…` and not tappable, a group under
+ * its heading. When the write failed they stay under `Couldn't save N items.` with Try again and Discard.
+ */
+function PendingMealView({
+  meal,
+  onRetry,
+  onDiscard,
+}: {
+  meal: PendingMeal;
+  onRetry: () => void;
+  onDiscard: () => void;
+}) {
+  const names = new Map(meal.rows.map((r) => [r.entry.id, r.name]));
+  const row = (e: FoodLogEntry) => (
+    <li key={e.id} data-testid="pending-row">
+      <div class="log-row is-pending" aria-busy={!meal.failed}>
+        <span class="recipe-text">
+          <span class="recipe-name">{names.get(e.id)}</span>
+          <span class="recipe-meta">{amountLine(e)}</span>
+        </span>
+        {meal.failed ? (
+          e.kcal === null ? null : (
+            <span class="log-row-kcal tabular">
+              {wholeKcal(e.kcal)} <span class="hint-inline">kcal</span>
+            </span>
+          )
+        ) : (
+          <span class="saving-tag" data-testid="saving-tag">
+            Saving…
+          </span>
+        )}
+      </div>
+    </li>
+  );
+  return (
+    <li class="pending-meal" data-testid="pending-meal">
+      {meal.failed && (
+        <div class="pending-failed" role="status" data-testid="pending-failed">
+          <p class="danger-text">{couldntSave(meal.rows.length)}</p>
+          <button type="button" class="text-btn" onClick={onRetry} data-testid="pending-retry">
+            Try again
+          </button>
+          <button type="button" class="text-btn" onClick={onDiscard} data-testid="pending-discard">
+            Discard
+          </button>
+        </div>
+      )}
+      <ul class="plain-list">
+        {dayItems(meal.rows.map((r) => r.entry)).map((item) =>
+          item.kind === 'entry' ? (
+            row(item.entry)
+          ) : (
+            <li key={item.id} class="group-li" data-testid="pending-group">
+              <div class="group-head">
+                <span class="group-name">{item.name}</span>
+              </div>
+              <ul class="plain-list group-entries">{item.entries.map(row)}</ul>
+            </li>
+          ),
+        )}
+      </ul>
+    </li>
+  );
+}
+
 type Overlay =
   | { kind: 'add'; slot: Slot; q?: string }
   | { kind: 'addFood'; slot: Slot }
   | { kind: 'barcode'; slot: Slot }
   | { kind: 'starter'; slot: Slot }
-  // `fill`: opened by a search row's Add nutrition, which comes back to the Add sheet rather than logging.
-  | { kind: 'form'; slot: Slot; food: Partial<Food>; origin: FoodFormOrigin; fill?: boolean }
-  | { kind: 'amount'; slot: Slot; target: LogTarget; entry?: FoodLogEntry }
+  | { kind: 'form'; slot: Slot; food: Partial<Food>; origin: FoodFormOrigin }
+  // An entry's amount sheet, opened from the day (#712); adding goes through the Add sheet's tray (#933).
+  | { kind: 'amount'; slot: Slot; target: LogTarget; entry: FoodLogEntry }
   | { kind: 'nutrition'; recipeId: string; back?: Slot }
   // #788: the New recipe sheet, over the meal in select mode.
   | { kind: 'saveRecipe'; slot: Slot }
@@ -371,27 +442,17 @@ type Overlay =
   | { kind: 'newUsual'; slot: Slot; ids: string[]; name?: string };
 
 /**
- * A pass (#786): from an Add row's tap until the Add sheet closes, one meal's adding. The screen holds it because the
- * Add sheet unmounts while the amount sheet is open.
- */
-interface Pass {
-  slot: Slot;
-  /** The entries logged in the pass, in the order logged; one deleted again stays here but leaves the list. */
-  ids: string[];
-  /** The search text, kept while the amount sheet is open. */
-  q: string;
-  /** The last save's status line, and the entry it touched. */
-  status: string | null;
-  fresh: string | null;
-}
-
-/**
  * The Eaten tab (#712): a day of the food log. The day card shows `getFoodLogTotals`, each meal its entries
  * (their stored snapshots), the day's planned meals not yet logged, and an Add row. The app adds nothing up.
  */
 export function EatenScreen({ api }: { api: ForageApi }) {
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  // #933: the tray, from an Add row's tap until the Add sheet closes. The screen holds it because the Add sheet
+  // unmounts while another sheet (Add a food, the barcode scanner) is over it.
   const [pass, setPass] = useState<Pass | null>(null);
+  const sentPass = useRef(false);
+  // The recipe the Nutrition sheet last saved from the Add sheet, which goes into the tray when it closes loggable.
+  const nutritionRecipe = useRef<RecipeSummary | null>(null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [failedPlan, setFailedPlan] = useState<string | null>(null);
   // One entry id per planned meal, kept across taps and retries, so they leave one entry.
@@ -405,9 +466,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const [copyBusy, setCopyBusy] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
-  // #885: the usual being logged, the pick-one list open (an entry id), a pick or a menu action saving.
-  const [loggingUsual, setLoggingUsual] = useState<string | null>(null);
-  const [loggingCombo, setLoggingCombo] = useState<string | null>(null);
+  // #885: the pick-one list open (an entry id), a pick or a menu action saving.
   const [openPick, setOpenPick] = useState<string | null>(null);
   const [pickBusy, setPickBusy] = useState<string | null>(null);
   const [groupBusy, setGroupBusy] = useState(false);
@@ -483,6 +542,12 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const recipes = logRecipes.value;
   const usuals = dayUsuals.value;
   const foodMap = new Map(foods.map((f) => [f.id, f]));
+  const pending = pendingMeals.value;
+  const pendingFor = (slot: Slot): PendingMeal[] =>
+    pending
+      .filter((p) => p.date === date && p.slot === slot)
+      .map((p) => ({ ...p, rows: p.rows.filter((r) => !entries.some((e) => e.id === r.entry.id)) }))
+      .filter((p) => p.rows.length > 0);
 
   // The write's own answer goes into the day, then the sheet closes and the toast shows, in one update; the totals
   // catch up quietly behind it (#785).
@@ -492,23 +557,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       upsertEntry(saved.entry);
     } else removeEntry(saved.removed);
     void refreshDay(api);
-    if (pass && overlay?.kind === 'amount') {
-      // #786: back to the Add sheet; a new entry joins the Added list and clears the search.
-      const isNew = !overlay.entry;
-      const id = 'entry' in saved ? saved.entry.id : null;
-      setPass(
-        (p) =>
-          p && {
-            ...p,
-            ids: id && !p.ids.includes(id) ? [...p.ids, id] : p.ids,
-            q: isNew ? '' : p.q,
-            status,
-            fresh: id,
-          },
-      );
-      setOverlay({ kind: 'add', slot: pass.slot, q: isNew ? '' : pass.q });
-      return;
-    }
     setOverlay(null);
     showToast(status);
   }
@@ -518,21 +566,40 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   }
 
   function beginPass(slot: Slot) {
-    setPass({ slot, ids: [], q: '', status: null, fresh: null });
+    sentPass.current = false;
+    setPass({ slot, date, items: [], q: '' });
     beginAddPass();
     setOverlay({ kind: 'add', slot });
   }
 
-  /** Done, close, Escape or the backdrop: one toast for what the pass left on the day, and focus on its Add row. */
+  /** The sheet closes, whatever the tray held, and focus goes back to its Add row. */
   function endPass() {
+    const slot = pass?.slot;
     setOverlay(null);
     setPass(null);
-    if (!pass) return;
-    const left = dayEntries.value.filter((e) => pass.ids.includes(e.id));
-    if (left.length === 1) showToast(`Logged ${entryName(left[0], foods, recipes)}`);
-    else if (left.length > 1) showToast(`Logged ${left.length} items to ${pass.slot.toLowerCase()}`);
+    if (!slot) return;
     requestAnimationFrame(() =>
-      document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${pass.slot}"]`)?.focus(),
+      document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${slot}"]`)?.focus(),
+    );
+  }
+
+  /** The footer's save (#933): the day shows the rows at once, `logMeal` goes out, and the sheet is gone. */
+  function savePass() {
+    if (!pass || !pass.items.length || sentPass.current) return;
+    sentPass.current = true;
+    saveMeal(api, pass.date, pass.slot, pass.items);
+    endPass();
+  }
+
+  function changeTray(change: (items: TrayItem[]) => TrayItem[]) {
+    setPass((p) => p && { ...p, items: change(p.items) });
+  }
+
+  /** A food or recipe made or given nutrition while the Add sheet was open goes into the tray, as a tap would. */
+  function addToTray(target: LogTarget) {
+    const last = lastEntries(addLists.value?.log ?? []);
+    changeTray((items) =>
+      items.length >= TRAY_MAX || looseItem(items, target) ? items : [...items, newItem(target, last)],
     );
   }
 
@@ -577,8 +644,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
 
   function addNutrition(target: LogTarget, slot: Slot) {
     if (target.kind === 'food') {
-      setOverlay({ kind: 'form', slot, food: target.food, origin: { focusNutrition: true }, fill: true });
+      setOverlay({ kind: 'form', slot, food: target.food, origin: { focusNutrition: true } });
     } else {
+      nutritionRecipe.current = null;
       setOverlay({ kind: 'nutrition', recipeId: target.recipe.id, back: slot });
     }
   }
@@ -650,68 +718,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
       (n) => pulledToast(from.date, today, slot, n),
       sheet ? null : `Couldn't copy ${word}'s ${slot.toLowerCase()}. Try again.`,
     );
-  }
-
-  /** Tap a usual in the Add sheet (#885): its entries go in as one group, the sheet closes, and the toast offers Undo. */
-  async function logUsual(u: Usual, slot: Slot) {
-    if (loggingUsual) return;
-    setLoggingUsual(u.id);
-    try {
-      const { entries: made } = await api.logUsual({ usual_id: u.id, date, slot });
-      for (const e of made) upsertEntry(e);
-      void refreshDay(api);
-      void loadDayUsuals(api);
-      setOverlay(null);
-      setPass(null);
-      const ids = made.map((e) => e.id);
-      showToast(addedToast(u.name, made.length), { label: 'Undo', run: () => void undoLogged(ids) });
-      requestAnimationFrame(() =>
-        document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${slot}"]`)?.focus(),
-      );
-    } catch {
-      setPass((p) => p && { ...p, status: `Couldn't add ${u.name}. Try again.` });
-    } finally {
-      setLoggingUsual(null);
-    }
-  }
-
-  /** Tap a combo in the Add sheet (#888): its foods go in as one group with no usual, and the toast offers Undo. */
-  async function logCombo(c: Combo, slot: Slot) {
-    if (loggingCombo) return;
-    setLoggingCombo(c.key);
-    try {
-      const { entries: made } = await api.logGroup({
-        date,
-        slot,
-        name: c.name.slice(0, 120),
-        items: groupItems(c),
-      });
-      for (const e of made) upsertEntry(e);
-      void refreshDay(api);
-      setOverlay(null);
-      setPass(null);
-      const ids = made.map((e) => e.id);
-      showToast(`Added ${c.name}`, { label: 'Undo', run: () => void undoLogged(ids) });
-      requestAnimationFrame(() =>
-        document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${slot}"]`)?.focus(),
-      );
-    } catch {
-      setPass((p) => p && { ...p, status: `Couldn't add ${c.name}. Try again.` });
-    } finally {
-      setLoggingCombo(null);
-    }
-  }
-
-  /** Undo of a logged usual: delete exactly its entries. */
-  async function undoLogged(ids: string[]) {
-    try {
-      await api.deleteLogEntries(ids);
-      for (const id of ids) removeEntry(id);
-      void refreshDay(api);
-      void loadDayUsuals(api);
-    } catch {
-      showToast("Couldn't undo. The items are still there.");
-    }
   }
 
   /** A pick-one's choice (#885): the entry becomes that option at the option's own amount, in place. */
@@ -837,7 +843,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     try {
       const food = await api.getFood(id);
       keepFood(food);
-      setOverlay(hasNutrition(food) ? { kind: 'amount', slot, target: { kind: 'food', food } } : { kind: 'add', slot });
+      if (hasNutrition(food)) addToTray({ kind: 'food', food });
+      setOverlay({ kind: 'add', slot });
     } catch {
       setOverlay({ kind: 'add', slot });
     }
@@ -929,8 +936,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
         below={
           line?.options ? (
             <PickOne
-              entry={e}
-              line={line}
+              foodId={e.food_id}
+              options={line.options}
               foods={foodMap}
               open={openPick === e.id}
               busy={pickBusy === e.id}
@@ -979,6 +986,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           const meal = mine.length ? dayMeals.value.find((m) => m.slot === slot) : undefined;
           const mealUnknown = !!meal && meal.kcal === null;
           const count = selectingHere ? mine.filter((e) => ticked.includes(e.id) && !blockedReason(e)).length : 0;
+          // #933: the tray's meals still being written for this day and meal; a row the day already holds is not shown twice.
+          const saving = state === 'ready' && !selectingHere ? pendingFor(slot) : [];
           return (
             <section key={slot} class="card meal-card" aria-labelledby={headId} data-testid="meal-card">
               <div class="meal-head-row">
@@ -1062,6 +1071,14 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                         </li>
                       );
                     })}
+                {saving.map((p) => (
+                  <PendingMealView
+                    key={p.id}
+                    meal={p}
+                    onRetry={() => void sendMeal(api, p.id)}
+                    onDiscard={() => discardMeal(p.id)}
+                  />
+                ))}
                 {!selectingHere &&
                   plans.map((p) => (
                     <PlannedRow
@@ -1108,6 +1125,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
                 <>
                   {state === 'ready' &&
                     mine.length === 0 &&
+                    saving.length === 0 &&
                     (() => {
                       const from = mealsBefore(date, slot)[0];
                       return from ? (
@@ -1314,29 +1332,20 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           onClose={() => setOverlay(null)}
         />
       )}
-      {overlay?.kind === 'add' && (
+      {overlay?.kind === 'add' && pass && (
         <AddSheet
           api={api}
           slot={overlay.slot}
           today={today}
-          initialQuery={overlay.q ?? pass?.q}
+          items={pass.items}
+          onItems={changeTray}
+          initialQuery={overlay.q ?? pass.q}
           onQuery={(q) => setPass((p) => (p && p.q !== q ? { ...p, q } : p))}
-          added={(pass?.ids ?? []).flatMap((id) => {
-            const e = entries.find((x) => x.id === id);
-            return e ? [{ entry: e, name: entryName(e, foods, recipes) }] : [];
-          })}
-          onOpenAdded={openEntry}
-          fresh={pass?.fresh}
-          status={pass?.status}
-          done={!!pass?.ids.length}
           usuals={usuals}
-          loggingUsual={loggingUsual}
-          onLogUsual={(u) => void logUsual(u, overlay.slot)}
-          loggingCombo={loggingCombo}
-          onLogCombo={(c) => void logCombo(c, overlay.slot)}
-          onPick={(target) => setOverlay({ kind: 'amount', slot: overlay.slot, target })}
           onAddNutrition={(target) => addNutrition(target, overlay.slot)}
           onAddFood={() => setOverlay({ kind: 'addFood', slot: overlay.slot })}
+          onSave={savePass}
+          onDiscard={endPass}
           onClose={endPass}
         />
       )}
@@ -1388,11 +1397,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           origin={overlay.origin}
           onSaved={(food) => {
             keepFood(food);
-            setOverlay(
-              hasNutrition(food) && !overlay.fill
-                ? { kind: 'amount', slot: overlay.slot, target: { kind: 'food', food } }
-                : { kind: 'add', slot: overlay.slot },
-            );
+            // #933: a food saved with nutrition goes into the tray at its first serving's default amount.
+            if (hasNutrition(food)) addToTray({ kind: 'food', food });
+            setOverlay({ kind: 'add', slot: overlay.slot });
           }}
           onCancel={() => setOverlay({ kind: 'add', slot: overlay.slot })}
         />
@@ -1406,10 +1413,18 @@ export function EatenScreen({ api }: { api: ForageApi }) {
               // A recipe given nutrition is loggable in the Add sheet's held list too.
               const { lines: _l, steps: _s, walkthrough: _w, walkthrough_check: _c, ...summary } = recipe;
               holdRecipe(summary);
+              nutritionRecipe.current = summary;
             }
             void refreshDay(api, true);
           }}
-          onClose={() => setOverlay(overlay.back ? { kind: 'add', slot: overlay.back } : null)}
+          onClose={() => {
+            const recipe = nutritionRecipe.current;
+            nutritionRecipe.current = null;
+            if (!overlay.back) return setOverlay(null);
+            // #933: a recipe given nutrition goes into the tray, as a food does.
+            if (recipe && recipeLoggable(recipe)) addToTray({ kind: 'recipe', recipe });
+            setOverlay({ kind: 'add', slot: overlay.back });
+          }}
         />
       )}
       {overlay?.kind === 'amount' && (
@@ -1420,9 +1435,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           today={today}
           slot={overlay.slot}
           entry={overlay.entry}
-          fixedSlot={!!pass}
           onSaved={done}
-          onClose={() => setOverlay(pass ? { kind: 'add', slot: pass.slot } : null)}
+          onClose={() => setOverlay(null)}
         />
       )}
     </>

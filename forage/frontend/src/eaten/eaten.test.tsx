@@ -4,7 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
 import App from '../App';
-import type { Food, FoodLogEntry, PlanEntry, RecipeSummary } from '../api/types';
+import { createLiveApi } from '../api/client';
+import type { Food, FoodLogEntry, PlanEntry, RecipeSummary, Slot } from '../api/types';
 import { _resetDemoApi } from '../api/use-api';
 import { _resetDemoModeCache } from '../demo/is-demo-mode';
 import { _resetFoods } from '../library/foods-store';
@@ -14,6 +15,7 @@ import { fakeApi } from '../test-api';
 import { readGlobalCss, rule } from '../test-css';
 import { toastText } from '../ui/toast';
 import { _resetEaten, unloggedPlan } from './eaten-store';
+import { AmountSheet, type LogTarget } from './amount-sheet';
 import { amountLine, dayTitle, fullDate } from './format';
 
 const env = import.meta.env as Record<string, string | undefined>;
@@ -177,6 +179,27 @@ async function addTo(slot: string) {
   return screen.getByTestId('add-sheet');
 }
 
+/**
+ * The amount sheet in logging mode. The Add sheet no longer opens it (#933: a tap puts the food in the tray), but it
+ * stays for any other caller, so it is mounted on its own here.
+ */
+function mountAmount(target: LogTarget, slot: Slot = 'Dinner') {
+  const onSaved = vi.fn();
+  const onClose = vi.fn();
+  render(
+    <AmountSheet
+      api={createLiveApi('tok')}
+      target={target}
+      date={TODAY}
+      today={TODAY}
+      slot={slot}
+      onSaved={onSaved}
+      onClose={onClose}
+    />,
+  );
+  return { onSaved, onClose };
+}
+
 describe('the helpers', () => {
   it('names a day and an amount as the design note does', () => {
     expect([dayTitle(TODAY, TODAY), dayTitle('2026-11-01', TODAY), dayTitle('2026-10-30', TODAY)]).toEqual([
@@ -309,15 +332,11 @@ describe('the day view', () => {
     expect(within(sheet).getByRole('heading').textContent).toBe('Add to after dinner');
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
-    let amount = screen.getByTestId('amount-sheet');
-    fireEvent.click(within(amount).getByTestId('log-it'));
-    await settle();
-    fireEvent.click(screen.getByTestId('add-done'));
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
     await settle();
     expect(api.log[0]).toMatchObject({ slot: 'After dinner' });
     expect(entriesIn('After dinner')[0].textContent).toContain('Greek yogurt');
-    expect(screen.getByTestId('toast').textContent).toBe('Logged Greek yogurt');
+    expect(screen.getByTestId('toast').textContent).toContain('Added Greek yogurt to after dinner');
     const stored = { kcal: api.log[0].kcal, protein_g: api.log[0].protein_g, carbs_g: api.log[0].carbs_g };
 
     // Snacks and back again: only the meal changes.
@@ -327,7 +346,7 @@ describe('the day view', () => {
     ]) {
       fireEvent.click(openOf(entriesIn(from)[0]));
       await settle();
-      amount = screen.getByTestId('amount-sheet');
+      const amount = screen.getByTestId('amount-sheet');
       expect(within(amount).getByRole('group', { name: 'Meal' }).textContent).toBe(
         'BreakfastLunchDinnerAfter dinnerSnacks',
       );
@@ -362,13 +381,9 @@ describe('logging', () => {
   it('a food in a named serving: its figures are on the sheet at once with no request, and a save writes through logFood', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Dinner');
-    expect(within(sheet).getByRole('heading').textContent).toBe('Add to dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    const { onSaved } = mountAmount({ kind: 'food', food: YOGURT });
     const amount = screen.getByTestId('amount-sheet');
+    expect(within(amount).getByRole('heading').textContent).toBe('Greek yogurt');
     expect(within(amount).getByTestId('amount-subline').textContent).toBe('Greek yogurt · 1 cup = 245 g');
     // #929: worked out in the app, so nothing was asked of the API for it.
     expect(api.calls('logFood')).toHaveLength(0);
@@ -389,24 +404,13 @@ describe('logging', () => {
     expect(saved[0].payload).toMatchObject({ food_id: 'fd_yog', qty: 1, unit: 'cup', slot: 'Dinner', date: TODAY });
     expect(saved[0].payload.id).toMatch(/^lg_[0-9a-f]{8}$/);
     expect(api.log[0]).toMatchObject({ kcal: 149.9, protein_g: 6, carbs_g: 9, fat_g: 0.4 });
-    expect(screen.queryByTestId('amount-sheet')).toBeNull();
-    // #786: back on the Add sheet; Done ends the pass on the day.
-    fireEvent.click(screen.getByTestId('add-done'));
-    await settle();
-    expect(entriesIn('Dinner')[0].textContent).toContain('Greek yogurt');
-    expect(entriesIn('Dinner')[0].textContent).toContain('1 cup · 245 g');
-    expect(kcal()).toBe('150');
-    expect(screen.getByTestId('toast').textContent).toBe('Logged Greek yogurt');
+    expect(onSaved).toHaveBeenCalledWith('Logged Greek yogurt', { entry: expect.objectContaining({ kcal: 149.9 }) });
   });
 
-  it('a food in grams: changing the unit resets the amount, the stepper steps by 10, and the day changes', async () => {
+  it('a food in grams: changing the unit resets the amount, and the stepper steps by 10', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Breakfast');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    const { onSaved } = mountAmount({ kind: 'food', food: YOGURT }, 'Breakfast');
     const amount = screen.getByTestId('amount-sheet');
     fireEvent.change(within(amount).getByTestId('log-unit'), { target: { value: 'g' } });
     expect((within(amount).getByTestId('log-amount') as HTMLInputElement).value).toBe('100');
@@ -416,27 +420,18 @@ describe('logging', () => {
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('92');
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
-    expect(api.log[0]).toMatchObject({ qty: 150, unit: 'g', grams: 150, kcal: 91.8 });
-    expect(entriesIn('Breakfast')[0].textContent).toContain('150 g');
-    expect(kcal()).toBe('92');
+    expect(api.log[0]).toMatchObject({ qty: 150, unit: 'g', grams: 150, kcal: 91.8, slot: 'Breakfast' });
+    expect(onSaved).toHaveBeenCalledTimes(1);
   });
 
   it('a recipe in servings, with partial said in words', async () => {
     const api = fakeApi();
-    api.recipes.push(
-      recipe('rc_p', 'Banana Bread', {
-        partial: true,
-        nutrition: { per_serving: { kcal: 68, protein_g: 1, carbs_g: 9, fat_g: 3 }, missing: [], partial: true },
-      }),
-    );
-    await open();
-    const sheet = await addTo('Lunch');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'bread' } });
-    expect(within(sheet).getAllByTestId('add-result')[0].textContent).toContain(
-      'Recipe · about 68 kcal a serving, partial',
-    );
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    const bread = recipe('rc_p', 'Banana Bread', {
+      partial: true,
+      nutrition: { per_serving: { kcal: 68, protein_g: 1, carbs_g: 9, fat_g: 3 }, missing: [], partial: true },
+    });
+    api.recipes.push(bread);
+    mountAmount({ kind: 'recipe', recipe: bread }, 'Lunch');
     const amount = screen.getByTestId('amount-sheet');
     expect(within(amount).getByTestId('amount-subline').textContent).toBe('Serves 6');
     expect(within(amount).queryByTestId('log-unit')).toBeNull();
@@ -447,17 +442,12 @@ describe('logging', () => {
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
     expect(api.log[0]).toMatchObject({ recipe_id: 'rc_p', qty: 1.5, unit: 'serving', kcal: 102 });
-    expect(entriesIn('Lunch')[0].textContent).toContain('1.5 servings · partial');
   });
 
   it('an amount of 0 or blank disables Log it with the helper', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    mountAmount({ kind: 'food', food: YOGURT });
     const amount = screen.getByTestId('amount-sheet');
     for (const v of ['0', '', '100000']) {
       fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: v } });
@@ -471,16 +461,13 @@ describe('logging', () => {
   it('a failed save keeps the sheet open and says so', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    const { onSaved } = mountAmount({ kind: 'food', food: YOGURT });
     api.answer('logFood', () => ({ success: false, error: 'food_id "fd_yog" is not a food' }));
     fireEvent.click(screen.getByTestId('log-it'));
     await settle();
     expect(screen.getByTestId('amount-error').textContent).toBe("Couldn't save: this food was deleted.");
     expect(screen.getByTestId('amount-sheet')).toBeDefined();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });
 
@@ -554,11 +541,7 @@ describe('the amount sheet: focus and the macro visual (#870)', () => {
   async function openYogurt() {
     const api = fakeApi();
     api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    mountAmount({ kind: 'food', food: YOGURT });
     return api;
   }
 
@@ -640,11 +623,7 @@ describe('the amount sheet: focus and the macro visual (#870)', () => {
   it('an amount and a unit show their figures on the tap, with no request (#929)', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
+    mountAmount({ kind: 'food', food: YOGURT });
     const amount = screen.getByTestId('amount-sheet');
     const kcalNow = () => within(amount).getByTestId('amount-kcal').textContent;
     expect(kcalNow()).toBe('150');
@@ -728,7 +707,7 @@ describe('the Add sheet', () => {
         .map((r) => r.querySelector('.recipe-name')!.textContent);
     fireEvent.input(search, { target: { value: 'kindly' } });
     expect(names()).toEqual(['Kindly Nut bar']);
-    expect(within(sheet).getAllByTestId('add-result')[0].textContent).toContain('Packaged · 190 kcal a bar');
+    expect(within(sheet).getAllByTestId('add-result')[0].textContent).toContain('1 bar · 190 kcal');
     fireEvent.input(search, { target: { value: 'BAR' } });
     expect(names()).toEqual(['Kindly Nut bar', 'Bar cookies']);
     fireEvent.input(search, { target: { value: 'stew' } });
@@ -745,9 +724,9 @@ describe('the Add sheet', () => {
     await settle();
     expect(screen.queryByTestId('amount-sheet')).toBeNull();
     const form = screen.getByTestId('food-form');
-    expect(api.calls('logFood')).toHaveLength(0);
+    expect(api.calls('logMeal')).toHaveLength(0);
 
-    // Its nutrition saved, the form comes back to the Add sheet, where the food is now loggable.
+    // Its nutrition saved, the form comes back to the Add sheet, with the food in the tray (#933).
     for (const [k, v] of [
       ['n-kcal', '276'],
       ['n-protein', '11'],
@@ -765,8 +744,13 @@ describe('the Add sheet', () => {
     await settle();
     expect(screen.queryByTestId('amount-sheet')).toBeNull();
     const back = screen.getByTestId('add-sheet');
+    expect(within(back).getByTestId('tray-row').textContent).toContain('Herbes de Provence');
+    expect(within(back).getByTestId('tray-row').textContent).toContain('276 kcal');
+    expect(within(back).getByTestId('tray-save').textContent).toBe('Add 1 to snacks · 276 kcal');
     fireEvent.input(within(back).getByTestId('add-search'), { target: { value: 'herbes' } });
-    expect(within(back).getAllByTestId('add-result')[0].textContent).toContain('Ingredient · 276 kcal / 100 g');
+    expect(within(back).getAllByTestId('add-result')[0].getAttribute('aria-label')).toBe(
+      'Herbes de Provence, in the tray, edit',
+    );
   });
 
   it('with no text lists what was logged most recently, newest first, each once, without foods lacking nutrition', async () => {
@@ -835,7 +819,7 @@ describe('the Add sheet', () => {
     expect(document.activeElement).toBe(add);
   });
 
-  it('"Not here? Add a food" opens the Add a food sheet, and the food saved there opens the amount sheet', async () => {
+  it('"Not here? Add a food" opens the Add a food sheet, and the food saved there goes into the tray', async () => {
     const api = fakeApi();
     await open();
     const sheet = await addTo('Snacks');
@@ -853,19 +837,19 @@ describe('the Add sheet', () => {
     fireEvent.input(within(form).getByTestId('n-fat'), { target: { value: '4' } });
     fireEvent.click(within(form).getByTestId('food-save'));
     await settle();
-    const amount = screen.getByTestId('amount-sheet');
-    expect(within(amount).getByRole('heading').textContent).toBe('Protein bar');
-    // #786: inside a pass the meal is the Add row's, so there are no Meal chips.
-    expect(within(amount).queryByRole('button', { name: 'Snacks' })).toBeNull();
-    expect(within(amount).getByTestId('amount-kcal').textContent).toBe('120');
-    fireEvent.click(within(amount).getByTestId('log-it'));
-    await settle();
-    expect(api.log[0]).toMatchObject({ slot: 'Snacks', qty: 1, unit: 'bar' });
-    // Back in the same pass, with the new food in its Added list and findable by search.
+    // Back on the sheet with no amount sheet: the new food is in the tray at its first serving, and nothing is logged.
+    expect(screen.queryByTestId('amount-sheet')).toBeNull();
     const back = screen.getByTestId('add-sheet');
-    expect(within(back).getByTestId('added-list').textContent).toContain('Protein bar');
+    expect(within(back).getByTestId('tray-row').textContent).toContain('Protein bar');
+    expect(within(back).getByTestId('tray-pill').textContent).toContain('1 bar');
+    expect(within(back).getByTestId('tray-save').textContent).toBe('Add 1 to snacks · 120 kcal');
+    expect(api.log).toHaveLength(0);
     fireEvent.input(within(back).getByTestId('add-search'), { target: { value: 'protein' } });
     expect(within(back).getAllByTestId('add-result')[0].textContent).toContain('Protein bar');
+    fireEvent.click(within(back).getByTestId('tray-save'));
+    await settle();
+    expect(api.log[0]).toMatchObject({ slot: 'Snacks', qty: 1, unit: 'bar' });
+    expect(entriesIn('Snacks')[0].textContent).toContain('Protein bar');
   });
 });
 
@@ -1165,8 +1149,18 @@ describe('saving a meal as a recipe (#788)', () => {
 describe('the stylesheet', () => {
   const css = readGlobalCss();
 
-  it.each(['.meal-add', '.chip', '.btn', '.text-btn', '.field'])('%s is at least 44px', (sel) => {
+  it.each(['.meal-add', '.chip', '.btn', '.text-btn', '.field', '.together-row'])('%s is at least 44px', (sel) => {
     expect(rule(css, sel)).toContain('min-height: var(--touch-target)');
+  });
+
+  it('the tray: group heads 44px, the footer pinned, rows 56px, and no fade under reduced motion (#933)', () => {
+    expect(rule(css, '.tray-group-head')).toContain('min-height: var(--touch-target)');
+    expect(rule(css, '.sheet-footer')).toContain('position: sticky');
+    expect(rule(css, '.sheet-footer')).toContain('bottom: 0');
+    expect(rule(css, '.tray')).toContain('background: var(--color-primary-light)');
+    expect(rule(css, '.tray')).toContain('border-radius: var(--radius-md)');
+    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.log-row\.is-fresh \{\s*animation: none;/);
+    expect(rule(css, '.log-row.is-pending')).toContain('opacity');
   });
 
   it('the arrows and the stepper are 44px icon buttons; entry and result rows are 56px', () => {
@@ -1192,25 +1186,22 @@ describe('the stylesheet', () => {
 describe('a save shows at once (#785)', () => {
   const offline = () => ({ success: false as const, error: 'offline' });
 
-  it('a logged food is under its meal when the sheet closes, whatever the refresh does; the old totals stay', async () => {
+  it('a saved tray is under its meal when the sheet closes, whatever the refresh does; the old totals stay', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
     await open();
     const sheet = await addTo('Dinner');
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
     // Every read after the save fails: what shows can only be the write's own answer.
     api.answer('getFoodLog', offline);
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
     await settle();
-    expect(screen.queryByTestId('amount-sheet')).toBeNull();
-    fireEvent.click(screen.getByTestId('add-done'));
-    await settle();
+    expect(screen.queryByTestId('add-sheet')).toBeNull();
     expect(entriesIn('Dinner')).toHaveLength(1);
     expect(entriesIn('Dinner')[0].textContent).toContain('Greek yogurt');
     expect(entriesIn('Dinner')[0].textContent).toContain('150');
-    expect(screen.getByTestId('toast').textContent).toBe('Logged Greek yogurt');
+    expect(screen.getByTestId('toast').textContent).toContain('Added Greek yogurt to dinner');
     // The failed refresh leaves the screen as it is: no error, no skeleton, the previous totals.
     expect(screen.queryByTestId('day-error')).toBeNull();
     expect(screen.queryByTestId('day-loading')).toBeNull();
@@ -1224,31 +1215,12 @@ describe('a save shows at once (#785)', () => {
     const sheet = await addTo('Dinner');
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
     await act(async () => {});
     expect(screen.queryByTestId('day-loading')).toBeNull();
     await settle();
     expect(kcal()).toBe('150');
     expect(entriesIn('Dinner')).toHaveLength(1);
-  });
-
-  it('a failed save keeps the sheet open with the error and the screen unchanged', async () => {
-    const api = fakeApi();
-    api.foods.push(YOGURT);
-    await open();
-    const sheet = await addTo('Dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
-    await settle();
-    const real = (p: any) => ({ success: true as const, data: entry({ food_id: 'fd_yog', slot: p.slot, kcal: 150 }) });
-    api.answer('logFood', (p) => (p.dry_run ? real(p) : { success: false, error: 'Network error' }));
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
-    await settle();
-    expect(screen.getByTestId('amount-error')).toBeDefined();
-    expect(screen.getByTestId('amount-sheet')).toBeDefined();
-    expect(entriesIn('Dinner')).toHaveLength(0);
-    expect(kcal()).toBe('—');
   });
 
   it('an edit and a delete show when the sheet closes, whatever the refresh does', async () => {
@@ -1291,7 +1263,7 @@ describe('a save shows at once (#785)', () => {
   });
 });
 
-describe('a pass: several foods to one meal (#786)', () => {
+describe('the Add sheet tray (#933)', () => {
   beforeEach(() => {
     toastText.value = null;
   });
@@ -1306,203 +1278,424 @@ describe('a pass: several foods to one meal (#786)', () => {
     servings_json: [{ name: 'cup', g: 140 }],
   });
 
-  /** In the open Add sheet: search, pick the first result, and wait for its amount sheet. */
-  async function pick(text: string) {
-    const sheet = screen.getByTestId('add-sheet');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: text } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+  const sheetEl = () => screen.getByTestId('add-sheet');
+  const search = (text: string) =>
+    fireEvent.input(within(sheetEl()).getByTestId('add-search'), { target: { value: text } });
+  const footer = () => within(sheetEl()).getByTestId('tray-save') as HTMLButtonElement;
+  const trayRows = () => within(sheetEl()).queryAllByTestId('tray-row');
+  /** Search, and tap the first result: it goes into the tray. */
+  async function tapFirst(text: string) {
+    search(text);
+    fireEvent.click(within(sheetEl()).getAllByTestId('add-result')[0]);
     await settle();
-    return screen.getByTestId('amount-sheet');
+  }
+  const follows = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  /** Hold every `logMeal` until released; the rest of the API answers as usual. */
+  function holdLogMeal(api: ReturnType<typeof fakeApi>) {
+    const orig = api.fetch.getMockImplementation()!;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    api.fetch.mockImplementation(async (url, init) => {
+      if ((init?.body as URLSearchParams).get('action') === 'logMeal') await gate;
+      return orig(url, init);
+    });
+    return release;
   }
 
-  async function logIt() {
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
-    await settle();
-    return screen.getByTestId('add-sheet');
-  }
-
-  const addedRows = () => within(screen.getByTestId('added-list')).getAllByTestId('entry-row');
-
-  it('Log it comes back to the Add sheet: search cleared and focused, the entry in "Added to dinner", no reload', async () => {
+  it('lays out the search, the status line, Recent, then Not here; the tray is absent and the button disabled', async () => {
     const api = fakeApi();
-    api.foods.push(GNOCCHI, YOGURT);
-    // Yesterday's yogurt, so the sheet has a Recent list.
+    api.foods.push(YOGURT);
     api.log.push(entry({ id: 'lg_y', date: '2026-11-01', food_id: 'fd_yog', unit: 'cup', kcal: 150 }));
     await open();
-    await addTo('Dinner');
-    const loads = () => [api.calls('getFoods').length, api.calls('getRecipes').length];
-    const recentLoads = () => api.calls('getFoodLog').filter((c) => c.params.get('from') === '2026-09-03').length;
-    const before = loads();
-    expect(recentLoads()).toBe(1);
-
-    await pick('gnocchi');
-    let sheet = await logIt();
-    expect((within(sheet).getByTestId('add-search') as HTMLInputElement).value).toBe('');
-    expect(document.activeElement).toBe(within(sheet).getByTestId('add-search'));
-    expect(within(sheet).queryByTestId('add-loading')).toBeNull();
-    expect(sheet.textContent).toContain('Added to dinner');
-    expect(addedRows()).toHaveLength(1);
-    expect(addedRows()[0].textContent).toContain("Trader Joe's Potato gnocchi");
-    expect(addedRows()[0].textContent).toContain('1 cup · 140 g');
-    expect(addedRows()[0].textContent).toContain('224 kcal');
-    expect(within(sheet).getByTestId('add-status').textContent).toBe("Logged Trader Joe's Potato gnocchi");
-    // Above Recent.
-    const text = sheet.textContent!;
-    expect(text.indexOf('Added to dinner')).toBeLessThan(text.indexOf('Recent'));
-
-    await pick('greek');
-    sheet = await logIt();
-    expect(addedRows().map((r) => r.textContent)).toEqual([
-      expect.stringContaining('Potato gnocchi'),
-      expect.stringContaining('Greek yogurt'),
-    ]);
-    expect(loads()).toEqual(before);
-    expect(recentLoads()).toBe(1);
-    expect(
-      api
-        .calls('logFood')
-        .filter((c) => !c.payload.dry_run)
-        .map((c) => c.payload.slot),
-    ).toEqual(['Dinner', 'Dinner']);
+    const sheet = await addTo('Dinner');
+    expect(within(sheet).getByRole('heading').textContent).toBe('Add to dinner');
+    const field = within(sheet).getByTestId('add-search') as HTMLInputElement;
+    expect(field.placeholder).toBe('Search foods, recipes, usuals');
+    expect(document.activeElement).toBe(field);
+    expect(within(sheet).queryByTestId('tray')).toBeNull();
+    expect(footer().textContent).toBe('Tap foods to add them');
+    expect(footer().disabled).toBe(true);
+    const status = within(sheet).getByTestId('add-status');
+    expect(status.getAttribute('role')).toBe('status');
+    const recent = within(sheet).getByText('Recent');
+    const here = within(sheet).getByTestId('not-here');
+    expect(follows(field, status) && follows(status, recent) && follows(recent, here) && follows(here, footer())).toBe(
+      true,
+    );
   });
 
-  it('Done replaces the close button once something is logged; Done, Escape and the backdrop end the pass with one toast', async () => {
-    const api = fakeApi();
-    api.foods.push(GNOCCHI, YOGURT);
-    await open();
-    let sheet = await addTo('Dinner');
-    expect(within(sheet).getByRole('button', { name: 'Close' })).toBeDefined();
-    expect(within(sheet).queryByTestId('add-done')).toBeNull();
-    await pick('gnocchi');
-    sheet = await logIt();
-    expect(within(sheet).queryByRole('button', { name: 'Close' })).toBeNull();
-    await pick('greek');
-    await logIt();
-    fireEvent.click(screen.getByTestId('add-done'));
-    await settle();
-    expect(screen.queryByTestId('add-sheet')).toBeNull();
-    expect(entriesIn('Dinner')).toHaveLength(2);
-    expect(screen.getByTestId('toast').textContent).toBe('Logged 2 items to dinner');
-
-    // One entry, ended with Escape: the entry's own name, and focus back on its Add row.
-    await addTo('Lunch');
-    await pick('greek');
-    sheet = await logIt();
-    fireEvent.keyDown(sheet, { key: 'Escape' });
-    await settle();
-    expect(screen.queryByTestId('add-sheet')).toBeNull();
-    expect(screen.getByTestId('toast').textContent).toBe('Logged Greek yogurt');
-    await new Promise((r) => requestAnimationFrame(r));
-    expect(document.activeElement).toBe(within(card('Lunch')).getByTestId('add-to-meal'));
-
-    // The backdrop ends one too.
-    await addTo('Snacks');
-    await pick('greek');
-    await logIt();
-    fireEvent.click(document.querySelector('.sheet-overlay')!);
-    await settle();
-    expect(screen.queryByTestId('add-sheet')).toBeNull();
-    expect(entriesIn('Snacks')).toHaveLength(1);
-  });
-
-  it('a pass that logged nothing closes with no toast', async () => {
+  it('one tap puts a food in the tray at the amount last logged: no sheet, no request, a check on its row', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
+    api.log.push(entry({ id: 'lg_y', date: '2026-11-01', food_id: 'fd_yog', unit: 'cup', qty: 2, kcal: 300 }));
     await open();
     const sheet = await addTo('Dinner');
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
+    const row = within(sheet).getAllByTestId('add-result')[0];
+    expect(row.textContent).toContain('2 cup · 300 kcal');
+    expect(row.getAttribute('aria-label')).toBe('Greek yogurt, 2 cup, 300 kcal, add');
+    const requests = api.sent.length;
+    fireEvent.click(row);
+    await settle();
+    expect(api.sent.length).toBe(requests);
+    expect(screen.queryByTestId('amount-sheet')).toBeNull();
+    const tray = within(sheet).getByTestId('tray');
+    expect(tray.textContent).toContain('Going into dinner');
+    expect(within(tray).getByTestId('tray-total').textContent).toBe('1 · 300 kcal');
+    expect(within(tray).getByTestId('tray-pill').textContent).toContain('2 cup');
+    expect(within(tray).getByTestId('tray-row').className).toContain('is-fresh');
+    expect(footer().textContent).toBe('Add 1 to dinner · 300 kcal');
+    expect(footer().disabled).toBe(false);
+    expect(within(sheet).getByTestId('add-status').textContent).toBe('Added Greek yogurt');
+    // The tray sits above the lists, and the row shows its check.
+    expect(follows(tray, within(sheet).getByText('Recent'))).toBe(true);
+    const back = within(sheet).getAllByTestId('add-result')[0];
+    expect(back.getAttribute('aria-label')).toBe('Greek yogurt, in the tray, edit');
+    expect(back.querySelector('.log-row-plus')!.classList.contains('is-in')).toBe(true);
+
+    // A second tap on the row opens that item's editor, and adds nothing.
+    fireEvent.click(back);
+    await settle();
+    expect(trayRows()).toHaveLength(1);
+    expect(within(sheet).getByTestId('tray-editor')).toBeDefined();
+    expect(document.activeElement).toBe(within(sheet).getByTestId('tray-qty'));
+    expect(api.sent.length).toBe(requests);
+  });
+
+  it('starts at the default when the last unit is gone, and a recipe at its last servings, else 1', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT, BAR);
+    api.recipes.push(STEW, recipe('rc_new', 'Brand new'));
+    api.log.push(
+      entry({ id: 'a', food_id: 'fd_yog', unit: 'scoop', qty: 3, kcal: 10, logged_at: '2026-11-01T10:00:00Z' }),
+      entry({ id: 'b', recipe_id: 'rc_stew', unit: 'serving', qty: 1.5, kcal: 618, logged_at: '2026-11-01T11:00:00Z' }),
+      entry({ id: 'c', food_id: 'fd_bar', unit: 'g', qty: 50, kcal: 237, logged_at: '2026-11-01T12:00:00Z' }),
+    );
+    await open();
+    const sheet = await addTo('Dinner');
+    const line = (name: string) =>
+      within(sheet)
+        .getAllByTestId('add-result')
+        .find((r) => r.textContent!.includes(name))!
+        .querySelector('.recipe-meta')!.textContent;
+    expect(line('Greek yogurt')).toBe('1 cup · 150 kcal');
+    expect(line('Beef Stew')).toBe('1½ servings · 618 kcal');
+    expect(line('Nut bar')).toBe('50 g · 238 kcal');
+    search('brand');
+    expect(line('Brand new')).toBe('1 serving · 412 kcal');
+  });
+
+  it('the editor changes the amount and the unit with no request; the totals follow on the same tap; Remove takes it out', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    await addTo('Dinner');
+    await tapFirst('greek');
+    const sheet = sheetEl();
+    const requests = api.sent.length;
+    fireEvent.click(within(sheet).getByTestId('tray-row'));
+    const editor = within(sheet).getByTestId('tray-editor');
+    expect(within(sheet).getByTestId('tray-row').getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(within(editor).getByRole('button', { name: 'More' }));
+    expect(within(sheet).getByTestId('tray-pill').textContent).toContain('1½ cup');
+    expect(within(sheet).getByTestId('tray-kcal').textContent).toBe('225 kcal');
+    expect(within(sheet).getByTestId('tray-total').textContent).toBe('1 · 225 kcal');
+    expect(footer().textContent).toBe('Add 1 to dinner · 225 kcal');
+    expect(within(editor).getByTestId('tray-macros').textContent).toMatch(/^P .* C .* F /);
+    // Grams keeps the weight: 1½ cup is 367 g, to the nearest 5.
+    fireEvent.click(within(editor).getByRole('button', { name: 'grams' }));
+    expect(within(sheet).getByTestId('tray-pill').textContent).toContain('370 g');
+    expect(within(sheet).getByTestId('tray-total').textContent).toBe('1 · 226 kcal');
+    fireEvent.click(within(editor).getByRole('button', { name: /^cup/ }));
+    expect(within(sheet).getByTestId('tray-pill').textContent).toContain('1½ cup');
+    expect(api.sent.length).toBe(requests);
+
+    // Less stops at a quarter and stays focusable.
+    const less = within(editor).getByRole('button', { name: 'Less' });
+    for (let i = 0; i < 6; i++) fireEvent.click(less);
+    expect(within(sheet).getByTestId('tray-qty').textContent).toBe('¼');
+    expect(less.getAttribute('aria-disabled')).toBe('true');
+    expect((less as HTMLButtonElement).disabled).toBe(false);
+
+    // Tapping the row again closes the editor.
+    fireEvent.click(within(sheet).getByTestId('tray-row'));
+    expect(within(sheet).queryByTestId('tray-editor')).toBeNull();
+
+    fireEvent.click(within(sheet).getByTestId('tray-row'));
+    fireEvent.click(within(sheet).getByTestId('tray-remove'));
+    expect(within(sheet).queryByTestId('tray')).toBeNull();
+    expect(footer().disabled).toBe(true);
+    expect(within(sheet).getByTestId('add-status').textContent).toBe('Removed Greek yogurt');
+    search('greek');
+    expect(within(sheet).getAllByTestId('add-result')[0].getAttribute('aria-label')).toMatch(/add$/);
+  });
+
+  it('search shows foods and recipes; adding from the results clears the search and keeps focus, with the tray above', async () => {
+    const api = fakeApi();
+    api.foods.push(GNOCCHI, YOGURT, BAR);
+    await open();
+    const sheet = await addTo('Dinner');
+    await tapFirst('greek');
+    expect((within(sheet).getByTestId('add-search') as HTMLInputElement).value).toBe('');
+    expect(document.activeElement).toBe(within(sheet).getByTestId('add-search'));
+    search('gnocchi');
+    expect(within(sheet).getByText('Foods')).toBeDefined();
+    expect(follows(within(sheet).getByTestId('tray'), within(sheet).getByTestId('results-list'))).toBe(true);
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    expect(trayRows().map((r) => r.querySelector('.recipe-name')!.textContent)).toEqual([
+      'Greek yogurt',
+      "Trader Joe's Potato gnocchi",
+    ]);
+    expect(within(sheet).getByTestId('tray-total').textContent).toBe('2 · 374 kcal');
+    expect(footer().textContent).toBe('Add 2 to dinner · 374 kcal');
+    expect(api.calls('logMeal')).toHaveLength(0);
+  });
+
+  it('saving sends one logMeal in tray order with fixed ids and closes at once; the day shows the rows muted until it answers', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT, BAR);
+    await open();
+    await addTo('Dinner');
+    await tapFirst('greek');
+    await tapFirst('nut bar');
+    const release = holdLogMeal(api);
+    fireEvent.click(footer());
+    await act(async () => {});
+    // Gone before the answer, focus back on its Add row.
+    expect(screen.queryByTestId('add-sheet')).toBeNull();
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(document.activeElement).toBe(within(card('Dinner')).getByTestId('add-to-meal'));
+    const pending = within(card('Dinner')).getAllByTestId('pending-row');
+    expect(pending).toHaveLength(2);
+    expect(pending.map((r) => r.querySelector('.recipe-name')!.textContent)).toEqual([
+      'Greek yogurt',
+      'Kindly Nut bar',
+    ]);
+    for (const r of pending) {
+      expect(r.textContent).toContain('Saving…');
+      expect(r.querySelector('.is-pending')).not.toBeNull();
+      expect(r.querySelector('button')).toBeNull();
+    }
+    // Not in the totals until they land.
+    expect(within(card('Dinner')).queryByTestId('meal-total')).toBeNull();
+    expect(entriesIn('Dinner')).toHaveLength(0);
+
+    release();
+    await settle();
+    const sent = api.calls('logMeal');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].payload).toMatchObject({ date: TODAY, slot: 'Dinner' });
+    expect(sent[0].payload.items).toEqual([
+      { id: expect.stringMatching(/^lg_[0-9a-f]{8}$/), food_id: 'fd_yog', qty: 1, unit: 'cup' },
+      { id: expect.stringMatching(/^lg_[0-9a-f]{8}$/), food_id: 'fd_bar', qty: 1, unit: 'bar' },
+    ]);
+    // The stored entries take the pending rows' place, with no Saving….
+    expect(within(card('Dinner')).queryAllByTestId('pending-row')).toHaveLength(0);
+    expect(entriesIn('Dinner').map((r) => r.querySelector('.recipe-name')!.textContent)).toEqual([
+      'Greek yogurt',
+      'Kindly Nut bar',
+    ]);
+    expect(card('Dinner').textContent).not.toContain('Saving…');
+    expect(kcal()).toBe('340');
+    const toast = screen.getByTestId('toast');
+    expect(toast.textContent).toBe('Added 2 to dinnerUndo');
+
+    // Undo deletes exactly those entries.
+    const ids = api.log.map((e) => e.id);
+    fireEvent.click(screen.getByTestId('toast-action'));
+    await settle();
+    expect(api.calls('deleteLogEntry').at(-1)!.payload).toEqual({ ids });
+    expect(entriesIn('Dinner')).toHaveLength(0);
+    expect(screen.getByTestId('toast').textContent).toBe('Removed 2 from dinner');
+  });
+
+  it('a second tap on the footer cannot send two writes', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    await addTo('Dinner');
+    await tapFirst('greek');
+    const button = footer();
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await settle();
+    expect(api.calls('logMeal')).toHaveLength(1);
+    expect(api.log).toHaveLength(1);
+  });
+
+  it('a failed write keeps the rows under Couldn’t save, Try again sends the same ids, and Discard removes them', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT, BAR);
+    await open();
+    const payloads: any[] = [];
+    let failing = true;
+    const orig = api.fetch.getMockImplementation()!;
+    api.fetch.mockImplementation(async (url, init) => {
+      const body = init?.body as URLSearchParams;
+      if (body.get('action') === 'logMeal') {
+        payloads.push(JSON.parse(body.get('payload')!));
+        if (failing) return { json: async () => ({ success: false, error: 'Network error' }) } as Response;
+      }
+      return orig(url, init);
+    });
+    await addTo('Dinner');
+    await tapFirst('greek');
+    await tapFirst('nut bar');
+    fireEvent.click(footer());
+    await settle();
+    const failed = within(card('Dinner')).getByTestId('pending-failed');
+    expect(failed.textContent).toContain("Couldn't save 2 items.");
+    expect(within(failed).getByRole('button', { name: 'Try again' })).toBeDefined();
+    expect(within(card('Dinner')).getAllByTestId('pending-row')).toHaveLength(2);
+    expect(card('Dinner').textContent).not.toContain('Saving…');
+    expect(entriesIn('Dinner')).toHaveLength(0);
+
+    failing = false;
+    fireEvent.click(within(failed).getByTestId('pending-retry'));
+    await settle();
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    expect(within(card('Dinner')).queryByTestId('pending-failed')).toBeNull();
+    expect(entriesIn('Dinner')).toHaveLength(2);
+    expect(api.log).toHaveLength(2);
+
+    // Sending the same call again (a write that landed but lost its answer) leaves one copy of each.
+    await addTo('Snacks');
+    await tapFirst('greek');
+    failing = true;
+    fireEvent.click(footer());
+    await settle();
+    fireEvent.click(within(card('Snacks')).getByTestId('pending-discard'));
+    await settle();
+    expect(within(card('Snacks')).queryAllByTestId('pending-row')).toHaveLength(0);
+    expect(entriesIn('Snacks')).toHaveLength(0);
+    expect(api.log).toHaveLength(2);
+  });
+
+  it('closing with items asks first: Keep adding, Discard and Add each do what they say', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT, BAR);
+    await open();
+    // An empty tray closes straight away.
+    await addTo('Dinner');
+    fireEvent.click(within(sheetEl()).getByRole('button', { name: 'Close' }));
     await settle();
     expect(screen.queryByTestId('add-sheet')).toBeNull();
-    expect(screen.getByTestId('toast').textContent).toBe('');
-  });
+    expect(screen.queryByTestId('close-prompt')).toBeNull();
 
-  it('closing the amount sheet comes back to the Add sheet with the search kept, before and during a pass', async () => {
-    const api = fakeApi();
-    api.foods.push(GNOCCHI, YOGURT);
-    await open();
     await addTo('Dinner');
-    const amount = await pick('greek');
-    fireEvent.click(within(amount).getByRole('button', { name: 'Close' }));
+    await tapFirst('greek');
+    fireEvent.click(within(sheetEl()).getByRole('button', { name: 'Close' }));
     await settle();
-    let sheet = screen.getByTestId('add-sheet');
-    expect((within(sheet).getByTestId('add-search') as HTMLInputElement).value).toBe('greek');
-    expect(api.calls('logFood').filter((c) => !c.payload.dry_run)).toHaveLength(0);
+    let prompt = screen.getByTestId('close-prompt');
+    expect(prompt.getAttribute('role')).toBe('alertdialog');
+    expect(within(prompt).getByRole('heading').textContent).toBe('Add 1 item to dinner?');
+    expect(prompt.textContent).toContain("They're in the tray but not saved yet.");
+    expect(
+      within(prompt)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Discard', 'Keep adding', 'Add 1']);
+    expect(document.activeElement).toBe(within(prompt).getByTestId('prompt-add'));
 
-    await pick('gnocchi');
-    await logIt();
-    const again = await pick('greek');
-    fireEvent.keyDown(again, { key: 'Escape' });
+    // Escape and Keep adding both close the prompt and keep the tray.
+    fireEvent.keyDown(prompt, { key: 'Escape' });
     await settle();
-    sheet = screen.getByTestId('add-sheet');
-    expect((within(sheet).getByTestId('add-search') as HTMLInputElement).value).toBe('greek');
-    // Search text hides the Added list; clearing it brings it back.
-    expect(within(sheet).queryByTestId('added-list')).toBeNull();
-    expect(within(sheet).getAllByTestId('add-result')[0].textContent).toContain('Greek yogurt');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: '' } });
-    expect(addedRows()).toHaveLength(1);
-  });
-
-  it('an Added row opens its entry without meal chips; Save and Delete come back to the Add sheet', async () => {
-    const api = fakeApi();
-    api.foods.push(GNOCCHI);
-    await open();
-    await addTo('Dinner');
-    await pick('gnocchi');
-    await logIt();
-    fireEvent.click(openOf(addedRows()[0]));
+    expect(screen.queryByTestId('close-prompt')).toBeNull();
+    expect(trayRows()).toHaveLength(1);
+    fireEvent.keyDown(sheetEl(), { key: 'Escape' });
     await settle();
-    const amount = screen.getByTestId('amount-sheet');
-    expect(within(amount).getByTestId('log-it').textContent).toBe('Save');
-    expect(within(amount).queryByRole('button', { name: 'Lunch' })).toBeNull();
-    fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: '2' } });
-    fireEvent.click(within(amount).getByTestId('log-it'));
+    fireEvent.click(within(screen.getByTestId('close-prompt')).getByTestId('prompt-keep'));
     await settle();
+    expect(screen.queryByTestId('close-prompt')).toBeNull();
     expect(screen.getByTestId('add-sheet')).toBeDefined();
-    expect(addedRows()).toHaveLength(1);
-    expect(addedRows()[0].textContent).toContain('2 cup · 280 g');
-    expect(addedRows()[0].textContent).toContain('448 kcal');
-    expect(screen.getByTestId('add-status').textContent).toBe("Saved Trader Joe's Potato gnocchi");
+    expect(trayRows()).toHaveLength(1);
 
-    fireEvent.click(openOf(addedRows()[0]));
+    // Discard closes the sheet, drops the tray and writes nothing.
+    fireEvent.click(document.querySelector('.sheet-overlay')!);
     await settle();
-    fireEvent.click(screen.getByTestId('delete-entry'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByTestId('close-prompt')).getByTestId('prompt-discard'));
     await settle();
-    const sheet = screen.getByTestId('add-sheet');
-    expect(within(sheet).queryByTestId('added-list')).toBeNull();
-    expect(within(sheet).getByTestId('add-status').textContent).toBe("Deleted Trader Joe's Potato gnocchi");
-    // Done stays; with nothing of the pass left on the day, ending it shows no toast.
-    fireEvent.click(within(sheet).getByTestId('add-done'));
+    expect(screen.queryByTestId('add-sheet')).toBeNull();
+    expect(api.calls('logMeal')).toHaveLength(0);
+    await addTo('Dinner');
+    expect(within(sheetEl()).queryByTestId('tray')).toBeNull();
+
+    // Add does what the footer does.
+    await tapFirst('greek');
+    await tapFirst('nut bar');
+    fireEvent.click(within(sheetEl()).getByRole('button', { name: 'Close' }));
     await settle();
-    expect(entriesIn('Dinner')).toHaveLength(0);
-    expect(screen.getByTestId('toast').textContent).toBe('');
+    prompt = screen.getByTestId('close-prompt');
+    expect(within(prompt).getByRole('heading').textContent).toBe('Add 2 items to dinner?');
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Add 2' }));
+    await settle();
+    expect(screen.queryByTestId('add-sheet')).toBeNull();
+    expect(api.calls('logMeal')).toHaveLength(1);
+    expect(entriesIn('Dinner')).toHaveLength(2);
   });
 
-  it('a failed Log it keeps the amount sheet open and adds nothing to the list', async () => {
+  it('at 30 items every add is disabled and the status line says so; removing one frees them', async () => {
     const api = fakeApi();
-    api.foods.push(YOGURT);
+    const make = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        food(`fd_${prefix}${i}`, `${prefix} ${String(i).padStart(2, '0')}`, {
+          kcal_100g: 100,
+          protein_100g: 1,
+          carbs_100g: 1,
+          fat_100g: 1,
+          servings_json: [{ name: 'cup', g: 100 }],
+        }),
+      );
+    api.foods.push(...make('alpha', 20), ...make('beta', 11));
     await open();
     await addTo('Dinner');
-    await pick('greek');
-    const real = (p: any) => ({ success: true as const, data: entry({ food_id: 'fd_yog', slot: p.slot, kcal: 150 }) });
-    api.answer('logFood', (p) => (p.dry_run ? real(p) : { success: false, error: 'Network error' }));
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
+    for (let i = 0; i < 20; i++) {
+      search('alpha');
+      fireEvent.click(within(sheetEl()).getAllByTestId('add-result')[i]);
+    }
+    for (let i = 0; i < 10; i++) {
+      search('beta');
+      fireEvent.click(within(sheetEl()).getAllByTestId('add-result')[i]);
+    }
     await settle();
-    expect(screen.getByTestId('amount-error')).toBeDefined();
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByRole('button', { name: 'Close' }));
-    await settle();
-    expect(within(screen.getByTestId('add-sheet')).queryByTestId('added-list')).toBeNull();
-    expect(within(screen.getByTestId('add-sheet')).queryByTestId('add-done')).toBeNull();
+    expect(trayRows()).toHaveLength(30);
+    search('beta');
+    const rows = within(sheetEl()).getAllByTestId('add-result') as HTMLButtonElement[];
+    expect(rows[10].disabled).toBe(true);
+    expect(rows[0].disabled).toBe(false);
+    expect(within(sheetEl()).getByTestId('add-status').textContent).toBe('A meal can hold 30 items at a time.');
+    expect(footer().textContent).toBe('Add 30 to dinner · 3,000 kcal');
+
+    fireEvent.click(trayRows()[0]);
+    fireEvent.click(within(sheetEl()).getByTestId('tray-remove'));
+    expect((within(sheetEl()).getAllByTestId('add-result')[10] as HTMLButtonElement).disabled).toBe(false);
+    expect(within(sheetEl()).getByTestId('add-status').textContent).toBe('Removed alpha 00');
   });
 
-  it('an entry opened from the day, outside a pass, keeps its meal chips', async () => {
+  it('a partial recipe reads 68+ kcal in the total, and a recipe edits in servings', async () => {
     const api = fakeApi();
-    api.foods.push(YOGURT);
-    api.log.push(entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9 }));
+    api.recipes.push(
+      recipe('rc_p', 'Banana Bread', {
+        partial: true,
+        nutrition: { per_serving: { kcal: 68, protein_g: 1, carbs_g: 9, fat_g: 3 }, missing: [], partial: true },
+      }),
+    );
     await open();
-    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
+    await addTo('Lunch');
+    await tapFirst('bread');
+    expect(within(sheetEl()).getByTestId('tray-total').textContent).toBe('1 · 68+ kcal');
+    expect(footer().textContent).toBe('Add 1 to lunch · 68+ kcal');
+    fireEvent.click(trayRows()[0]);
+    const editor = within(sheetEl()).getByTestId('tray-editor');
+    expect(within(editor).queryByRole('group', { name: 'Unit' })).toBeNull();
+    fireEvent.click(within(editor).getByRole('button', { name: 'More' }));
+    expect(within(sheetEl()).getByTestId('tray-pill').textContent).toContain('1½ servings');
+    fireEvent.click(footer());
     await settle();
-    expect(within(screen.getByTestId('amount-sheet')).getByRole('button', { name: 'Lunch' })).toBeDefined();
+    expect(api.log[0]).toMatchObject({ recipe_id: 'rc_p', qty: 1.5, unit: 'serving', kcal: 102 });
+    expect(entriesIn('Lunch')[0].textContent).toContain('1.5 servings · partial');
   });
 
   it('works the same in demo mode', async () => {
@@ -1513,17 +1706,26 @@ describe('a pass: several foods to one meal (#786)', () => {
       await open(true);
       const before = entriesIn('Snacks').length;
       await addTo('Snacks');
-      await pick('yog');
-      await logIt();
-      expect(addedRows()).toHaveLength(1);
-      fireEvent.click(screen.getByTestId('add-done'));
+      await tapFirst('yog');
+      expect(trayRows()).toHaveLength(1);
+      fireEvent.click(footer());
       await settle();
       expect(entriesIn('Snacks')).toHaveLength(before + 1);
-      expect(screen.getByTestId('toast').textContent).toMatch(/^Logged /);
+      expect(screen.getByTestId('toast').textContent).toMatch(/^Added /);
     } finally {
       delete env.VITE_DEMO_MODE;
       _resetDemoModeCache();
       _resetDemoApi();
     }
+  });
+
+  it('an entry opened from the day keeps its meal chips', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    api.log.push(entry({ food_id: 'fd_yog', unit: 'cup', grams: 245, kcal: 149.9 }));
+    await open();
+    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
+    await settle();
+    expect(within(screen.getByTestId('amount-sheet')).getByRole('button', { name: 'Lunch' })).toBeDefined();
   });
 });

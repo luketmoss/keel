@@ -154,14 +154,18 @@ describe('opening the sheet again', () => {
     expect(counts.getFoodLog - before.getFoodLog).toBe(1);
     expect(counts.getCombos - before.getCombos).toBe(1);
 
-    // Out to the amount sheet and back: nothing is read.
+    // Out to the Add a food sheet and back: nothing is read, and what was tapped is still in the tray (#933).
     const mid = { ...counts };
     fireEvent.click(within(screen.getByTestId('add-sheet')).getAllByTestId('add-result')[0]);
     await settle();
-    expect(screen.getByTestId('amount-sheet')).toBeTruthy();
-    fireEvent.click(within(screen.getByTestId('amount-sheet')).getByLabelText('Close'));
+    expect(within(screen.getByTestId('add-sheet')).getAllByTestId('tray-row')).toHaveLength(1);
+    fireEvent.click(within(screen.getByTestId('add-sheet')).getByTestId('not-here'));
+    await settle();
+    expect(screen.getByTestId('add-food')).toBeTruthy();
+    fireEvent.click(within(screen.getByTestId('add-food')).getByLabelText('Close'));
     await settle();
     expect(screen.getByTestId('add-sheet')).toBeTruthy();
+    expect(within(screen.getByTestId('add-sheet')).getAllByTestId('tray-row')).toHaveLength(1);
     expect(counts).toEqual(mid);
   });
 

@@ -16,7 +16,7 @@ import { Toast, toastAction, toastText } from '../ui/toast';
 import { _resetLookback } from './copy-meal';
 import { EatenScreen } from './eaten-screen';
 import { _resetEaten } from './eaten-store';
-import { addedToast, dayItems, groupChanges, groupKcal, updatedUsual, usualsFor } from './usual-group';
+import { dayItems, groupChanges, groupKcal, updatedUsual, usualsFor } from './usual-group';
 
 async function settle() {
   for (let i = 0; i < 10; i++) await act(async () => {});
@@ -58,13 +58,16 @@ async function openAdd(slot: string) {
   return screen.getByTestId('add-sheet');
 }
 
-/** Log a usual from the Add sheet and return its group in the meal card. */
+/** Put a usual in the Add sheet's tray, save it, and return its group in the meal card. */
 async function logUsual(slot: string, name: string) {
   const sheet = await openAdd(slot);
   const row = within(sheet)
     .getAllByTestId('usual-result')
     .find((r) => r.querySelector('.recipe-name')!.textContent === name)!;
   fireEvent.click(row);
+  await settle();
+  // #933: a usual goes into the tray as a group; the footer saves it and the day shows it.
+  fireEvent.click(within(screen.getByTestId('add-sheet')).getByTestId('tray-save'));
   await settle();
   return within(card(slot)).getByTestId('group');
 }
@@ -85,13 +88,13 @@ describe('the Add sheet', () => {
       'Yogurt bowl',
       'After dinner cereal',
     ]);
-    expect(within(sheet).getByText('Usuals')).toBeTruthy();
+    expect(within(sheet).getByText('Usuals for breakfast')).toBeTruthy();
     expect(rows[0].querySelector('.recipe-meta')!.textContent).toBe(
       'Rolled oats · Almond butter · Blueberries / Banana / Strawberries · Milk, 2%',
     );
     expect(rows[0].textContent).toMatch(/kcal$/);
     // Usuals come before the foods.
-    const label = within(sheet).getByText('Usuals');
+    const label = within(sheet).getByText('Usuals for breakfast');
     const recent = within(sheet)
       .getAllByRole('list')
       .find((l) => l.getAttribute('aria-labelledby') === 'add-list-label');
@@ -113,10 +116,10 @@ describe('the Add sheet', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'oatm' } });
     await settle();
     expect(within(sheet).getAllByTestId('usual-result')).toHaveLength(1);
-    expect(within(sheet).getByText('Usuals')).toBeTruthy();
+    expect(within(sheet).getByText('Usuals with oatm')).toBeTruthy();
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'zzzz' } });
     await settle();
-    expect(within(sheet).queryByText('Usuals')).toBeNull();
+    expect(within(sheet).queryByText('Usuals with zzzz')).toBeNull();
     expect(within(sheet).getByTestId('add-no-match')).toBeTruthy();
   });
 
@@ -127,21 +130,106 @@ describe('the Add sheet', () => {
     });
     await mount(api);
     const sheet = await openAdd('Breakfast');
-    expect(within(sheet).queryByText('Usuals')).toBeNull();
+    expect(within(sheet).queryByText('Usuals for breakfast')).toBeNull();
     expect(within(sheet).getAllByTestId('add-result').length).toBeGreaterThan(0);
   });
 
-  it('says so in the sheet when logging fails, and keeps it open', async () => {
+  it('a tap puts the usual in the tray as a group and writes nothing; saving sends one logMeal with its usual and lines', async () => {
     const api = createDemoApi();
-    api.logUsual = vi.fn(async () => {
-      throw new Error('down');
-    });
+    const logMeal = vi.spyOn(api, 'logMeal');
+    const logUsual = vi.spyOn(api, 'logUsual');
     await mount(api);
     const sheet = await openAdd('Breakfast');
     fireEvent.click(within(sheet).getAllByTestId('usual-result')[0]);
     await settle();
-    expect(screen.getByTestId('add-status').textContent).toBe("Couldn't add Oatmeal. Try again.");
-    expect(screen.getByTestId('add-sheet')).toBeTruthy();
+    expect(logMeal).not.toHaveBeenCalled();
+    expect(within(sheet).getByTestId('tray-group-name').textContent).toBe('Oatmeal');
+    expect(within(sheet).getAllByTestId('tray-item')).toHaveLength(4);
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
+    await settle();
+    expect(logMeal).toHaveBeenCalledTimes(1);
+    expect(logUsual).not.toHaveBeenCalled();
+    const items = logMeal.mock.calls[0][0].items;
+    expect(items).toHaveLength(4);
+    expect(new Set(items.map((i) => i.group!.key)).size).toBe(1);
+    expect(items[0].group).toMatchObject({ name: 'Oatmeal', usual_id: expect.any(String) });
+    expect(items.every((i) => !!i.group!.usual_line_id)).toBe(true);
+  });
+});
+
+describe('a usual in the tray (#933)', () => {
+  const oatmeal = async () => {
+    const sheet = await openAdd('Breakfast');
+    const row = within(sheet)
+      .getAllByTestId('usual-result')
+      .find((r) => r.querySelector('.recipe-name')!.textContent === 'Oatmeal')!;
+    fireEvent.click(row);
+    await settle();
+    return sheet;
+  };
+
+  it('a pick-one is changed in the tray by its buttons, at the option’s own amount, and saves as that food on the same line', async () => {
+    const api = createDemoApi();
+    const logMeal = vi.spyOn(api, 'logMeal');
+    await mount(api);
+    const sheet = await oatmeal();
+    const berries = within(sheet)
+      .getAllByTestId('tray-row')
+      .find((r) => r.textContent!.includes('Blueberries'))!;
+    fireEvent.click(berries);
+    await settle();
+    expect(logMeal).not.toHaveBeenCalled();
+    const pills = within(sheet).getAllByTestId('pick-option');
+    expect(pills.map((p) => [p.textContent, p.getAttribute('aria-pressed')])).toEqual([
+      ['Blueberries', 'true'],
+      ['Banana', 'false'],
+      ['Strawberries', 'false'],
+    ]);
+    fireEvent.click(pills[1]);
+    await settle();
+    const rows = within(sheet).getAllByTestId('tray-row');
+    expect(rows.some((r) => r.textContent!.includes('Blueberries'))).toBe(false);
+    expect(rows.find((r) => r.textContent!.includes('Banana'))!.textContent).toContain('½ medium');
+    fireEvent.click(within(sheet).getByTestId('tray-save'));
+    await settle();
+    const items = logMeal.mock.calls[0][0].items;
+    expect(items).toHaveLength(4);
+    const banana = items.find((i) => i.food_id === 'fd_demo_banana')!;
+    expect(banana).toMatchObject({ qty: 0.5, unit: 'medium', group: { name: 'Oatmeal' } });
+    expect(banana.group!.usual_line_id).toBeTruthy();
+    expect(items.some((i) => i.food_id === 'fd_demo_blueberries')).toBe(false);
+  });
+
+  it('Remove all takes the group out and its heading with it; a second usual adds a second group', async () => {
+    await mount(createDemoApi());
+    const sheet = await oatmeal();
+    expect(within(sheet).getAllByTestId('tray-group')).toHaveLength(1);
+    fireEvent.click(within(sheet).getByTestId('tray-remove-all'));
+    await settle();
+    expect(within(sheet).queryByTestId('tray')).toBeNull();
+    expect(within(sheet).getByTestId('tray-save').textContent).toBe('Tap foods to add them');
+    expect(within(sheet).getByTestId('add-status').textContent).toBe('Removed Oatmeal');
+    const row = () =>
+      within(sheet)
+        .getAllByTestId('usual-result')
+        .find((r) => r.querySelector('.recipe-name')!.textContent === 'Oatmeal')!;
+    fireEvent.click(row());
+    fireEvent.click(row());
+    await settle();
+    // The usual is a set: adding it again adds the group anyway.
+    expect(within(sheet).getAllByTestId('tray-group')).toHaveLength(2);
+    expect(within(sheet).getAllByTestId('tray-item')).toHaveLength(8);
+  });
+
+  it('removing the last item of a group takes the heading with it', async () => {
+    await mount(createDemoApi());
+    const sheet = await oatmeal();
+    for (let i = 0; i < 4; i++) {
+      fireEvent.click(within(sheet).getAllByTestId('tray-row')[0]);
+      fireEvent.click(within(sheet).getByTestId('tray-remove'));
+    }
+    expect(within(sheet).queryByTestId('tray-group')).toBeNull();
+    expect(within(sheet).queryByTestId('tray')).toBeNull();
   });
 });
 
@@ -156,7 +244,7 @@ describe('logging a usual', () => {
     expect(within(group).queryByTestId('group-changed-chip')).toBeNull();
     expect(within(group).getByTestId('group-kcal').textContent).toMatch(/\d kcal$/);
     expect(names(group)).toHaveLength(4);
-    expect(toast()).toContain('Added Oatmeal · 4 items. Change anything below.Undo');
+    expect(toast()).toContain('Added 4 to breakfastUndo');
     expect(within(group).getByRole('button', { name: 'Oatmeal options' })).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('toast-action'));
@@ -475,8 +563,6 @@ describe('the words and the rules', () => {
     expect(items.map((i) => (i.kind === 'group' ? `g:${i.entries.length}` : 'e'))).toEqual(['e', 'g:2', 'e']);
     expect(groupKcal([entry({ kcal: 50 }), entry({ kcal: null })])).toBe(50);
     expect(groupKcal([entry({ kcal: null })])).toBeNull();
-    expect(addedToast('Oatmeal', 4)).toBe('Added Oatmeal · 4 items. Change anything below.');
-    expect(addedToast('Toast', 1)).toBe('Added Toast · 1 item. Change anything below.');
   });
 
   it('orders usuals for a meal: its own first, then most recently used', () => {

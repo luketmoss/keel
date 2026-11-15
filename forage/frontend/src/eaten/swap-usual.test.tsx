@@ -60,6 +60,9 @@ async function logUsual(slot: string, name: string) {
     .find((r) => r.querySelector('.recipe-name')!.textContent === name)!;
   fireEvent.click(row);
   await settle();
+  // #933: the usual is in the tray; the footer saves it.
+  fireEvent.click(within(screen.getByTestId('add-sheet')).getByTestId('tray-save'));
+  await settle();
   const groups = within(card(slot)).getAllByTestId('group');
   return groups[groups.length - 1];
 }

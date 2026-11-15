@@ -1,5 +1,5 @@
 // A group in a meal card (#885): its heading, a pick-one's choice under its row, and the group's ⋯ menu.
-import type { Food, FoodLogEntry, UsualLine, UsualOption } from '../api/types';
+import type { Food, UsualOption } from '../api/types';
 import { labelOf, pickLayout } from '../library/usuals-store';
 import { Sheet } from '../ui/sheet';
 import { fractionQty } from './amount-edit';
@@ -62,8 +62,10 @@ export function GroupHeading({ name, usual, changed, kcal, onMenu }: HeadingProp
 const amount = (o: UsualOption) => `${fractionQty(o.qty)} ${o.unit}`;
 
 interface PickProps {
-  entry: FoodLogEntry;
-  line: UsualLine;
+  /** The food the line is on now. */
+  foodId: string;
+  /** The line's options (a usual's, or a combo's in the Add sheet's tray). */
+  options: UsualOption[];
   foods: Map<string, Food>;
   /** Whether the list is open (the list form only). */
   open: boolean;
@@ -77,9 +79,8 @@ interface PickProps {
  * the logged one pressed; otherwise `Pick one · 2 of 5` opening a list of full names. A pick swaps the entry to that
  * option at the option's own amount.
  */
-export function PickOne({ entry, line, foods, open, busy, onToggle, onPick }: PickProps) {
-  const options = line.options!;
-  const at = options.findIndex((o) => o.food_id === entry.food_id);
+export function PickOne({ foodId, options, foods, open, busy, onToggle, onPick }: PickProps) {
+  const at = options.findIndex((o) => o.food_id === foodId);
   if (pickLayout(options, foods).kind === 'buttons') {
     return (
       <div class="chip-row pick-row" role="group" aria-label="Pick one" data-testid="pick-buttons">
@@ -88,10 +89,10 @@ export function PickOne({ entry, line, foods, open, busy, onToggle, onPick }: Pi
             key={o.food_id}
             type="button"
             class="chip"
-            aria-pressed={o.food_id === entry.food_id}
+            aria-pressed={o.food_id === foodId}
             aria-busy={busy || undefined}
             disabled={busy}
-            onClick={() => o.food_id !== entry.food_id && onPick(o)}
+            onClick={() => o.food_id !== foodId && onPick(o)}
             data-testid="pick-option"
           >
             {labelOf(foods.get(o.food_id))}
@@ -118,7 +119,7 @@ export function PickOne({ entry, line, foods, open, busy, onToggle, onPick }: Pi
           {options.map((o) => {
             const food = foods.get(o.food_id);
             const kcal = optionKcal(food, o);
-            const on = o.food_id === entry.food_id;
+            const on = o.food_id === foodId;
             const brand = (food?.brand ?? '').trim();
             return (
               <button

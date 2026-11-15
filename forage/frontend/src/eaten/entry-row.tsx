@@ -28,12 +28,11 @@ function chipParts(entry: FoodLogEntry, food: Food | null, qty: number, unit: st
   return { main, grams, aria };
 }
 
-/** A log entry as the day lists it (#712), and as the Add sheet's Added list does (#786); `fresh` fades in. */
+/** A log entry as the day lists it (#712). */
 export function EntryRow({
   entry,
   name,
   onOpen,
-  fresh,
   amount,
   below,
   onSwap,
@@ -41,8 +40,7 @@ export function EntryRow({
   entry: FoodLogEntry;
   name: string;
   onOpen: () => void;
-  fresh?: boolean;
-  /** Given on the day's own rows, so line two is the amount chip (#882); the Added list and a removed food's row leave it out. */
+  /** Given on the day's own rows, so line two is the amount chip (#882); a removed food's row leaves it out. */
   amount?: RowEditing;
   /** What sits under line two, before the editor: a usual's pick-one choice (#885). */
   below?: ComponentChildren;
@@ -62,7 +60,7 @@ export function EntryRow({
     </span>
   );
   const label = `${name}, ${line}, ${unknown ? 'no nutrition' : `${wholeKcal(shown.kcal!)} kcal`}`;
-  const cls = fresh ? 'log-row is-fresh' : 'log-row';
+  const cls = 'log-row';
 
   if (!amount) {
     return (

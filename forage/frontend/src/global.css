@@ -2553,17 +2553,6 @@ a.text-btn {
   font-weight: 600;
 }
 
-/* #786: what a pass added, above Recent; the row just logged or saved fades in. */
-.added-list {
-  padding: 0 var(--space-sm);
-  border-radius: var(--radius-md);
-  background: var(--color-primary-light);
-}
-
-.added-list li:last-child .log-row {
-  border-bottom: 0;
-}
-
 .log-row.is-fresh {
   animation: added-fade var(--transition-normal);
 }
@@ -2592,10 +2581,22 @@ a.text-btn {
 
 .log-row-plus {
   flex: none;
-  width: var(--touch-target);
-  text-align: center;
+  width: 32px;
+  height: 32px;
+  margin: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
   color: var(--color-primary);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+/* #933: the row's item is already in the tray. */
+.log-row-plus.is-in {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .log-row-action {
@@ -2703,6 +2704,165 @@ a.text-btn {
 
 .add-food-btn {
   margin-top: var(--space-md);
+}
+
+/* === The Add sheet's tray (#933) === */
+
+/* The save button is pinned under the scrolling body, at the bottom of the sheet. */
+.sheet-has-footer {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.sheet-has-footer .sheet-body {
+  flex: 1 0 auto;
+}
+
+.sheet-has-footer .sheet-footer {
+  flex: none;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.tray {
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+}
+
+.tray-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.tray-label {
+  margin: 0;
+  color: var(--color-primary);
+}
+
+.tray-total {
+  flex: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.tray .log-row {
+  border-bottom-color: var(--color-border);
+}
+
+.tray > .plain-list > li:last-child > .log-row,
+.tray > .plain-list > li:last-child > .tray-editor {
+  margin-bottom: 0;
+}
+
+.amount-pill {
+  flex: none;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.tray-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: var(--touch-target);
+}
+
+.tray-group-name {
+  min-width: 0;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.tray-remove-all {
+  flex: none;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.tray-editor {
+  background: var(--color-surface);
+}
+
+.tray-editor-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.tray-macros {
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.tray-macro-protein {
+  color: var(--color-macro-protein);
+}
+
+.tray-macro-carbs {
+  color: var(--color-macro-carbs);
+}
+
+.tray-macro-fat {
+  color: var(--color-macro-fat);
+}
+
+.tray-remove {
+  flex: none;
+}
+
+/* Often eaten together: one collapsed row under the lists. */
+.together-row {
+  width: 100%;
+  min-height: var(--touch-target);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-light);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* A meal the tray saved, on the day while its write is out: muted, not tappable. */
+.log-row.is-pending {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.saving-tag {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.pending-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) 0;
+}
+
+.pending-failed p {
+  flex: 1 1 100%;
 }
 
 /* #756: the More nutrition block and the food form's More from the label section. */

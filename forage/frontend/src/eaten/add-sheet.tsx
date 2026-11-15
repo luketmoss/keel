@@ -1,23 +1,44 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import type { Combo, Food, FoodLogEntry, RecipeSummary, Slot, Usual } from '../api/types';
-import { addSheetMeta, comboKcalText, comboMatches } from '../library/combos-store';
+import { comboKcalText } from '../library/combos-store';
 import { FoodName } from '../library/food-name';
-import { displayName, hasNutrition } from '../library/food-math';
+import { hasNutrition } from '../library/food-math';
 import { foodsInShort, startKcalText } from '../library/usuals-store';
 import { Sheet } from '../ui/sheet';
 import type { LogTarget } from './amount-sheet';
 import { addCombos, addFailed, addLists, refreshAdd } from './add-store';
-import { EntryRow } from './entry-row';
-import { foodRowLine, recipeLoggable, recipeRowLine } from './format';
+import { recipeLoggable, wholeKcal } from './format';
 import { usualsFor } from './usual-group';
+import { TrayView } from './tray-view';
+import {
+  TRAY_FULL,
+  TRAY_MAX,
+  closePromptTitle,
+  comboItems,
+  comboWhen,
+  footerText,
+  lastEntries,
+  looseItem,
+  newItem,
+  pickOption,
+  removeGroup,
+  removeItem,
+  rowAmount,
+  searchTargets,
+  setAmount,
+  targetId,
+  targetName,
+  trayTotals,
+  usualItems,
+  usualsMatching,
+  type TrayItem,
+} from './tray';
 
 /** How many recents the sheet lists, and how many rows a search shows. */
 const RECENT_MAX = 10;
 const RESULTS_MAX = 20;
 const FALLBACK_RECIPES = 3;
-/** Combos shown before a search (#888). */
-const COMBOS_MAX = 3;
 const NO_COMBOS: Combo[] = [];
 
 /** A row of the Add sheet: a food or a recipe. */
@@ -27,36 +48,24 @@ interface Props {
   api: ForageApi;
   slot: Slot;
   today: string;
+  /** What is going into the meal, held by the screen so it survives a sheet opened over this one. */
+  items: TrayItem[];
+  onItems: (change: (items: TrayItem[]) => TrayItem[]) => void;
   /** The search text to open with: the pass's, or a starter food just added. */
   initialQuery?: string;
-  /** The search text as it changes, so the pass can keep it while the amount sheet is open. */
+  /** The search text as it changes, so the pass can keep it while another sheet is open. */
   onQuery?: (q: string) => void;
-  /** The entries the pass logged that are still on the day, in the order logged. */
-  added?: { entry: FoodLogEntry; name: string }[];
-  /** A row of the Added list: that entry's amount sheet, in edit mode. */
-  onOpenAdded?: (entry: FoodLogEntry) => void;
-  /** The Added row just logged or saved, which fades in. */
-  fresh?: string | null;
-  /** "Logged Gnocchi": the pass's last save, as a status line under the search. */
-  status?: string | null;
-  /** The pass has logged something: the header's close is Done. */
-  done?: boolean;
   /** The usuals (#885), most recently used first; empty until they load, or when there are none. */
   usuals?: Usual[];
-  /** The usual being logged, whose row is disabled. */
-  loggingUsual?: string | null;
-  /** A usual row tapped: the screen logs it with `logUsual`. */
-  onLogUsual?: (usual: Usual) => void;
-  /** The combo being logged (#888), whose row is disabled. */
-  loggingCombo?: string | null;
-  /** A combo row tapped: the screen logs its foods as a group with `logGroup`. */
-  onLogCombo?: (combo: Combo) => void;
-  /** A food or recipe that can be logged: the amount sheet opens for it. */
-  onPick: (target: LogTarget) => void;
   /** One with no nutrition: #707's food form, or the recipe's Nutrition sheet. */
   onAddNutrition: (target: LogTarget) => void;
   /** Not here? Add a food: #707's Add a food sheet. */
   onAddFood: () => void;
+  /** The footer button, and the close prompt's Add: one `logMeal`, and the sheet is gone. */
+  onSave: () => void;
+  /** The close prompt's Discard: the sheet closes and the tray is dropped. */
+  onDiscard: () => void;
+  /** Close, Escape or the backdrop with an empty tray. */
   onClose: () => void;
 }
 
@@ -81,57 +90,40 @@ export function recentRows(log: FoodLogEntry[], foods: Food[], recipes: RecipeSu
   return out;
 }
 
-/** Foods whose name or brand contains the text, ignoring case, then recipes by name; at most 20. */
-export function searchRows(q: string, foods: Food[], recipes: RecipeSummary[]): Row[] {
-  const needle = q.trim().toLowerCase();
-  const fs: Row[] = foods
-    .filter((f) => `${f.name} ${f.brand ?? ''}`.toLowerCase().includes(needle))
-    .map((f) => ({ key: f.id, target: { kind: 'food', food: f } }));
-  const rs: Row[] = recipes
-    .filter((r) => r.name.toLowerCase().includes(needle))
-    .map((r) => ({ key: r.id, target: { kind: 'recipe', recipe: r } }));
-  return [...fs, ...rs].slice(0, RESULTS_MAX);
-}
-
 const loggable = (t: LogTarget) => (t.kind === 'food' ? hasNutrition(t.food) : recipeLoggable(t.recipe));
 
-/** The Usuals section (#885): one row per usual, those usually for this meal first. Renders nothing when none match. */
+/** The Usuals section (#885): one row per usual. A tap drops its lines into the tray as a group. */
 function UsualRows({
   usuals,
-  slot,
-  q,
+  label,
   foods,
-  logging,
-  onLog,
+  disabled,
+  onAdd,
 }: {
   usuals: Usual[];
-  slot: Slot;
-  q: string;
-  foods: Food[];
-  logging: string | null;
-  onLog: (u: Usual) => void;
+  label: string;
+  foods: Map<string, Food>;
+  disabled: (u: Usual) => boolean;
+  onAdd: (u: Usual) => void;
 }) {
-  const rows = usualsFor(usuals, slot, q);
-  if (!rows.length) return null;
-  const byId = new Map(foods.map((f) => [f.id, f]));
+  if (!usuals.length) return null;
   return (
     <>
       <p class="card-label" id="usuals-label">
-        Usuals
+        {label}
       </p>
       <ul class="plain-list" aria-labelledby="usuals-label" data-testid="usuals-list">
-        {rows.map((u) => {
-          const short = foodsInShort(u, byId);
+        {usuals.map((u) => {
+          const short = foodsInShort(u, foods);
           const kcal = startKcalText(u);
           return (
             <li key={u.id}>
               <button
                 type="button"
                 class="log-row"
-                onClick={() => onLog(u)}
-                disabled={!!logging}
-                aria-busy={logging === u.id}
-                aria-label={`${u.name}, ${short}${kcal ? `, ${kcal}` : ''}`}
+                onClick={() => onAdd(u)}
+                disabled={disabled(u)}
+                aria-label={`${u.name}, ${short}${kcal ? `, ${kcal}` : ''}, add`}
                 data-testid="usual-result"
               >
                 <span class="recipe-text">
@@ -148,82 +140,122 @@ function UsualRows({
   );
 }
 
-/** The Combos section (#888): the top 3 before a search, every match with one. Renders nothing when none show. */
+/**
+ * Often eaten together (#888): one collapsed row, closed every time the sheet opens. Open, it lists the combos for
+ * this meal. They load behind it, so their arrival moves nothing above it.
+ */
 function ComboRows({
   combos,
-  q,
   foods,
   today,
-  logging,
-  onLog,
+  open,
+  onToggle,
+  disabled,
+  onAdd,
 }: {
   combos: Combo[];
-  q: string;
-  foods: Food[];
+  foods: Map<string, Food>;
   today: string;
-  logging: string | null;
-  onLog: (c: Combo) => void;
+  open: boolean;
+  onToggle: () => void;
+  disabled: (c: Combo) => boolean;
+  onAdd: (c: Combo) => void;
 }) {
-  const rows = q ? combos.filter((c) => comboMatches(c, q)) : combos.slice(0, COMBOS_MAX);
-  if (!rows.length) return null;
-  const byId = new Map(foods.map((f) => [f.id, f]));
+  if (!combos.length) return null;
   return (
-    <>
-      <p class="card-label" id="combos-label">
-        Combos you've logged
-      </p>
-      <ul class="plain-list" aria-labelledby="combos-label" data-testid="combos-list">
-        {rows.map((c) => {
-          const kcal = comboKcalText(c, byId);
-          const meta = addSheetMeta(c, today);
-          return (
-            <li key={c.key}>
-              <button
-                type="button"
-                class="log-row"
-                onClick={() => onLog(c)}
-                disabled={!!logging}
-                aria-busy={logging === c.key}
-                aria-label={`${c.name}, ${meta}${kcal ? `, ${kcal}` : ''}`}
-                data-testid="combo-result"
-              >
-                <span class="recipe-text">
-                  <span class="recipe-name usual-foods">{c.name}</span>
-                  <span class="recipe-meta">{meta}</span>
-                </span>
-                {kcal ? <span class="log-row-kcal tabular">{kcal}</span> : <span class="chip-flag">—</span>}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </>
+    <div class="combos-together">
+      <button
+        type="button"
+        class="together-row"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls="together-list"
+        data-testid="together-toggle"
+      >
+        <span>Often eaten together ({combos.length})</span>
+        <span class="together-chevron" aria-hidden="true">
+          {open ? '▴' : '▾'}
+        </span>
+      </button>
+      {open && (
+        <ul class="plain-list" id="together-list" data-testid="combos-list">
+          {combos.map((c) => {
+            const kcal = comboKcalText(c, foods);
+            const when = comboWhen(c, today);
+            return (
+              <li key={c.key}>
+                <button
+                  type="button"
+                  class="log-row"
+                  onClick={() => onAdd(c)}
+                  disabled={disabled(c)}
+                  aria-label={`${c.name}, ${when}${kcal ? `, ${kcal}` : ''}, add`}
+                  data-testid="combo-result"
+                >
+                  <span class="recipe-text">
+                    <span class="recipe-name usual-foods">{c.name}</span>
+                    <span class="recipe-meta">{when}</span>
+                  </span>
+                  {kcal ? <span class="log-row-kcal tabular">{kcal}</span> : <span class="chip-flag">—</span>}
+                  <span class="log-row-plus" aria-hidden="true">
+                    +
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
-function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => void; onAddNutrition: () => void }) {
-  const t = row.target;
-  const ok = loggable(t);
-  const name = t.kind === 'food' ? displayName(t.food) : t.recipe.name;
-  const line = t.kind === 'food' ? foodRowLine(t.food) : recipeRowLine(t.recipe);
+/** A food or recipe: one tap puts it in the tray at the amount last logged, or opens it when it is already there. */
+function ResultRow({
+  target,
+  last,
+  inTray,
+  full,
+  onTap,
+  onAddNutrition,
+}: {
+  target: LogTarget;
+  last: Map<string, FoodLogEntry>;
+  inTray: boolean;
+  full: boolean;
+  onTap: () => void;
+  onAddNutrition: () => void;
+}) {
+  const ok = loggable(target);
+  const name = targetName(target);
+  const amount = ok ? rowAmount(target, last) : null;
+  const line = amount
+    ? `${amount.text}${amount.kcal === null ? '' : ` · ${wholeKcal(amount.kcal)} kcal`}`
+    : 'No nutrition yet';
+  const label = !ok
+    ? `${name}, no nutrition yet, add nutrition`
+    : inTray
+      ? `${name}, in the tray, edit`
+      : `${name}, ${amount!.text}${amount!.kcal === null ? '' : `, ${wholeKcal(amount!.kcal)} kcal`}, add`;
   return (
     <li>
       <button
         type="button"
         class="log-row"
-        onClick={ok ? onPick : onAddNutrition}
-        aria-label={ok ? `${name}, ${line}` : `${name}, no nutrition yet, add nutrition`}
+        onClick={ok ? onTap : onAddNutrition}
+        disabled={ok && !inTray && full}
+        aria-label={label}
         data-testid="add-result"
       >
         <span class="recipe-text">
           <span class={ok ? 'recipe-name' : 'recipe-name status-muted'}>
-            {t.kind === 'food' ? <FoodName food={t.food} /> : name}
+            {target.kind === 'food' ? <FoodName food={target.food} /> : name}
           </span>
           <span class="recipe-meta">{line}</span>
         </span>
         {ok ? (
-          <span class="log-row-plus" aria-hidden="true">
-            +
+          <span class={inTray ? 'log-row-plus is-in' : 'log-row-plus'} aria-hidden="true">
+            {inTray ? '✓' : '+'}
           </span>
         ) : (
           <span class="log-row-action">Add nutrition</span>
@@ -234,33 +266,36 @@ function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => vo
 }
 
 /**
- * The Add sheet (#712): a search over foods and recipes, with what was logged most recently when it is empty.
- * Recents are derived from the last 60 days of the log itself; nothing new is stored for them. During a pass
- * (#786) it lists what the pass added above Recent. Its lists are held in `add-store.ts` (#931): what is held shows on
- * the first frame, and one refresh a pass swaps in behind it, so a return from the amount sheet loads nothing.
+ * The Add sheet (#712, rebuilt around a tray in #933): a search over foods, recipes and usuals; the tray, where one
+ * tap puts what was picked at the amount last logged, edited in place; and one button that saves the meal. Its lists
+ * are held in `add-store.ts` (#931): what is held shows on the first frame, and one refresh an open swaps in behind it.
+ * Nothing is saved while picking.
  */
 export function AddSheet({
   api,
   slot,
   today,
+  items,
+  onItems,
   initialQuery = '',
   onQuery,
-  added = [],
-  onOpenAdded,
-  fresh,
-  status,
-  done,
   usuals = [],
-  loggingUsual = null,
-  onLogUsual,
-  loggingCombo = null,
-  onLogCombo,
-  onPick,
   onAddNutrition,
   onAddFood,
+  onSave,
+  onDiscard,
   onClose,
 }: Props) {
   const [q, setQ] = useState(initialQuery);
+  const [open, setOpen] = useState<string | null>(null);
+  const [pickOpen, setPickOpen] = useState<string | null>(null);
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [status, setStatus] = useState('');
+  const [together, setTogether] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const search = useRef<HTMLInputElement>(null);
+  const recents = useRef<{ keys: string[]; fallback: boolean } | null>(null);
+
   const lists = addLists.value;
   /** #888: the combos held for this meal; none until they load, and when that fails, so the sheet works without them. */
   const combos = addCombos.value[slot] ?? NO_COMBOS;
@@ -268,6 +303,8 @@ export function AddSheet({
   const foods = lists?.foods ?? null;
   const recipes = lists?.recipes ?? [];
   const log = lists?.log ?? [];
+  const foodMap = useMemo(() => new Map((foods ?? []).map((f) => [f.id, f])), [foods]);
+  const last = useMemo(() => lastEntries(log), [log]);
 
   useEffect(() => {
     void refreshAdd(api, slot, today);
@@ -276,6 +313,89 @@ export function AddSheet({
 
   const meal = slot.toLowerCase();
   const text = q.trim();
+  const full = items.length >= TRAY_MAX;
+  const totals = trayTotals(items);
+
+  // Recent is worked out once, when the lists first show, and not again while the sheet is open.
+  if (foods && !recents.current) {
+    const rows = recentRows(log, foods, recipes);
+    recents.current = rows.length
+      ? { keys: rows.map((r) => r.key), fallback: false }
+      : { keys: recipes.slice(0, FALLBACK_RECIPES).map((r) => r.id), fallback: true };
+  }
+
+  function say(message: string) {
+    setStatus(message);
+  }
+
+  /** A food or recipe row tapped: into the tray at its amount, or, when it is already there, its editor. */
+  function tap(target: LogTarget) {
+    const hit = looseItem(items, target);
+    if (hit) {
+      setOpen(hit.id);
+      setFresh(hit.id);
+      return;
+    }
+    if (full) return;
+    const item = newItem(target, last);
+    onItems((prev) => (prev.length >= TRAY_MAX ? prev : [...prev, item]));
+    setFresh(item.id);
+    say(`Added ${targetName(target)}`);
+    if (text) {
+      setQ('');
+      search.current?.focus();
+    }
+  }
+
+  function addGroup(made: TrayItem[], name: string) {
+    if (!made.length) return;
+    if (items.length + made.length > TRAY_MAX) {
+      say(TRAY_FULL);
+      return;
+    }
+    onItems((prev) => [...prev, ...made]);
+    setFresh(made[0].id);
+    say(made.length === 1 ? `Added ${name}` : `Added ${name}, ${made.length} items`);
+    if (text) {
+      setQ('');
+      search.current?.focus();
+    }
+  }
+
+  function remove(id: string) {
+    const item = items.find((i) => i.id === id);
+    onItems((prev) => removeItem(prev, id));
+    setOpen(null);
+    setPickOpen(null);
+    if (item) say(`Removed ${targetName(item.target)}`);
+  }
+
+  function removeAll(key: string) {
+    const name = items.find((i) => i.group?.key === key)?.group?.name ?? '';
+    onItems((prev) => removeGroup(prev, key));
+    setOpen(null);
+    setPickOpen(null);
+    say(`Removed ${name}`);
+  }
+
+  function requestClose() {
+    if (items.length) setConfirming(true);
+    else onClose();
+  }
+
+  const groupFits = (n: number) => items.length + n <= TRAY_MAX;
+  const rowFor = (target: LogTarget) => (
+    <ResultRow
+      key={`${target.kind}:${targetId(target)}`}
+      target={target}
+      last={last}
+      inTray={!!looseItem(items, target)}
+      full={full}
+      onTap={() => tap(target)}
+      onAddNutrition={() => onAddNutrition(target)}
+    />
+  );
+
   let body;
   if (failed) {
     body = (
@@ -297,44 +417,28 @@ export function AddSheet({
   } else if (!foods.length && !recipes.length) {
     body = <p class="library-status">No foods in your library yet.</p>;
   } else if (text) {
-    const rows = searchRows(text, foods, recipes);
-    const usualRows = (
-      <UsualRows
-        usuals={usuals}
-        slot={slot}
-        q={text}
-        foods={foods}
-        logging={loggingUsual}
-        onLog={(u) => onLogUsual?.(u)}
-      />
-    );
-    const comboRows = (
-      <ComboRows
-        combos={combos}
-        q={text}
-        foods={foods}
-        today={today}
-        logging={loggingCombo}
-        onLog={(c) => onLogCombo?.(c)}
-      />
-    );
+    const targets = searchTargets(text, foods, recipes, RESULTS_MAX);
+    const matching = usualsMatching(usuals, slot, text, foodMap);
     body =
-      rows.length || usualsFor(usuals, slot, text).length || combos.some((c) => comboMatches(c, text)) ? (
+      targets.length || matching.length ? (
         <>
-          {usualRows}
-          {comboRows}
-          {rows.length > 0 && (
-            <ul class="plain-list" aria-label="Results">
-              {rows.map((r) => (
-                <ResultRow
-                  key={r.key}
-                  row={r}
-                  onPick={() => onPick(r.target)}
-                  onAddNutrition={() => onAddNutrition(r.target)}
-                />
-              ))}
-            </ul>
+          {targets.length > 0 && (
+            <>
+              <p class="card-label" id="results-label">
+                Foods
+              </p>
+              <ul class="plain-list" aria-labelledby="results-label" data-testid="results-list">
+                {targets.map(rowFor)}
+              </ul>
+            </>
           )}
+          <UsualRows
+            usuals={matching}
+            label={`Usuals with ${text}`}
+            foods={foodMap}
+            disabled={(u) => !groupFits(u.lines.length)}
+            onAdd={(u) => addGroup(usualItems(u, foodMap), u.name)}
+          />
         </>
       ) : (
         <p class="library-status" data-testid="add-no-match">
@@ -342,102 +446,136 @@ export function AddSheet({
         </p>
       );
   } else {
-    const recents = recentRows(log, foods, recipes);
-    const rows: Row[] = recents.length
-      ? recents
-      : recipes.slice(0, FALLBACK_RECIPES).map((r) => ({ key: r.id, target: { kind: 'recipe', recipe: r } }));
+    const keys = recents.current?.keys ?? [];
+    const rows: LogTarget[] = keys.flatMap((k): LogTarget[] => {
+      const f = foodMap.get(k);
+      if (f) return hasNutrition(f) ? [{ kind: 'food', food: f }] : [];
+      const r = recipes.find((x) => x.id === k);
+      return r ? [{ kind: 'recipe', recipe: r }] : [];
+    });
+    const fallback = recents.current?.fallback;
     body = (
       <>
         <UsualRows
-          usuals={usuals}
-          slot={slot}
-          q=""
-          foods={foods}
-          logging={loggingUsual}
-          onLog={(u) => onLogUsual?.(u)}
+          usuals={usualsFor(usuals, slot, '')}
+          label={`Usuals for ${meal}`}
+          foods={foodMap}
+          disabled={(u) => !groupFits(u.lines.length)}
+          onAdd={(u) => addGroup(usualItems(u, foodMap), u.name)}
         />
-        <ComboRows
-          combos={combos}
-          q=""
-          foods={foods}
-          today={today}
-          logging={loggingCombo}
-          onLog={(c) => onLogCombo?.(c)}
-        />
-        {added.length > 0 && (
-          <>
-            <p class="card-label" id="added-label">
-              Added to {meal}
-            </p>
-            <ul class="plain-list added-list" aria-labelledby="added-label" data-testid="added-list">
-              {added.map(({ entry, name }) => (
-                <EntryRow
-                  key={entry.id}
-                  entry={entry}
-                  name={name}
-                  fresh={entry.id === fresh}
-                  onOpen={() => onOpenAdded?.(entry)}
-                />
-              ))}
-            </ul>
-          </>
-        )}
-        {!recents.length && <p class="library-status">Nothing logged yet. Search for a food or recipe.</p>}
+        {fallback && <p class="library-status">Nothing logged yet. Search for a food or recipe.</p>}
         {rows.length > 0 && (
           <>
             <p class="card-label" id="add-list-label">
-              {recents.length ? 'Recent' : 'Your recipes'}
+              {fallback ? 'Your recipes' : 'Recent'}
             </p>
-            <ul class="plain-list" aria-labelledby="add-list-label">
-              {rows.map((r) => (
-                <ResultRow
-                  key={r.key}
-                  row={r}
-                  onPick={() => onPick(r.target)}
-                  onAddNutrition={() => onAddNutrition(r.target)}
-                />
-              ))}
+            <ul class="plain-list" aria-labelledby="add-list-label" data-testid="recent-list">
+              {rows.map(rowFor)}
             </ul>
           </>
         )}
+        <ComboRows
+          combos={combos}
+          foods={foodMap}
+          today={today}
+          open={together}
+          onToggle={() => setTogether((o) => !o)}
+          disabled={(c) => !groupFits(c.lines.length)}
+          onAdd={(c) => addGroup(comboItems(c, foodMap), c.name)}
+        />
       </>
     );
   }
 
-  return (
-    <Sheet
-      title={`Add to ${meal}`}
-      onClose={onClose}
-      testId="add-sheet"
-      tall
-      headerEnd={
-        done ? (
-          <button type="button" class="btn btn-secondary" onClick={onClose} data-testid="add-done">
-            Done
-          </button>
-        ) : undefined
-      }
+  const footer = (
+    <button
+      type="button"
+      class="btn btn-primary btn-block"
+      onClick={onSave}
+      disabled={!items.length}
+      data-testid="tray-save"
     >
-      <label class="visually-hidden" for="add-search">
-        Search foods and recipes
-      </label>
-      <input
-        id="add-search"
-        class="field"
-        type="search"
-        placeholder="Search foods and recipes"
-        value={q}
-        onInput={(e) => setQ((e.target as HTMLInputElement).value)}
-        data-autofocus
-        data-testid="add-search"
-      />
-      <p class="hint add-status" role="status" data-testid="add-status">
-        {status ?? ''}
-      </p>
-      {body}
-      <button type="button" class="btn btn-secondary btn-block add-food-btn" onClick={onAddFood} data-testid="not-here">
-        Not here? Add a food
-      </button>
-    </Sheet>
+      {items.length ? footerText(totals, slot) : 'Tap foods to add them'}
+    </button>
+  );
+
+  return (
+    <>
+      <Sheet title={`Add to ${meal}`} onClose={requestClose} testId="add-sheet" tall footer={footer}>
+        <label class="visually-hidden" for="add-search">
+          Search foods, recipes, usuals
+        </label>
+        <input
+          id="add-search"
+          ref={search}
+          class="field"
+          type="search"
+          placeholder="Search foods, recipes, usuals"
+          value={q}
+          onInput={(e) => setQ((e.target as HTMLInputElement).value)}
+          data-autofocus
+          data-testid="add-search"
+        />
+        <p class="hint add-status" role="status" data-testid="add-status">
+          {full ? TRAY_FULL : status}
+        </p>
+        {items.length > 0 && (
+          <TrayView
+            items={items}
+            meal={meal}
+            foods={foodMap}
+            open={open}
+            pickOpen={pickOpen}
+            fresh={fresh}
+            onOpen={(id) => {
+              setOpen(id);
+              setPickOpen(null);
+            }}
+            onPickOpen={setPickOpen}
+            onFreshDone={(id) => setFresh((f) => (f === id ? null : f))}
+            onAmount={(id, qty, unit) => onItems((prev) => setAmount(prev, id, qty, unit))}
+            onPick={(id, option) => onItems((prev) => pickOption(prev, id, option, foodMap))}
+            onRemove={remove}
+            onRemoveGroup={removeAll}
+          />
+        )}
+        {body}
+        <button
+          type="button"
+          class="btn btn-secondary btn-block add-food-btn"
+          onClick={onAddFood}
+          data-testid="not-here"
+        >
+          Not here? Add a food
+        </button>
+      </Sheet>
+      {confirming && (
+        <Sheet
+          title={closePromptTitle(items.length, slot)}
+          onClose={() => setConfirming(false)}
+          closable={false}
+          alert
+          testId="close-prompt"
+        >
+          <p class="sheet-message">They're in the tray but not saved yet.</p>
+          <div class="sheet-actions">
+            <button type="button" class="btn btn-secondary" onClick={onDiscard} data-testid="prompt-discard">
+              Discard
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onClick={() => setConfirming(false)}
+              data-testid="prompt-keep"
+            >
+              Keep adding
+            </button>
+            <button type="button" class="btn btn-primary" onClick={onSave} data-autofocus data-testid="prompt-add">
+              Add {items.length}
+            </button>
+          </div>
+        </Sheet>
+      )}
+    </>
   );
 }

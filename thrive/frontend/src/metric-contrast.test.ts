@@ -78,3 +78,17 @@ describe.each(THEMES)('metric colours (%s)', (theme) => {
     expect(block).toMatch(/--metric-sleep:\s*var\(--metric-sleep-rem\);/);
   });
 });
+
+// #891: Custom's ride-day band sits behind every mark, so each metric and chart colour is held to 3:1 on it.
+// --metric-sleep-light is the one known exception: 3.23:1 on the card, so any visible band takes it under 3 in light.
+const SHADE_EXCEPTIONS = ['--metric-sleep-light'];
+
+describe.each(THEMES)('ride-day shade (%s)', (theme) => {
+  it.each([...METRICS, '--chart-dot', '--chart-line'].filter((n) => !SHADE_EXCEPTIONS.includes(n)))(
+    '%s is at least 3:1 on --trend-ride-shade',
+    (name) => {
+      const ratio = contrast(token(theme, name), token(theme, '--trend-ride-shade'));
+      expect(ratio, `${name} on the shade is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    },
+  );
+});

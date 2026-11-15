@@ -22,6 +22,8 @@ interface Props {
   date: string;
   avgDays: number;
   today: string;
+  /** Shade ride days is on and this is a ride day (#891). */
+  rideDay?: boolean;
 }
 
 /** "Friday, August 28", with the year when it is not this year. Screen-reader text. */
@@ -30,13 +32,14 @@ export function openDayName(date: string, today: string): string {
   return date.slice(0, 4) === today.slice(0, 4) ? name : `${name}, ${date.slice(0, 4)}`;
 }
 
-export function TrendReadout({ metric, series, date, avgDays, today }: Props) {
+export function TrendReadout({ metric, series, date, avgDays, today, rideDay }: Props) {
   const cells = dayCells(metric, series, pointsByDate(series), date, avgDays);
   return (
     <div class="trend-readout" data-date={date}>
       <div class="trend-readout-head">
         <p class="trend-readout-date" aria-hidden="true">
           {readoutDate(date, today)}
+          {rideDay ? ' · ride day' : ''}
         </p>
         <a class="trend-open-day" href={openDayHref(date, today)} tabIndex={-1} onClick={openDayClick(date, today)}>
           Open day<span class="sr-only">{`, ${openDayName(date, today)}`}</span> <span aria-hidden="true">›</span>

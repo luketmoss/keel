@@ -99,6 +99,8 @@
   --chart-line: #2452c9;
   --chart-band: #e1e9fd;
   --chart-grid: #e8eaed;
+  /* Custom's ride-day bands (#891): 1.18:1 on the card, a help to the eye, the fact is also in words. */
+  --trend-ride-shade: #f1ece3;
   /* Calendar shading (#241), low to high. Every bin carries its own passing
      pairs (calendar-shade-contrast.test.ts): --cal-on-shade text 14.13 /
      11.86 / 10.02 / 8.51, --color-primary-text (note dot, selected border)
@@ -172,6 +174,7 @@
   --chart-line: #6e97ff;
   --chart-band: #1a2645;
   --chart-grid: #2c2c30;
+  --trend-ride-shade: #2b2823;
   /* Calendar (#241): --cal-on-shade 12.42 / 10.55 / 8.76 / 7.42,
      --color-primary-text 5.37 / 4.56 / 3.79 / 3.21 on bins 1-4. */
   --cal-shade-1: #1b2836;
@@ -7428,6 +7431,8 @@ a.training-card {
 /* ===== Trends: custom set (#246) ===== */
 .trends-custom-head {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
   margin-bottom: var(--space-sm);
 }
 

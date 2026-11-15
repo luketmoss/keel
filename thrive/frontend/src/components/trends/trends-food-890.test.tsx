@@ -183,16 +183,15 @@ describe('the screen', () => {
     localStorage.setItem('thrive-trends-custom', JSON.stringify(['protein']));
     getFoodLogTotals.mockResolvedValue({ ok: true, days: [fd(day(2)), fd(day(1), { partial: true, kcal: 1240 })] });
     const { container, getByRole, getByText } = renderScreen();
-    await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(4));
+    await waitFor(() => expect(container.querySelectorAll('.trend-card:not(.fuel-card)')).toHaveLength(4));
     expect(getFoodLogTotals).toHaveBeenCalledTimes(1);
     expect(getFoodLogTotals).toHaveBeenCalledWith('tok');
-    expect([...container.querySelectorAll('.trend-card-title')].map((e) => e.textContent!.trim())).toEqual([
-      'Calories kcal',
-      'Protein g',
-      'Carbs g',
-      'Fat g',
-    ]);
-    expect(container.querySelectorAll('.trend-note')).toHaveLength(4);
+    expect(
+      [...container.querySelectorAll('.trend-card:not(.fuel-card) .trend-card-title')].map((e) =>
+        e.textContent!.trim(),
+      ),
+    ).toEqual(['Calories kcal', 'Protein g', 'Carbs g', 'Fat g']);
+    expect(container.querySelectorAll('.trend-card:not(.fuel-card) .trend-note')).toHaveLength(4);
     expect(getByText('Eaten, from Forage', { selector: '#trend-calories-note' })).toBeTruthy();
     expect(container.querySelectorAll('.trend-bar-low').length).toBe(4);
     expect(container.querySelector('.trends-caption, .trend-caption')!.textContent).toContain(
@@ -213,7 +212,7 @@ describe('the screen', () => {
     let resolve!: (v: unknown) => void;
     getFoodLogTotals.mockReturnValue(new Promise((r) => (resolve = r)));
     const { container, queryByText } = renderScreen();
-    expect(container.querySelectorAll('.trend-card')).toHaveLength(4);
+    expect(container.querySelectorAll('.trend-card:not(.fuel-card)')).toHaveLength(4);
     expect(queryByText('Loading…')).toBeNull();
     expect(getFoodLogTotals).toHaveBeenCalledTimes(1);
     resolve({ ok: true, days: [fd(day(2))] });
@@ -227,7 +226,7 @@ describe('the screen', () => {
     await findByText("Couldn't load your food.");
     getFoodLogTotals.mockResolvedValueOnce({ ok: true, days: [fd(day(2))] });
     fireEvent.click(getByText('Try again'));
-    await waitFor(() => expect(container.querySelectorAll('.trend-card')).toHaveLength(4));
+    await waitFor(() => expect(container.querySelectorAll('.trend-card:not(.fuel-card)')).toHaveLength(4));
     expect(getFoodLogTotals).toHaveBeenCalledTimes(2);
   });
   it('says nothing is logged yet, and what an empty range holds', async () => {

@@ -1,7 +1,7 @@
 // #891 — which DailySummary rows are ride days.
 
 import { describe, it, expect } from 'vitest';
-import { isRideDay, rideDays } from './ride-days';
+import { isRideDay, rideDays, isLiftDay, liftDays, restDays } from './ride-days';
 
 describe('isRideDay', () => {
   it.each(['bike', 'bike:road', 'bike:indoor', 'weight,bike:mountain', 'bike:spin,weight', 'hike, bike'])(
@@ -27,5 +27,32 @@ describe('rideDays', () => {
   it('is empty for no rows', () => {
     expect(rideDays(null).size).toBe(0);
     expect(rideDays([]).size).toBe(0);
+  });
+});
+
+describe('day kinds (#892)', () => {
+  it.each([
+    ['bike', true, false],
+    ['bike:road', true, false],
+    ['bike:indoor', true, false],
+    ['weight,bike:mountain', true, true],
+    ['weight', false, true],
+    ['run', false, false],
+    ['stretch,weight', false, true],
+    ['', false, false],
+  ])('%s: ride %s, lift %s', (types, ride, lift) => {
+    expect(isRideDay(types)).toBe(ride);
+    expect(isLiftDay(types)).toBe(lift);
+  });
+  it('rest is a row with a count of 0 or blank; a missing row is none', () => {
+    const rows = [
+      { date: 'a', activity_count: '0', activity_types: '' },
+      { date: 'b', activity_count: '', activity_types: '' },
+      { date: 'c', activity_count: '1', activity_types: 'run' },
+    ];
+    expect([...restDays(rows)]).toEqual(['a', 'b']);
+    expect([...liftDays([{ date: 'x', activity_types: 'stretch,weight' }])]).toEqual(['x']);
+    expect(restDays(null).size).toBe(0);
+    expect(liftDays(null).size).toBe(0);
   });
 });

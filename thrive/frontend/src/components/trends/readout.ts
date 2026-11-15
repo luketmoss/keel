@@ -50,6 +50,7 @@ export function dayCells(
   byDate: ReadonlyMap<string, TrendPoint>,
   date: string,
   avgDays: number,
+  today?: string,
 ): DayCells {
   const p = byDate.get(date);
   const avg = series.average.get(date);
@@ -60,6 +61,11 @@ export function dayCells(
     // A held value has no average, whatever the control says (#772).
     average: avgDays > 0 && !series.held ? (avg !== undefined ? metric.format(avg) : BLANK) : null,
   };
+  // A blank day says why, for a metric where a blank is not a zero (#890).
+  if (!p && metric.gapNote && today !== undefined) {
+    cells.note = metric.gapNote(date, today);
+    cells.tableNote = cells.note;
+  }
   const held = series.held?.cells.get(date);
   if (held) {
     // In effect that day: the entry's own value on its day and every day after it until the next entry.
@@ -113,7 +119,7 @@ export function announceText(
   rideDays?: ReadonlySet<string> | null,
 ): string {
   const clauses = parts.map(({ metric, series }) => {
-    const c = dayCells(metric, series, pointsByDate(series), date, avgDays);
+    const c = dayCells(metric, series, pointsByDate(series), date, avgDays, today);
     const bits = [`${metric.label} ${valueText(metric, c)}${c.partial ? ` ${c.partial}` : ''}`];
     if (c.note) bits.push(c.note);
     const avg = averageText(metric, c, avgDays);

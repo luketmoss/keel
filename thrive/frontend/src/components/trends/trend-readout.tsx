@@ -33,7 +33,7 @@ export function openDayName(date: string, today: string): string {
 }
 
 export function TrendReadout({ metric, series, date, avgDays, today, rideDay }: Props) {
-  const cells = dayCells(metric, series, pointsByDate(series), date, avgDays);
+  const cells = dayCells(metric, series, pointsByDate(series), date, avgDays, today);
   return (
     <div class="trend-readout" data-date={date}>
       <div class="trend-readout-head">

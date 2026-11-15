@@ -8,7 +8,7 @@
 
 import { useRef } from 'preact/hooks';
 import { useModalFocus } from '../shared/use-modal-focus';
-import { CUSTOM_SECTIONS, CUSTOM_MAX, normaliseCustom } from './metrics';
+import { availableSections, CUSTOM_MAX, normaliseCustom } from './metrics';
 
 interface Props {
   selected: readonly string[];
@@ -46,7 +46,7 @@ export function CustomMetricsPicker({ selected, onChange, onClose }: Props) {
           {atCap ? `${CUSTOM_MAX} selected — remove one to add another.` : ''}
         </p>
         <div class="trends-picker-list">
-          {CUSTOM_SECTIONS.map((section) => {
+          {availableSections().map((section) => {
             const headingId = `trends-picker-${section.label.toLowerCase().replace(/\s+/g, '-')}`;
             return (
               <div key={section.label} role="group" aria-labelledby={headingId}>

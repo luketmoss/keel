@@ -13,6 +13,15 @@ export function forageApiUrl(): string {
 /** Forage's Eaten tab, opened by the card's link. */
 export const FORAGE_EATEN_URL = 'https://luketmoss.github.io/keel/forage/#/eaten';
 
+/**
+ * #890 - Forage's Trends (#913), opened from a Trends food card at the metric and range
+ * (`forage/docs/design/913-trends-screen.md` §The route). `metric` is `kcal`, `protein`, `carbs` or `fat`;
+ * a metric whose tab is not built yet opens Energy, which is Forage's own fallback.
+ */
+export function forageTrendsUrl(metric: 'kcal' | 'protein' | 'carbs' | 'fat', range: string): string {
+  return `${FORAGE_EATEN_URL}/trends?metric=${metric}&range=${range}`;
+}
+
 /** #757 - the seven label values Forage adds in #755, in label order. */
 export const LABEL_KEYS = [
   'satfat_g',
@@ -107,11 +116,19 @@ function parseDay(raw: unknown): FoodDay | null {
   };
 }
 
-/** The days Forage reports from `from` to `to`, both `YYYY-MM-DD`. Never throws; every failure is a `kind`. */
-export async function getFoodLogTotals(token: string, from: string, to: string): Promise<FoodTotalsOutcome> {
+/**
+ * The days Forage reports from `from` to `to`, both `YYYY-MM-DD`; with neither, the whole log (#890).
+ * Never throws; every failure is a `kind`.
+ */
+export async function getFoodLogTotals(token: string, from?: string, to?: string): Promise<FoodTotalsOutcome> {
   const url = forageApiUrl();
   if (!url) return { ok: false, kind: 'no_api_url' };
-  const res = await callAction<{ days?: unknown }>('getFoodLogTotals', token, { fields: { from, to } }, { url });
+  const res = await callAction<{ days?: unknown }>(
+    'getFoodLogTotals',
+    token,
+    { fields: from !== undefined && to !== undefined ? { from, to } : {} },
+    { url },
+  );
   if (!res.ok) return { ok: false, kind: res.kind };
   const raw = res.data?.days;
   if (!Array.isArray(raw)) return { ok: false, kind: 'bad_response' };

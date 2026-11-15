@@ -7,6 +7,7 @@ import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSumm
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 import { switchUnit, type UnitOption } from './amount-edit';
+import { previewFood, previewRecipe, type EntryNutrition } from './preview';
 
 export type DayState = 'loading' | 'ready' | 'error';
 
@@ -43,8 +44,8 @@ export function keepDayUsual(usual: Usual): void {
 }
 
 /**
- * The one inline amount editor open in the day (#882): the entry, the amount being set, the dry-run preview of it, and
- * whether it is saving or the save failed. The row reads it for its chip and calories; the editor writes it.
+ * The one inline amount editor open in the day (#882): the entry, the amount being set, the figures worked out for it
+ * (#929, no request), and whether it is saving or the save failed. The row reads it for its chip and calories; the editor writes it.
  */
 export interface AmountEdit {
   id: string;
@@ -52,27 +53,17 @@ export interface AmountEdit {
   base: { qty: number; unit: string };
   qty: number;
   unit: string;
-  /** The API's dry run of `qty` and `unit`; null until one answers, or while the amount is the stored one. */
-  preview: FoodLogEntry | null;
+  /** The figures of `qty` and `unit` (`preview.ts`); null while the amount is the stored one, or the unit has no weight. */
+  preview: EntryNutrition | null;
   busy: boolean;
   error: boolean;
 }
 export const editing = signal<AmountEdit | null>(null);
 
-/** The preview is asked for this long after the last change to the amount or unit. */
-export const PREVIEW_DELAY_MS = 400;
-let previewSeq = 0;
-let previewTimer: ReturnType<typeof setTimeout> | undefined;
 let saving: Promise<boolean> | null = null;
-
-function stopPreview(): void {
-  clearTimeout(previewTimer);
-  previewSeq++;
-}
 
 /** Open the editor on an entry, at its stored amount. The caller has closed any other first. */
 export function openEditor(entry: FoodLogEntry): void {
-  stopPreview();
   editing.value = {
     id: entry.id,
     base: { qty: entry.qty, unit: entry.unit },
@@ -84,25 +75,27 @@ export function openEditor(entry: FoodLogEntry): void {
   };
 }
 
-/** Set the amount being edited; the row's calories follow from one dry run, 400ms after the last change. */
-export function setDraft(api: ForageApi, qty: number, unit: string): void {
+/**
+ * The figures of an amount of an entry, worked out here: its food (or recipe) as the day holds it, and the entry's own
+ * grams per unit for a serving the food has since renamed (#880). Null for a food or recipe the day doesn't hold, and
+ * for a unit with no weight, so the row keeps the stored figure and the save is left to the API.
+ */
+function figuresFor(entry: FoodLogEntry, qty: number, unit: string): EntryNutrition | null {
+  if (entry.recipe_id) {
+    const recipe = logRecipes.value.find((r) => r.id === entry.recipe_id);
+    return recipe ? previewRecipe(recipe, qty) : null;
+  }
+  const food = logFoods.value.find((f) => f.id === entry.food_id);
+  return food ? previewFood(food, qty, unit, entry) : null;
+}
+
+/** Set the amount being edited; the row's calories follow on the same tap, with no request (#929). */
+export function setDraft(qty: number, unit: string): void {
   const e = editing.value;
   if (!e || e.busy) return;
-  stopPreview();
   const changed = qty !== e.base.qty || unit !== e.base.unit;
-  editing.value = { ...e, qty, unit, error: false, preview: changed ? e.preview : null };
-  if (!changed) return;
-  const mine = previewSeq;
-  previewTimer = setTimeout(() => {
-    api.updateLogEntry(e.id, { qty, unit }, true).then(
-      (preview) => {
-        const now = editing.value;
-        if (mine === previewSeq && now && now.id === e.id) editing.value = { ...now, preview };
-      },
-      // A failed preview leaves the old figure and says nothing: the save is still allowed.
-      () => {},
-    );
-  }, PREVIEW_DELAY_MS);
+  const entry = dayEntries.value.find((x) => x.id === e.id);
+  editing.value = { ...e, qty, unit, error: false, preview: changed && entry ? figuresFor(entry, qty, unit) : null };
 }
 
 /**
@@ -114,7 +107,6 @@ export function closeEditor(api: ForageApi): Promise<boolean> {
   const e = editing.value;
   if (!e) return Promise.resolve(true);
   if (saving) return saving;
-  stopPreview();
   const changes: { qty?: number; unit?: string } = {};
   if (e.qty !== e.base.qty) changes.qty = e.qty;
   if (e.unit !== e.base.unit) changes.unit = e.unit;
@@ -149,7 +141,6 @@ export function switchEditorTo(api: ForageApi, from: UnitOption | undefined, to:
   const e = editing.value;
   if (!e) return Promise.resolve(true);
   if (saving) return saving;
-  stopPreview();
   const qty = switchUnit(e.qty, from, to);
   editing.value = { ...e, qty, unit: to.unit, preview: null, busy: true, error: false };
   saving = (async () => {
@@ -313,7 +304,6 @@ export function _resetEaten(): void {
   fullOut = false;
   patches = 0;
   loadedDate = '';
-  stopPreview();
   saving = null;
   editing.value = null;
   eatenDate.value = localDate();

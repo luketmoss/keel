@@ -1,7 +1,7 @@
 // #882 in the app: the amount chip on an entry row and the inline editor under it (stepper, unit pills, Done), the
 // one dry-run preview, the save on Done or when the editor is left, and its failure. The Amount sheet is #712's.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
+import { act, fireEvent, render, screen, within } from '@testing-library/preact';
 import App from '../App';
 import type { Food, FoodLogEntry } from '../api/types';
 import { _resetDemoApi } from '../api/use-api';
@@ -116,8 +116,6 @@ const rows = () => screen.getAllByTestId('entry-row');
 const chipOf = (row: HTMLElement) => within(row).getByTestId('amount-chip');
 const editorIn = (row: HTMLElement) => within(row).queryByTestId('amount-editor');
 const press = (row: HTMLElement, name: string) => fireEvent.click(within(row).getByRole('button', { name }));
-const dryRuns = (api: ReturnType<typeof fakeApi>) =>
-  api.calls('updateLogEntry').filter((c) => (c.payload as { dry_run?: boolean }).dry_run);
 const saves = (api: ReturnType<typeof fakeApi>) =>
   api.calls('updateLogEntry').filter((c) => !(c.payload as { dry_run?: boolean }).dry_run);
 
@@ -254,7 +252,7 @@ describe('the inline editor', () => {
     expect(api.calls('updateLogEntry')).toHaveLength(0);
   });
 
-  it('lists the servings in order then grams, and steps; the chip follows at once and one dry run follows the last change', async () => {
+  it('lists the servings in order then grams, and steps; the chip and the calories follow each tap with no request (#929)', async () => {
     const api = await twoRows();
     const [, oil] = rows();
     fireEvent.click(chipOf(oil));
@@ -273,13 +271,12 @@ describe('the inline editor', () => {
     press(oil, 'More');
     expect(within(oil).getByTestId('editor-qty').textContent).toBe('2½');
     expect(chipOf(oil).textContent).toBe('2½ tbsp · 35 g');
-    // Calories are the stored ones until the preview answers.
-    expect(oil.textContent).toContain('124');
-    await new Promise((r) => setTimeout(r, 200));
-    expect(dryRuns(api)).toHaveLength(0);
-    await waitFor(() => expect(oil.textContent).toContain('309'), { timeout: 2000 });
-    expect(dryRuns(api)).toHaveLength(1);
-    expect(dryRuns(api)[0].payload).toEqual({ id: 'lg_2', changes: { qty: 2.5, unit: 'tbsp' }, dry_run: true });
+    // The calories follow the tap too: 2.5 tbsp of 14 g at 884 kcal per 100 g.
+    expect(oil.textContent).toContain('309');
+    press(oil, 'Less');
+    expect(oil.textContent).toContain('248');
+    await new Promise((r) => setTimeout(r, 500));
+    expect(api.calls('updateLogEntry')).toHaveLength(0);
     expect(saves(api)).toHaveLength(0);
   });
 
@@ -318,7 +315,7 @@ describe('the inline editor', () => {
     expect(screen.getByTestId('day-kcal').textContent).toBe('349');
   });
 
-  it('a failed save keeps the editor open with the error and the stored figures, and Done tries again', async () => {
+  it('a failed save keeps the editor open with the error and the amount set, and Done tries again', async () => {
     const api = await twoRows();
     fireEvent.click(chipOf(rows()[0]));
     await settle();
@@ -329,7 +326,7 @@ describe('the inline editor', () => {
     expect(within(rows()[0]).getByTestId('editor-error').textContent).toBe("Couldn't save. Try again.");
     expect(editorIn(rows()[0])).not.toBeNull();
     expect(within(rows()[0]).getByTestId('editor-done').getAttribute('aria-busy')).toBe('false');
-    expect(rows()[0].textContent).toContain('150');
+    expect(rows()[0].textContent).toContain('225');
   });
 
   it('moving to another day with an unsaved change saves it first, and a failed save keeps the day', async () => {
@@ -393,6 +390,43 @@ describe('the inline editor', () => {
     press(row, 'cup (245 g)');
     // 64 g is 0.26 cup: the nearest 0.25.
     expect(within(row).getByTestId('editor-qty').textContent).toBe('¼');
+  });
+
+  it("a unit the food dropped is worked out from the entry's own grams per unit, and a unit change follows the tap", async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    api.log.push(entry({ unit: 'serving', qty: 2, grams: 64, kcal: 39 }));
+    await open();
+    const [row] = rows();
+    fireEvent.click(chipOf(row));
+    await settle();
+    press(row, 'More');
+    // 2.5 servings at 32 g is 80 g of yogurt at 61.2 kcal per 100 g.
+    expect(chipOf(row).textContent).toBe('2½ serving · 80 g');
+    expect(row.textContent).toContain('49');
+    press(row, 'cup (245 g)');
+    // 80 g is 0.33 cup, to the nearest 0.25: ¼ cup is 61.25 g.
+    expect(row.textContent).toContain('38');
+    expect(api.calls('updateLogEntry')).toHaveLength(0);
+  });
+
+  it("a recipe entry's calories follow the stepper from its per-serving figure, with no request", async () => {
+    const api = fakeApi();
+    api.recipes.push({
+      id: 'rc_stew',
+      name: 'Beef Stew',
+      servings: 6,
+      nutrition: { per_serving: { kcal: 412, protein_g: 30, carbs_g: 20, fat_g: 18 }, missing: [], partial: false },
+      partial: false,
+    } as never);
+    api.log.push(entry({ food_id: '', recipe_id: 'rc_stew', qty: 1, unit: 'serving', grams: null, kcal: 412 }));
+    await open();
+    const [row] = rows();
+    fireEvent.click(chipOf(row));
+    await settle();
+    press(row, 'More');
+    expect(row.textContent).toContain('618');
+    expect(api.calls('updateLogEntry')).toHaveLength(0);
   });
 
   it('keeps nothing wider than the screen and the controls at 44px', () => {

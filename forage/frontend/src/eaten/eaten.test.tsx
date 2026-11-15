@@ -177,11 +177,6 @@ async function addTo(slot: string) {
   return screen.getByTestId('add-sheet');
 }
 
-/** Wait for the amount sheet's preview to settle. */
-async function previewed() {
-  await waitFor(() => expect(within(screen.getByTestId('amount-sheet')).queryByText('Updating…')).toBeNull());
-}
-
 describe('the helpers', () => {
   it('names a day and an amount as the design note does', () => {
     expect([dayTitle(TODAY, TODAY), dayTitle('2026-11-01', TODAY), dayTitle('2026-10-30', TODAY)]).toEqual([
@@ -315,7 +310,6 @@ describe('the day view', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     let amount = screen.getByTestId('amount-sheet');
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
@@ -365,7 +359,7 @@ describe('the day view', () => {
 });
 
 describe('logging', () => {
-  it('a food in a named serving: the preview is shown before saving, and what is saved equals it', async () => {
+  it('a food in a named serving: its figures are on the sheet at once with no request, and a save writes through logFood', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
     await open();
@@ -374,12 +368,10 @@ describe('logging', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     const amount = screen.getByTestId('amount-sheet');
     expect(within(amount).getByTestId('amount-subline').textContent).toBe('Greek yogurt · 1 cup = 245 g');
-    const dry = api.calls('logFood').filter((c) => c.payload.dry_run);
-    expect(dry).toHaveLength(1);
-    expect(dry[0].payload).toMatchObject({ food_id: 'fd_yog', qty: 1, unit: 'cup', slot: 'Dinner', date: TODAY });
+    // #929: worked out in the app, so nothing was asked of the API for it.
+    expect(api.calls('logFood')).toHaveLength(0);
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('150');
     expect(within(amount).queryByTestId('amount-macros')).toBeNull();
     expect(within(amount).getByTestId('macro-bar').getAttribute('aria-label')).toBe(
@@ -394,7 +386,7 @@ describe('logging', () => {
     await settle();
     const saved = api.calls('logFood').filter((c) => !c.payload.dry_run);
     expect(saved).toHaveLength(1);
-    expect(saved[0].payload.id).toBe(dry[0].payload.id);
+    expect(saved[0].payload).toMatchObject({ food_id: 'fd_yog', qty: 1, unit: 'cup', slot: 'Dinner', date: TODAY });
     expect(saved[0].payload.id).toMatch(/^lg_[0-9a-f]{8}$/);
     expect(api.log[0]).toMatchObject({ kcal: 149.9, protein_g: 6, carbs_g: 9, fat_g: 0.4 });
     expect(screen.queryByTestId('amount-sheet')).toBeNull();
@@ -421,7 +413,6 @@ describe('logging', () => {
     fireEvent.click(within(amount).getByRole('button', { name: 'More' }));
     expect((within(amount).getByTestId('log-amount') as HTMLInputElement).value).toBe('110');
     fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: '150' } });
-    await previewed();
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('92');
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
@@ -446,14 +437,13 @@ describe('logging', () => {
     );
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     const amount = screen.getByTestId('amount-sheet');
     expect(within(amount).getByTestId('amount-subline').textContent).toBe('Serves 6');
     expect(within(amount).queryByTestId('log-unit')).toBeNull();
     expect(amount.textContent).toContain('Some ingredients are left out.');
     fireEvent.click(within(amount).getByRole('button', { name: 'More' }));
-    await previewed();
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('102');
+    expect(api.calls('logFood')).toHaveLength(0);
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
     expect(api.log[0]).toMatchObject({ recipe_id: 'rc_p', qty: 1.5, unit: 'serving', kcal: 102 });
@@ -486,7 +476,6 @@ describe('logging', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     api.answer('logFood', () => ({ success: false, error: 'food_id "fd_yog" is not a food' }));
     fireEvent.click(screen.getByTestId('log-it'));
     await settle();
@@ -506,16 +495,11 @@ describe('editing and deleting', () => {
     fireEvent.click(openOf(entriesIn('Breakfast')[0]));
     await settle();
     let amount = screen.getByTestId('amount-sheet');
-    // The first preview is the entry itself: no dry run.
+    // The first figures are the entry itself, and no figure is ever asked of the API (#929).
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('150');
     expect(api.calls('updateLogEntry')).toHaveLength(0);
     fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: '2' } });
-    await previewed();
-    expect(api.calls('updateLogEntry')[0].payload).toEqual({
-      id: 'lg_1',
-      changes: { qty: 2, unit: 'cup' },
-      dry_run: true,
-    });
+    expect(api.calls('updateLogEntry')).toHaveLength(0);
     expect(within(amount).getByTestId('amount-kcal').textContent).toBe('300');
     expect(amount.textContent).toContain('Recalculated from the food as it is now.');
     fireEvent.click(within(amount).getByRole('button', { name: 'Lunch' }));
@@ -526,7 +510,7 @@ describe('editing and deleting', () => {
     expect(entriesIn('Lunch')[0].textContent).toContain('2 cup · 490 g');
     expect(kcal()).toBe('300');
 
-    // Only the meal: the stored numbers are kept and no preview is asked for.
+    // Only the meal: the stored numbers are kept.
     fireEvent.click(openOf(entriesIn('Lunch')[0]));
     await settle();
     amount = screen.getByTestId('amount-sheet');
@@ -546,7 +530,6 @@ describe('editing and deleting', () => {
     await settle();
     amount = screen.getByTestId('amount-sheet');
     fireEvent.change(within(amount).getByTestId('log-unit'), { target: { value: 'g' } });
-    await previewed();
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
     expect(entriesIn('Snacks')[0].textContent).toContain('100 g');
@@ -634,25 +617,47 @@ describe('the amount sheet: focus and the macro visual (#870)', () => {
     expect(document.activeElement).toBe(less);
   });
 
-  it('shows the empty bar and unknown columns before the first preview, at the same structure as filled', async () => {
+  it('shows the empty bar and unknown columns when a unit has no weight, at the same structure as filled, and still saves', async () => {
     const api = fakeApi();
     api.foods.push(YOGURT);
+    // A unit the food no longer has, on an entry that kept no grams: nothing to work a new amount out from.
+    api.log.push(entry({ food_id: 'fd_yog', unit: 'scoop', qty: 1, grams: null, kcal: 150 }));
     await open();
-    api.answer('logFood', () => ({ success: false, error: 'nope' }));
-    const sheet = await addTo('Dinner');
-    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'yog' } });
-    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    fireEvent.click(openOf(entriesIn('Breakfast')[0]));
     await settle();
-    await previewed();
     const amount = screen.getByTestId('amount-sheet');
+    expect(within(amount).getByTestId('amount-kcal').textContent).toBe('150');
+    fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: '2' } });
+    expect(within(amount).getByTestId('amount-kcal').textContent).toBe('—');
     expect(within(amount).getByTestId('macro-empty')).toBeDefined();
     expect(within(amount).getAllByRole('img', { name: 'not known' })).toHaveLength(3);
     expect(amount.textContent).toContain("Couldn't work out the calories.");
+    // Save is allowed: the API decides.
+    expect((within(amount).getByTestId('log-it') as HTMLButtonElement).disabled).toBe(false);
+    expect(api.calls('updateLogEntry')).toHaveLength(0);
+  });
+
+  it('an amount and a unit show their figures on the tap, with no request (#929)', async () => {
+    const api = fakeApi();
+    api.foods.push(YOGURT);
+    await open();
+    const sheet = await addTo('Dinner');
+    fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
+    fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
+    await settle();
+    const amount = screen.getByTestId('amount-sheet');
+    const kcalNow = () => within(amount).getByTestId('amount-kcal').textContent;
+    expect(kcalNow()).toBe('150');
+    fireEvent.click(within(amount).getByRole('button', { name: 'More' }));
+    expect(kcalNow()).toBe('225');
+    fireEvent.change(within(amount).getByTestId('log-unit'), { target: { value: 'g' } });
+    expect(kcalNow()).toBe('61');
+    expect(api.calls('logFood')).toHaveLength(0);
+    expect(api.calls('updateLogEntry')).toHaveLength(0);
   });
 
   it('More nutrition opens as the parts groups', async () => {
     await openYogurt();
-    await previewed();
     const amount = screen.getByTestId('amount-sheet');
     fireEvent.click(within(amount).getByRole('button', { name: /More nutrition/ }));
     expect(amount.textContent).toContain("This food doesn't have sodium, fiber or the rest yet.");
@@ -848,7 +853,6 @@ describe('the Add sheet', () => {
     fireEvent.input(within(form).getByTestId('n-fat'), { target: { value: '4' } });
     fireEvent.click(within(form).getByTestId('food-save'));
     await settle();
-    await previewed();
     const amount = screen.getByTestId('amount-sheet');
     expect(within(amount).getByRole('heading').textContent).toBe('Protein bar');
     // #786: inside a pass the meal is the Add row's, so there are no Meal chips.
@@ -1196,7 +1200,6 @@ describe('a save shows at once (#785)', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     // Every read after the save fails: what shows can only be the write's own answer.
     api.answer('getFoodLog', offline);
     fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
@@ -1222,7 +1225,6 @@ describe('a save shows at once (#785)', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
     await act(async () => {});
     expect(screen.queryByTestId('day-loading')).toBeNull();
@@ -1239,7 +1241,6 @@ describe('a save shows at once (#785)', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: 'greek' } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     const real = (p: any) => ({ success: true as const, data: entry({ food_id: 'fd_yog', slot: p.slot, kcal: 150 }) });
     api.answer('logFood', (p) => (p.dry_run ? real(p) : { success: false, error: 'Network error' }));
     fireEvent.click(within(screen.getByTestId('amount-sheet')).getByTestId('log-it'));
@@ -1311,7 +1312,6 @@ describe('a pass: several foods to one meal (#786)', () => {
     fireEvent.input(within(sheet).getByTestId('add-search'), { target: { value: text } });
     fireEvent.click(within(sheet).getAllByTestId('add-result')[0]);
     await settle();
-    await previewed();
     return screen.getByTestId('amount-sheet');
   }
 
@@ -1455,7 +1455,6 @@ describe('a pass: several foods to one meal (#786)', () => {
     expect(within(amount).getByTestId('log-it').textContent).toBe('Save');
     expect(within(amount).queryByRole('button', { name: 'Lunch' })).toBeNull();
     fireEvent.input(within(amount).getByTestId('log-amount'), { target: { value: '2' } });
-    await previewed();
     fireEvent.click(within(amount).getByTestId('log-it'));
     await settle();
     expect(screen.getByTestId('add-sheet')).toBeDefined();

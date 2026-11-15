@@ -1,5 +1,5 @@
 // The inline amount editor's arithmetic (#882): the units an entry offers, the stepper's steps, and how a change of
-// unit keeps the weight. Display figures only: the calories and macros are always the API's (a dry run of the write).
+// unit keeps the weight. The calories and macros of a draft come from `preview.ts` (#929); what is stored is always the API's.
 import type { Food, FoodLogEntry } from '../api/types';
 import { tenth } from './format';
 

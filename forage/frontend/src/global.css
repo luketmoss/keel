@@ -40,6 +40,14 @@
   --color-macro-fat: #6b2e68;
   --color-macro-carbs-added: #5e3b00;
   --color-macro-fat-trans: #a35da0;
+
+  /* #915: one colour per meal slot. On --color-surface: 5.18, 5.47, 7.90, 6.04, 4.76 (each over 3:1); every slot's name
+     is beside its colour, so colour is never the only cue. */
+  --color-slot-breakfast: #c2410c;
+  --color-slot-lunch: #0f766e;
+  --color-slot-dinner: #4338ca;
+  --color-slot-after-dinner: #be185d;
+  --color-slot-snacks: #64748b;
 }
 
 [data-theme='dark'] {
@@ -55,6 +63,13 @@
   --color-macro-fat: #a85aa4;
   --color-macro-carbs-added: #8f6508;
   --color-macro-fat-trans: #d79ad3;
+
+  /* #915: on --color-surface: 7.67, 9.32, 5.82, 6.55, 6.77; on --color-surface-raised: 6.75, 8.21, 5.12, 5.77, 5.96. */
+  --color-slot-breakfast: #fb923c;
+  --color-slot-lunch: #2dd4bf;
+  --color-slot-dinner: #818cf8;
+  --color-slot-after-dinner: #f472b6;
+  --color-slot-snacks: #94a3b8;
 }
 
 /* === Base === */
@@ -3352,17 +3367,23 @@ a.text-btn {
   margin-bottom: var(--space-sm);
 }
 
+/* #915: the tabs share the row; past what fits (larger text) the row scrolls sideways and never clips a label. */
 .trends-tabs {
   display: flex;
   gap: var(--space-xs);
   margin-bottom: var(--space-md);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .trends-tab {
   display: inline-flex;
+  flex: 1 0 auto;
   align-items: center;
+  justify-content: center;
   min-height: var(--touch-target);
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-xs);
+  white-space: nowrap;
   border-radius: var(--radius-full);
   color: var(--color-text-secondary);
   font-weight: 600;
@@ -3732,4 +3753,91 @@ a.text-btn {
 .nut-panel-title {
   margin: 0 0 var(--space-xs);
   font-weight: 700;
+}
+
+/* === Trends: Meals (#915) === */
+
+.slot-breakfast {
+  background: var(--color-slot-breakfast);
+}
+
+.slot-lunch {
+  background: var(--color-slot-lunch);
+}
+
+.slot-dinner {
+  background: var(--color-slot-dinner);
+}
+
+.slot-after-dinner {
+  background: var(--color-slot-after-dinner);
+}
+
+.slot-snacks {
+  background: var(--color-slot-snacks);
+}
+
+.slot-other {
+  background: var(--color-text-muted);
+}
+
+.chart-seg-slot-breakfast {
+  fill: var(--color-slot-breakfast);
+}
+
+.chart-seg-slot-lunch {
+  fill: var(--color-slot-lunch);
+}
+
+.chart-seg-slot-dinner {
+  fill: var(--color-slot-dinner);
+}
+
+.chart-seg-slot-after-dinner {
+  fill: var(--color-slot-after-dinner);
+}
+
+.chart-seg-slot-snacks {
+  fill: var(--color-slot-snacks);
+}
+
+.chart-seg-slot-other {
+  fill: var(--color-text-muted);
+}
+
+/* A hairline in the surface colour, so adjacent segments are never told apart by colour alone. */
+.chart-seg-line {
+  stroke: var(--color-surface);
+  stroke-width: 1;
+}
+
+.legend-slot {
+  border-radius: var(--radius-sm);
+}
+
+/* The longest readout (all five meals and the link) is three lines at 375px. */
+.readout-3 {
+  min-height: calc(3 * 1.4em);
+}
+
+.meal-row-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.meal-row-days {
+  font-size: var(--text-xs);
+}
+
+.meal-row-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.meal-row-kcal {
+  font-size: var(--text-base);
+  font-weight: 600;
 }

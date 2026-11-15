@@ -20,6 +20,7 @@ import {
   type WeekPoint,
 } from './energy';
 import { MacrosTab } from './macros-tab';
+import { MealsTab } from './meals-tab';
 import { NutrientsTab } from './nutrients-tab';
 import { Segmented } from './segmented';
 import { Chip, openDay } from './series-chart';
@@ -352,12 +353,12 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
         options={AVERAGES}
         value={average}
         onChange={chooseAverage}
-        disabled={weekly}
-        describedBy={weekly ? 'weekly-note' : undefined}
+        disabled={weekly || tab === 'meals'}
+        describedBy={weekly || tab === 'meals' ? 'weekly-note' : undefined}
       />
-      {weekly && (
+      {(weekly || tab === 'meals') && (
         <p class="hint" id="weekly-note" data-testid="weekly-note">
-          Weekly bars have no average line
+          {tab === 'meals' ? 'No average line on this chart' : 'Weekly bars have no average line'}
         </p>
       )}
     </div>
@@ -372,6 +373,11 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
     window.location.hash = trendsHash(to, range);
     document.getElementById(`trends-tab-${to}`)?.focus();
   };
+
+  // A tab opened by link or key is brought into view when the row scrolls sideways.
+  useEffect(() => {
+    document.getElementById(`trends-tab-${tab}`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [tab]);
 
   const tabs =
     BUILT_TABS.length > 1 ? (
@@ -423,7 +429,9 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
       ? `${summary.logged} of ${summary.total} days logged${summary.low ? ` · ${summary.low} low` : ''}`
       : '';
     body =
-      tab === 'macros' ? (
+      tab === 'meals' ? (
+        <MealsTab key={`${range}-${average}`} view={view} />
+      ) : tab === 'macros' ? (
         <MacrosTab key={`${range}-${average}`} view={view} />
       ) : tab === 'nutrients' ? (
         <NutrientsTab

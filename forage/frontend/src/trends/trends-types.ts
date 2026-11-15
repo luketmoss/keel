@@ -11,7 +11,7 @@ export const DEFAULT_AVERAGE: AverageId = '7d';
 /** The tabs the screen will have (#915, #916 add the rest); only `BUILT_TABS` show. */
 export const TREND_TABS = ['energy', 'macros', 'nutrients', 'meals', 'foods'] as const;
 export type TrendTab = (typeof TREND_TABS)[number];
-export const BUILT_TABS: readonly TrendTab[] = ['energy', 'macros', 'nutrients'];
+export const BUILT_TABS: readonly TrendTab[] = ['energy', 'macros', 'nutrients', 'meals'];
 
 /** #914: the macro a Grams per day chart shows, and the seven nutrients, as the hash's `metric` names them. */
 export const MACRO_METRICS = ['protein', 'carbs', 'fat'] as const;

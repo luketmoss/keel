@@ -14,6 +14,23 @@ export function openDay(date: string, today: string): void {
   window.location.hash = dayHash(date, today);
 }
 
+/** The readout's link to a day in Eaten (#913): a 44px target, named for the day. */
+export function DayLink({ date, today, text }: { date: string; today: string; text: string }) {
+  return (
+    <a
+      class="readout-link"
+      href={dayHash(date, today)}
+      aria-label={`${text.replace(' ›', '')}, ${longWeekdayDate(date)}`}
+      onClick={() => {
+        eatenDate.value = date;
+      }}
+      data-testid="readout-link"
+    >
+      {text}
+    </a>
+  );
+}
+
 export function Chip({ text }: { text: string }) {
   return <span class="chip-flag low-chip">{text}</span>;
 }

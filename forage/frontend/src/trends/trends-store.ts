@@ -1,5 +1,5 @@
 // #913: the Trends screen's data and choices. The screen reads the signals; this file owns the fetching and the
-// remembered controls. One `getFoodLogTotals` read covers the widest span shown; a shorter range slices it.
+// remembered controls. One `getFoodLogTotals` read (with `by_meal`, #915, which every tab shares) covers the widest span shown; a shorter range slices it.
 import { signal } from '@preact/signals';
 import type { ForageApi } from '../api/client';
 import type { FoodLogDay } from '../api/types';
@@ -100,7 +100,7 @@ export async function loadTrends(api: ForageApi, range: RangeId, force = false):
   const seq = ++latest;
   trendsState.value = 'loading';
   try {
-    const totals = await api.getFoodLogTotals(from, today);
+    const totals = await api.getFoodLogTotals(from, today, true);
     if (seq !== latest) return;
     trendsDays.value = new Map(totals.days.map((d) => [d.date, d]));
     trendsToday.value = today;

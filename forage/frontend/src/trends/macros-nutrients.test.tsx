@@ -202,11 +202,11 @@ describe('the numbers', () => {
 });
 
 describe('the tabs', () => {
-  it('shows Energy, Macros and Nutrients; ?tab opens one; a switch makes no request and clears the day', async () => {
+  it('shows Energy, Macros, Nutrients and Meals; ?tab opens one; a switch makes no request and clears the day', async () => {
     const api = fakeApi();
     seedWeeks(api);
     await openAt('/#/eaten/trends');
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Energy', 'Macros', 'Nutrients']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Energy', 'Macros', 'Nutrients', 'Meals']);
     expect(screen.getByRole('tab', { name: 'Energy' }).getAttribute('aria-selected')).toBe('true');
     fireEvent.click(screen.getByRole('radio', { name: '3M' }));
     await settle();
@@ -372,7 +372,7 @@ describe('Macros', () => {
     await openAt('/#/eaten/trends?tab=macros');
     expect(q('trends-error')).toBeDefined();
     expect(screen.getByRole('radio', { name: '1M' })).toBeDefined();
-    expect(screen.getAllByRole('tab')).toHaveLength(3);
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
   });
 
   it('with nothing logged at all shows the one card on both tabs', async () => {

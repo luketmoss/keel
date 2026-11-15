@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { ApiError, type ForageApi } from '../api/client';
 import { SLOTS, type Food, type FoodLogEntry, type LogEntryInput, type RecipeSummary, type Slot } from '../api/types';
 import { parseAmount } from '../import/amount';
@@ -8,6 +8,7 @@ import { MacroCols } from '../ui/macro-cols';
 import { MoreNutrition } from '../ui/more-nutrition';
 import { ConfirmSheet, Sheet } from '../ui/sheet';
 import { MAX_QTY, dayPossessive, defaultQty, newLogId, qtyText, sheetGrams, stepFor, tenth, wholeKcal } from './format';
+import { previewFood, previewRecipe, type EntryNutrition } from './preview';
 
 /** What is being logged: a food, or a recipe in servings. */
 export type LogTarget = { kind: 'food'; food: Food } | { kind: 'recipe'; recipe: RecipeSummary };
@@ -36,9 +37,6 @@ export type SavedLog = { entry: FoodLogEntry } | { removed: string };
 
 export const targetName = (t: LogTarget) => (t.kind === 'food' ? displayName(t.food) : t.recipe.name);
 
-/** The preview is asked for this long after the last change to the amount or unit. */
-const PREVIEW_DELAY_MS = 400;
-
 /** Why a save was refused, in fixed words: a food or recipe deleted meanwhile, else the API's own text. */
 export function saveRefusal(err: unknown): string {
   if (err instanceof ApiError && err.code !== 'network' && err.code !== 'unconfigured') {
@@ -51,8 +49,8 @@ export function saveRefusal(err: unknown): string {
 
 /**
  * The amount sheet (#712), for adding and editing: an amount in servings or grams, the calories and macros the
- * API would store for it (a dry run of the same write), the meal, and Log it or Save. The app works out no
- * nutrition: every figure on this sheet is the API's.
+ * API will store for it, the meal, and Log it or Save. The figures are worked out here at once (#929, `preview.ts`,
+ * pinned to the API's own arithmetic by a test) with no request; what is stored is what the write answers.
  */
 export function AmountSheet({
   api,
@@ -72,15 +70,13 @@ export function AmountSheet({
   const [unit, setUnit] = useState(startUnit);
   const [typed, setTyped] = useState(qtyText(entry?.qty ?? defaultQty(startUnit)));
   const [slot, setSlot] = useState<Slot>(entry?.slot ?? initialSlot);
-  const [preview, setPreview] = useState<FoodLogEntry | null>(entry ?? null);
-  const [updating, setUpdating] = useState(!entry);
-  const [previewFailed, setPreviewFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   // One id per sheet open: a repeated tap or a retry after a lost answer leaves one entry.
   const id = useRef(entry?.id ?? newLogId());
-  const seq = useRef(0);
+  // An amount that can't be typed into a figure (blank, 0) leaves the last one in place.
+  const lastFigures = useRef<EntryNutrition | FoodLogEntry | null>(entry ?? null);
   // A second tap on Delete while the first is out sends no second write.
   const deleting = useRef(false);
 
@@ -96,43 +92,21 @@ export function AmountSheet({
       : { id: id.current, date, slot, recipe_id: target.recipe.id, qty: q, unit: 'serving' };
   }
 
-  // The preview follows the amount and the unit, never the meal: moving an entry keeps its numbers.
-  useEffect(() => {
-    if (!valid) return;
+  // The figures follow the amount and the unit, never the meal: moving an entry keeps its numbers.
+  let preview: EntryNutrition | FoodLogEntry | null = lastFigures.current;
+  let previewFailed = false;
+  if (valid) {
     if (entry && qty === entry.qty && unit === entry.unit) {
-      seq.current++;
-      setPreview(entry);
-      setUpdating(false);
-      setPreviewFailed(false);
-      return;
+      preview = entry;
+    } else {
+      preview =
+        target.kind === 'food'
+          ? previewFood(target.food, qty as number, unit, entry)
+          : previewRecipe(target.recipe, qty as number);
+      previewFailed = preview === null;
     }
-    const mine = ++seq.current;
-    setUpdating(true);
-    const ask = () =>
-      (entry
-        ? api.updateLogEntry(entry.id, { qty: qty as number, unit }, true)
-        : api.logEntry(input(qty as number), true)
-      ).then(
-        (p) => {
-          if (mine !== seq.current) return;
-          setPreview(p);
-          setPreviewFailed(false);
-          setUpdating(false);
-        },
-        () => {
-          if (mine !== seq.current) return;
-          setPreviewFailed(true);
-          setUpdating(false);
-        },
-      );
-    // The first preview of a new entry is asked at once; later ones after the typing stops.
-    if (!entry && !preview && !previewFailed) {
-      void ask();
-      return;
-    }
-    const t = setTimeout(() => void ask(), PREVIEW_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [qty, unit]);
+    lastFigures.current = preview;
+  }
 
   function chooseUnit(next: string) {
     setUnit(next);
@@ -281,13 +255,7 @@ export function AmountSheet({
         <span class="amount-kcal tabular" data-testid="amount-kcal">
           {preview && preview.kcal !== null ? wholeKcal(preview.kcal) : '—'}
         </span>
-        {updating ? (
-          <span class="hint" role="status">
-            Updating…
-          </span>
-        ) : (
-          <span class="hint">kcal{partial && <span class="chip-flag plan-chip">partial</span>}</span>
-        )}
+        <span class="hint">kcal{partial && <span class="chip-flag plan-chip">partial</span>}</span>
         <MacroBar protein={macros.protein} carbs={macros.carbs} fat={macros.fat} size="day" />
         <MacroCols protein={macros.protein} carbs={macros.carbs} fat={macros.fat} format={sheetGrams} />
         {preview && preview.kcal !== null && (
@@ -305,8 +273,8 @@ export function AmountSheet({
           />
         )}
         {partial && <span class="hint">Some ingredients are left out.</span>}
-        {recalculated && !updating && <span class="hint">Recalculated from the food as it is now.</span>}
-        {previewFailed && !updating && (
+        {recalculated && <span class="hint">Recalculated from the food as it is now.</span>}
+        {previewFailed && (
           <span class="hint danger-text" role="status">
             Couldn't work out the calories.
           </span>

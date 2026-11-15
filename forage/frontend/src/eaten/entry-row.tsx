@@ -166,7 +166,7 @@ function AmountEditor({
           disabled={edit.busy}
           aria-disabled={atMin ? 'true' : undefined}
           onClick={() => {
-            if (!atMin) setDraft(api, stepQty(edit.qty, edit.unit, -1), edit.unit);
+            if (!atMin) setDraft(stepQty(edit.qty, edit.unit, -1), edit.unit);
           }}
         >
           −
@@ -181,7 +181,7 @@ function AmountEditor({
           disabled={edit.busy}
           aria-disabled={atMax ? 'true' : undefined}
           onClick={() => {
-            if (!atMax) setDraft(api, stepQty(edit.qty, edit.unit, 1), edit.unit);
+            if (!atMax) setDraft(stepQty(edit.qty, edit.unit, 1), edit.unit);
           }}
         >
           +
@@ -203,7 +203,6 @@ function AmountEditor({
               onClick={() => {
                 if (o.unit === edit.unit) return;
                 setDraft(
-                  api,
                   switchUnit(
                     edit.qty,
                     options.find((x) => x.unit === edit.unit),

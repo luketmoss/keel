@@ -72,7 +72,7 @@ key-only `ensureSchema`; run it again after a release that adds a tab (#713) or
 columns (#755): an existing tab whose header row is exactly a prefix of its
 fields gets the missing header names appended, and one that is not is left
 alone and named.
-Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`; the
+Nutrition (unit conversion, per serving, the partial rule) is computed only in `apps-script/src/nutrition.js`, with one mirror (#929): the app's amount preview, `frontend/src/eaten/preview.ts`, copies `foodEntryNutrition` and `recipeEntryNutrition` so the amount sheet and the inline editor show figures with no request, and `frontend/src/eaten/preview-parity.test.ts` runs the real `nutrition.js` in `node:vm` and fails when the two disagree (change both together; what is stored is still the API's); the
 plan's derived fields (a meal's kcal a serving, partial, trip status) and the Plan banner's count, `not_on_trip`, only in
 `apps-script/src/plan.js` (#709); a usual's starting nutrition only in `nutrition.js` (`usualNutrition`, #877); combo detection only in `apps-script/src/combos.js` (#879); a trip's items, what the meals need, the default choices and the stale-line
 prune only in `apps-script/src/trips.js` (#718, behind `startTrip`, `setTripItem`, `closeTrip`, `discardTrip`,

@@ -5,31 +5,23 @@ import { addSheetMeta, comboKcalText, comboMatches } from '../library/combos-sto
 import { FoodName } from '../library/food-name';
 import { displayName, hasNutrition } from '../library/food-math';
 import { foodsInShort, startKcalText } from '../library/usuals-store';
-import { addDays } from '../plan/dates';
 import { Sheet } from '../ui/sheet';
 import type { LogTarget } from './amount-sheet';
+import { addCombos, addFailed, addLists, refreshAdd } from './add-store';
 import { EntryRow } from './entry-row';
 import { foodRowLine, recipeLoggable, recipeRowLine } from './format';
 import { usualsFor } from './usual-group';
 
-/** How far back the recents look, how many they list, and how many rows a search shows. */
-const RECENT_DAYS = 60;
+/** How many recents the sheet lists, and how many rows a search shows. */
 const RECENT_MAX = 10;
 const RESULTS_MAX = 20;
 const FALLBACK_RECIPES = 3;
 /** Combos shown before a search (#888). */
 const COMBOS_MAX = 3;
+const NO_COMBOS: Combo[] = [];
 
 /** A row of the Add sheet: a food or a recipe. */
 type Row = { key: string; target: LogTarget };
-
-/** What the Add sheet lists from: loaded once a pass (#786), and kept for its returns. */
-export interface AddLists {
-  foods: Food[];
-  recipes: RecipeSummary[];
-  /** The last 60 days of the log, behind Recent. */
-  log: FoodLogEntry[];
-}
 
 interface Props {
   api: ForageApi;
@@ -37,9 +29,6 @@ interface Props {
   today: string;
   /** The search text to open with: the pass's, or a starter food just added. */
   initialQuery?: string;
-  /** The pass's lists (#786), or null until they load: the sheet loads them once and hands them up. */
-  lists: AddLists | null;
-  onLoaded: (lists: AddLists) => void;
   /** The search text as it changes, so the pass can keep it while the amount sheet is open. */
   onQuery?: (q: string) => void;
   /** The entries the pass logged that are still on the day, in the order logged. */
@@ -247,15 +236,14 @@ function ResultRow({ row, onPick, onAddNutrition }: { row: Row; onPick: () => vo
 /**
  * The Add sheet (#712): a search over foods and recipes, with what was logged most recently when it is empty.
  * Recents are derived from the last 60 days of the log itself; nothing new is stored for them. During a pass
- * (#786) it lists what the pass added above Recent, and comes back with the lists it loaded first.
+ * (#786) it lists what the pass added above Recent. Its lists are held in `add-store.ts` (#931): what is held shows on
+ * the first frame, and one refresh a pass swaps in behind it, so a return from the amount sheet loads nothing.
  */
 export function AddSheet({
   api,
   slot,
   today,
   initialQuery = '',
-  lists,
-  onLoaded,
   onQuery,
   added = [],
   onOpenAdded,
@@ -273,34 +261,18 @@ export function AddSheet({
   onClose,
 }: Props) {
   const [q, setQ] = useState(initialQuery);
-  const [failed, setFailed] = useState(false);
-  /** #888: the combos for this meal; empty until they load, and when that fails, so the sheet works without them. */
-  const [combos, setCombos] = useState<Combo[]>([]);
+  const lists = addLists.value;
+  /** #888: the combos held for this meal; none until they load, and when that fails, so the sheet works without them. */
+  const combos = addCombos.value[slot] ?? NO_COMBOS;
+  const failed = addFailed.value;
   const foods = lists?.foods ?? null;
   const recipes = lists?.recipes ?? [];
   const log = lists?.log ?? [];
 
-  function load() {
-    setFailed(false);
-    Promise.all([api.getFoods(), api.getRecipes(), api.getFoodLog(addDays(today, -RECENT_DAYS), today)]).then(
-      ([f, r, l]) => onLoaded({ foods: f, recipes: r, log: l }),
-      () => setFailed(true),
-    );
-  }
   useEffect(() => {
-    if (!lists) load();
+    void refreshAdd(api, slot, today);
   }, [api]);
   useEffect(() => onQuery?.(q), [q]);
-  useEffect(() => {
-    let live = true;
-    api.getCombos({ slot }).then(
-      (r) => live && setCombos(r.combos),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [api, slot]);
 
   const meal = slot.toLowerCase();
   const text = q.trim();
@@ -309,7 +281,7 @@ export function AddSheet({
     body = (
       <div class="library-status danger-text" role="status">
         <p>Couldn't load your foods.</p>
-        <button type="button" class="text-btn" onClick={load}>
+        <button type="button" class="text-btn" onClick={() => void refreshAdd(api, slot, today, true)}>
           Try again
         </button>
       </div>

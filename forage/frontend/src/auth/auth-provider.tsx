@@ -5,6 +5,7 @@ import { AuthContext, type AuthState } from './auth-context';
 import { loadGisScript } from './gis-script';
 import { isDemoMode } from '../demo/is-demo-mode';
 import { DEMO_USER } from '../demo/demo-data';
+import { clearAddHeld } from '../eaten/add-store';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 // Identity only: the app reads and writes through the Forage API with this
@@ -60,12 +61,18 @@ function LiveAuthProvider({ children }: Props) {
     };
   }, [session]);
 
+  // #931: signing out removes the Add sheet's held lists from the device.
+  const logout = useCallback(() => {
+    clearAddHeld();
+    session.logout();
+  }, [session]);
+
   const value: AuthState = {
     token: state.token,
     user: state.user,
     isAuthenticated: !!state.token,
     login: session.login,
-    logout: session.logout,
+    logout,
     rememberedUser: state.rememberedUser,
     ready: state.ready,
     renewing: state.renewing,

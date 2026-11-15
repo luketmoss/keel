@@ -7,6 +7,7 @@ import type { Food, FoodLogDay, FoodLogEntry, FoodLogMeal, PlanEntry, RecipeSumm
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 import { switchUnit, type UnitOption } from './amount-edit';
+import { bindAddAccount, dropHeldEntry, holdEntry, holdFood, holdUsuals, _resetAdd } from './add-store';
 import { previewFood, previewRecipe, type EntryNutrition } from './preview';
 
 export type DayState = 'loading' | 'ready' | 'error';
@@ -33,6 +34,7 @@ export const dayUsuals = signal<Usual[]>([]);
 export async function loadDayUsuals(api: ForageApi): Promise<void> {
   try {
     dayUsuals.value = await api.getUsuals();
+    holdUsuals(dayUsuals.value);
   } catch {
     // Nothing to say: the foods work without them.
   }
@@ -41,6 +43,16 @@ export async function loadDayUsuals(api: ForageApi): Promise<void> {
 /** Put a saved usual into the held list, replacing the old copy. */
 export function keepDayUsual(usual: Usual): void {
   dayUsuals.value = [...dayUsuals.value.filter((u) => u.id !== usual.id), usual];
+  holdUsuals(dayUsuals.value);
+}
+
+/**
+ * Bind the Add sheet's held lists to the signed-in account (#931), `null` for the demo user. What the device kept for
+ * the account seeds the usuals, so the sheet's first frame has them; a different account drops the last one's.
+ */
+export function bindAccount(email: string | null): void {
+  const { changed, usuals } = bindAddAccount(email);
+  if (changed) dayUsuals.value = usuals ?? [];
 }
 
 /**
@@ -246,6 +258,7 @@ export function refreshDay(api: ForageApi, recipes = false): Promise<void> {
 
 /** Put an entry as the write answered it into the day: inserted, or replaced in place. Another day's is left to the refresh. */
 export function upsertEntry(entry: FoodLogEntry): void {
+  holdEntry(entry);
   if (entry.date !== eatenDate.value) return;
   const rest = dayEntries.value;
   const i = rest.findIndex((e) => e.id === entry.id);
@@ -257,11 +270,13 @@ export function upsertEntry(entry: FoodLogEntry): void {
 
 /** A food the day's rows may name, as the screen has it now: a food added moments ago isn't in `logFoods` yet. */
 export function knowFood(food: Food): void {
+  holdFood(food);
   logFoods.value = [...logFoods.value.filter((f) => f.id !== food.id), food];
 }
 
 /** Take a deleted entry out of the day. */
 export function removeEntry(id: string): void {
+  dropHeldEntry(id);
   dayEntries.value = dayEntries.value.filter((e) => e.id !== id);
   patches++;
 }
@@ -298,6 +313,7 @@ export function unloggedPlan(plan: PlanEntry[], entries: FoodLogEntry[]): PlanEn
 
 /** Forget what was loaded (tests and sign-out). */
 export function _resetEaten(): void {
+  _resetAdd();
   latest++;
   gate.reset();
   wantRecipes = false;

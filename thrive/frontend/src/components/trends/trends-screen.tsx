@@ -12,7 +12,7 @@ import { loadHealth } from '../../state/actions';
 import { drinkHistory, loadDrinkHistory } from '../../state/drinks';
 import { foodHistory, loadFoodHistory } from '../../state/food';
 import { dailyHealth, bodyMeasurements, dailySummary, ftpHistory } from '../../state/store';
-import { trendGroups, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
+import { trendGroups, FOOD_GROUP_ID, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
 import {
   type RangeKey,
   type AverageKey,
@@ -44,6 +44,7 @@ import { TrendCharts } from './trend-chart';
 import { TrendTable } from './trend-table';
 import { openDay } from './open-day';
 import { rideDays as rideDaysOf } from './ride-days';
+import { FuelCard } from './fuel-card';
 import { isRestoringFocus, ROUTE_FOCUS_ATTR } from '../../router/route-focus';
 import { useFocusHandoff } from '../focus-handoff';
 import { today as todaySignal, watchToday } from '../../day/today';
@@ -338,7 +339,7 @@ export function TrendsScreen() {
   } else if (isCustom && group.metrics.length === 0) {
     content = <p class="trends-custom-empty">Pick up to 4 metrics to see them here.</p>;
   } else if (built) {
-    const { to, series, recorded, nothingEver, hasBand, rides, food } = built;
+    const { from, to, series, recorded, nothingEver, hasBand, rides, food } = built;
     const dates = series[0]?.dates ?? [];
     // Keyboard moves select and announce; pointer moves only select (AC4).
     const moveTo = (date: string) => {
@@ -439,6 +440,7 @@ export function TrendsScreen() {
             />
           </div>
         )}
+        {group.id === FOOD_GROUP_ID && <FuelCard range={range} from={from} to={to} today={today} />}
       </>
     );
   }

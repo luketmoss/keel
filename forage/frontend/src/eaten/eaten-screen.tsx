@@ -826,9 +826,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   }
 
   function savedRecipe(recipe: RecipeDetail) {
-    // The reply goes into the Add sheet's and the Library's lists, then the sheet closes and the toast shows together.
-    const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = recipe;
-    holdRecipe(summary);
+    // The reply goes into the Library's list and the Add sheet's (`addRecipe` does both, #941), then the sheet closes
+    // and the toast shows together.
     addRecipe(recipe);
     setOverlay(null);
     leaveSelect();

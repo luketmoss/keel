@@ -6,6 +6,7 @@ import { ApiError, type ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
 import type { RecipeDetail, RecipeSort, RecipeSummary } from '../api/types';
 import { shortDate, starsText } from '../cook/format';
+import { dropHeldRecipe, holdRecipe } from '../eaten/add-store';
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -66,18 +67,31 @@ export function refreshRecipes(api: ForageApi): Promise<void> {
   return gate.request(() => loadRecipes(api, true));
 }
 
-/** Put a recipe just created (#788) at the top of the list, as the default newest-first order has it. */
-export function addRecipe(detail: RecipeDetail): void {
+/** The summary is the detail without its lines, steps and walkthrough. */
+function summaryOf(detail: RecipeDetail): RecipeSummary {
   const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = detail;
+  return summary;
+}
+
+/**
+ * Put a recipe just created (#788) or imported at the top of the list, as the default newest-first order has it, and
+ * into the Eaten tab's held recipes (#941).
+ */
+export function addRecipe(detail: RecipeDetail): void {
+  const summary = summaryOf(detail);
   if (recipes.value.some((r) => r.id === summary.id)) return patchRecipe(detail);
   recipes.value = [summary, ...recipes.value];
   patches++;
+  holdRecipe(summary);
 }
 
-/** Put a recipe as a write answered it into its row, when the list shows it (a search or sort may not). */
+/**
+ * Put a recipe as a write answered it into the Eaten tab's held recipes (#941), and into its row here when the list
+ * shows it (a search or sort may not).
+ */
 export function patchRecipe(detail: RecipeDetail): void {
-  // The summary is the detail without its lines, steps and walkthrough.
-  const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = detail;
+  const summary = summaryOf(detail);
+  holdRecipe(summary);
   if (!recipes.value.some((r) => r.id === summary.id)) return;
   recipes.value = recipes.value.map((r) => (r.id === summary.id ? summary : r));
   patches++;
@@ -104,6 +118,7 @@ export async function deleteRecipe(api: ForageApi, id: string): Promise<string |
   }
   recipes.value = recipes.value.filter((r) => r.id !== id);
   recipeTotal.value = Math.max(0, recipeTotal.value - 1);
+  dropHeldRecipe(id);
   return null;
 }
 

@@ -533,6 +533,32 @@ export interface LogGroupResult {
   group_id: string;
 }
 
+/** One item of `logMeal` (#930): a food or a recipe, and the group it is logged under, if any. */
+export type LogMealItem = { id?: string; qty: number; unit: string; group?: LogMealGroup } & (
+  { food_id: string; recipe_id?: undefined } | { recipe_id: string; food_id?: undefined }
+);
+
+/** Items with the same `key` share one new group named `name`; a group holds foods, not recipes. */
+export interface LogMealGroup {
+  key: string;
+  name: string;
+  usual_id?: string;
+  usual_line_id?: string;
+}
+
+/** `logMeal` (#930): 1 to 30 items in one write, in order. The same ids sent again write nothing new. */
+export interface LogMealInput {
+  date: string;
+  slot: Slot;
+  items: LogMealItem[];
+}
+
+/** What `logMeal` answers: the entries in the order sent, and each `group.key`'s new group id. */
+export interface LogMealResult {
+  entries: FoodLogEntry[];
+  group_ids: Record<string, string>;
+}
+
 /** `copyMeal` (#878): every entry of one meal, or only one group's, added after the target meal's. */
 export interface CopyMealInput {
   from_date: string;

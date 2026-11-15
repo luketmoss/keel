@@ -35,6 +35,7 @@ const FORAGE_WRITE = [
   'forage_log_cook',
   'forage_log_food',
   'forage_log_group',
+  'forage_log_meal',
   'forage_log_usual',
   'forage_move_meal',
   'forage_plan_meal',

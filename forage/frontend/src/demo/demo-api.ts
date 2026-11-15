@@ -850,6 +850,7 @@ export function createDemoApi(): ForageApi {
     deleteUsual: usuals.deleteUsual,
     logUsual: usuals.logUsual,
     logGroup: usuals.logGroup,
+    logMeal: usuals.logMeal,
     copyMeal: usuals.copyMeal,
     setLogGroup: usuals.setLogGroup,
     deleteLogEntries: usuals.deleteLogEntries,

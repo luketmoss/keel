@@ -122,6 +122,139 @@ function logGroup(payload, caller) {
   });
 }
 
+/**
+ * Log a whole meal in one write (#930). Payload `{ date, slot, dry_run?, items:
+ * [{ id?, food_id | recipe_id, qty, unit, group?: { key, name, usual_id?,
+ * usual_line_id? } }] }`, 1 to 30 items, written in the order sent. Items that
+ * share a `group.key` go under one new group with that `name`; a group holds
+ * foods, not recipes. An item with a `usual_line_id` must name a line of its
+ * `usual_id`, and one logged from a pick-one line whose food is one of the
+ * line's options makes that food the line's `last_pick`. Every entry is built
+ * through writeLogEntry's dry-run path first, so a refusal on any item writes
+ * nothing and names it (`items[3]: ...`). Ids sent are kept: an item whose id
+ * is already logged is not written again and answers the stored entry, so a
+ * retry after a lost answer leaves one copy. Answers `{ entries, group_ids }`,
+ * entries in the order sent, `group_ids` by `group.key`.
+ */
+function logMeal(payload, caller) {
+  if (!payload || typeof payload !== 'object') throw new Error('payload must be a meal to log');
+  var date = validateDate('date', payload.date);
+  var slot = validateEnum('slot', payload.slot, SLOTS);
+  if (!Array.isArray(payload.items)) throw new Error('items must be a list');
+  var n = payload.items.length;
+  if (n < 1 || n > MAX_GROUP_ITEMS) throw new Error('items must have 1 to ' + MAX_GROUP_ITEMS + ' items, not ' + n);
+
+  var usualCache = {};
+  var usualLines = function (usualId) {
+    if (!usualCache[usualId]) {
+      var usual = getRecord('Usuals', { id: usualId });
+      usualCache[usualId] = usual ? {
+        usual: usual,
+        lines: sortLines(listRecords('UsualLines', function (l) { return l.usual_id === usualId; })),
+      } : null;
+    }
+    return usualCache[usualId];
+  };
+
+  // Validate the shape of every item and its group before reading any entry.
+  var ids = {};
+  var groups = {};
+  var items = payload.items.map(function (item, i) {
+    var at = 'items[' + (i + 1) + ']';
+    if (!item || typeof item !== 'object') throw new Error(at + ': must be an object');
+    try {
+      var id = idFor(item.id, ID_PREFIXES.log);
+      if (ids[id]) throw new Error('id "' + id + '" is used by an earlier item');
+      ids[id] = true;
+      var spec = { id: id, at: at, item: item, group: null };
+      if (item.group !== undefined && item.group !== null) {
+        var g = item.group;
+        if (typeof g !== 'object' || Array.isArray(g)) throw new Error('group must be { key, name, usual_id?, usual_line_id? }');
+        if (cell(item.recipe_id).trim()) throw new Error('is a recipe: a group holds foods, not recipes');
+        var key = requireString('group.key', typeof g.key === 'number' ? String(g.key) : g.key);
+        var name = groupName(g.name);
+        var usualId = cell(g.usual_id).trim();
+        var lineId = cell(g.usual_line_id).trim();
+        if (lineId && !usualId) throw new Error('group.usual_line_id needs a group.usual_id');
+        var prior = groups[key];
+        if (prior && (prior.name !== name || prior.usual_id !== usualId)) {
+          throw new Error('group "' + key + '" has a different name or usual than an earlier item with that key');
+        }
+        groups[key] = prior || { name: name, usual_id: usualId, group_id: '' };
+        var line = null;
+        if (usualId) {
+          var found = usualLines(usualId);
+          if (!found) throw new Error('Usual "' + usualId + '" not found');
+          if (lineId) {
+            found.lines.forEach(function (l) { if (l.line_id === lineId) line = l; });
+            if (!line) throw new Error('usual_line_id "' + lineId + '" is not a line of "' + found.usual.name + '"');
+          }
+        }
+        spec.group = { key: key, usual_id: usualId, usual_line_id: lineId, line: line };
+      }
+      return spec;
+    } catch (err) {
+      throw new Error(at + ': ' + err.message);
+    }
+  });
+
+  // A retry: entries already stored under these ids are answered as they are,
+  // and keep the group they were written under.
+  var stored = {};
+  listRecords('FoodLog', function (e) { return ids[e.id]; }).forEach(function (e) { stored[e.id] = e; });
+  items.forEach(function (spec) {
+    var e = stored[spec.id];
+    if (e && spec.group && e.group_id && !groups[spec.group.key].group_id) groups[spec.group.key].group_id = e.group_id;
+  });
+  Object.keys(groups).forEach(function (k) {
+    if (!groups[k].group_id) groups[k].group_id = newId(ID_PREFIXES.group);
+  });
+
+  var picks = [];
+  var entries = items.map(function (spec) {
+    if (stored[spec.id]) return stored[spec.id];
+    var item = spec.item;
+    var group = { group_id: '', group_name: '', usual_id: '', usual_line_id: '' };
+    if (spec.group) {
+      var g = groups[spec.group.key];
+      group = { group_id: g.group_id, group_name: g.name, usual_id: spec.group.usual_id, usual_line_id: spec.group.usual_line_id };
+    }
+    var entry;
+    try {
+      entry = writeLogEntry(null, {
+        date: date, slot: slot, food_id: item.food_id, recipe_id: item.recipe_id, qty: item.qty, unit: item.unit,
+      }, spec.id, caller, true, { group: group });
+    } catch (err) {
+      throw new Error(spec.at + ': ' + err.message);
+    }
+    var line = spec.group && spec.group.line;
+    if (line && Array.isArray(line.options_json) && entry.food_id && optionFor(line, entry.food_id)) {
+      picks.push({ usual_id: line.usual_id, line_id: line.line_id, food_id: entry.food_id });
+    }
+    return entry;
+  });
+
+  var result = {
+    entries: entries,
+    group_ids: Object.keys(groups).reduce(function (out, k) { out[k] = groups[k].group_id; return out; }, {}),
+  };
+  if (isDryRun(payload)) return result;
+
+  return withScriptLock(function () {
+    var fresh = entries.filter(function (e) { return !stored[e.id]; });
+    appendRecords('FoodLog', fresh);
+    picks.forEach(function (p) {
+      updateRecordsWhere('UsualLines', function (l) {
+        return l.usual_id === p.usual_id && l.line_id === p.line_id;
+      }, function (l) { l.last_pick = p.food_id; });
+    });
+    var written = {};
+    listRecords('FoodLog', function (e) { return ids[e.id]; }).forEach(function (e) { written[e.id] = e; });
+    result.entries = items.map(function (spec) { return written[spec.id]; });
+    return result;
+  });
+}
+
 function groupName(value) {
   var name = requireString('name', value);
   if (name.length > MAX_GROUP_NAME) throw new Error('name must be at most ' + MAX_GROUP_NAME + ' characters');

@@ -10,6 +10,7 @@ import type {
   FoodLogEntry,
   LogEntryInput,
   LogGroupResult,
+  LogMealResult,
   PerServing,
   Slot,
   Usual,
@@ -73,6 +74,7 @@ export type DemoUsuals = Pick<
   | 'deleteUsual'
   | 'logUsual'
   | 'logGroup'
+  | 'logMeal'
   | 'copyMeal'
   | 'setLogGroup'
   | 'deleteLogEntries'
@@ -305,6 +307,61 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
         group: { group_id, group_name: name, usual_id: '', usual_line_id: '' },
       }));
       return clone({ entries: writeAll(rows, dryRun), group_id });
+    },
+    logMeal: async (input, dryRun = false): Promise<LogMealResult> => {
+      if (input.items.length < 1 || input.items.length > 30) throw new ApiError('items must have 1 to 30 items');
+      const groups = new Map<string, { id: string; name: string }>();
+      const stored = new Map(log.map((e) => [e.id, e]));
+      const ids = new Set<string>();
+      const at = (i: number) => `items[${i + 1}]`;
+      const rows = input.items.map((it, i) => {
+        const id = it.id || nextId('lg');
+        if (ids.has(id)) throw new ApiError(`${at(i)}: id "${id}" is used by an earlier item`);
+        ids.add(id);
+        let group: GroupFields | undefined;
+        let line: StoredLine | undefined;
+        if (it.group) {
+          const name = (it.group.name ?? '').trim();
+          if (!it.group.key) throw new ApiError(`${at(i)}: group.key is required`);
+          if (!name) throw new ApiError(`${at(i)}: name is required`);
+          if (name.length > 120) throw new ApiError(`${at(i)}: name is over 120 characters`);
+          if (it.recipe_id) throw new ApiError(`${at(i)}: is a recipe: a group holds foods, not recipes`);
+          const usual_id = it.group.usual_id ?? '';
+          const usual_line_id = it.group.usual_line_id ?? '';
+          if (usual_line_id && !usual_id) throw new ApiError(`${at(i)}: group.usual_line_id needs a group.usual_id`);
+          if (usual_id) {
+            const u = usuals.find((x) => x.id === usual_id);
+            if (!u) throw new ApiError(`${at(i)}: Usual "${usual_id}" not found`);
+            if (usual_line_id) {
+              line = u.lines.find((l) => l.line_id === usual_line_id);
+              if (!line) throw new ApiError(`${at(i)}: usual_line_id "${usual_line_id}" is not a line of "${u.name}"`);
+            }
+          }
+          const prior = stored.get(id)?.group_id;
+          if (!groups.has(it.group.key)) groups.set(it.group.key, { id: prior || nextId('gr'), name });
+          group = { group_id: groups.get(it.group.key)!.id, group_name: name, usual_id, usual_line_id };
+        }
+        const { id: _id, group: _group, ...rest } = it;
+        const entry = { ...rest, id, date: input.date, slot: input.slot } as LogEntryInput;
+        if (!stored.has(id)) {
+          try {
+            ctx.writeLog(entry, true, undefined, group);
+          } catch (err) {
+            throw new ApiError(`${at(i)}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+        return { id, entry, group, line, fresh: !stored.has(id) };
+      });
+      const group_ids = Object.fromEntries([...groups].map(([k, g]) => [k, g.id]));
+      if (dryRun) {
+        return clone({ entries: rows.map((r) => ctx.writeLog(r.entry, true, stored.get(r.id), r.group)), group_ids });
+      }
+      const entries = rows.map((r) => (r.fresh ? ctx.writeLog(r.entry, false, undefined, r.group) : stored.get(r.id)!));
+      for (const r of rows) {
+        const food = 'food_id' in r.entry ? r.entry.food_id : '';
+        if (r.fresh && food && r.line?.options?.some((o) => o.food_id === food)) r.line.last_pick = food;
+      }
+      return clone({ entries, group_ids });
     },
     copyMeal: async (input) => {
       if (input.to_date > today) throw new ApiError('A meal can only be copied to a day up to today');

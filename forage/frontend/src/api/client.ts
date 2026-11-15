@@ -20,6 +20,8 @@ import type {
   LogGroupChange,
   LogGroupInput,
   LogGroupResult,
+  LogMealInput,
+  LogMealResult,
   LogUsualInput,
   ImportPreview,
   NewRecipeInput,
@@ -113,6 +115,8 @@ export interface ForageApi {
   /** #878: one entry per line under a new group. */
   logUsual(input: LogUsualInput, dryRun?: boolean): Promise<LogGroupResult>;
   logGroup(input: LogGroupInput, dryRun?: boolean): Promise<LogGroupResult>;
+  /** #930: a whole meal (foods, recipes, groups) in one write; every item carries an id so a retry writes nothing new. */
+  logMeal(input: LogMealInput, dryRun?: boolean): Promise<LogMealResult>;
   /** The new entries, after the target meal's own. */
   copyMeal(input: CopyMealInput): Promise<FoodLogEntry[]>;
   /** `null` ungroups; the entries must share one date and slot. */
@@ -257,6 +261,7 @@ export function createLiveApi(token: string, url = import.meta.env.VITE_FORAGE_A
     },
     logUsual: (input, dryRun = false) => call<LogGroupResult>('logUsual', dryRun ? { ...input, dry_run: true } : input),
     logGroup: (input, dryRun = false) => call<LogGroupResult>('logGroup', dryRun ? { ...input, dry_run: true } : input),
+    logMeal: (input, dryRun = false) => call<LogMealResult>('logMeal', dryRun ? { ...input, dry_run: true } : input),
     copyMeal: (input) => call<FoodLogEntry[]>('copyMeal', input),
     setLogGroup: (ids, group) => call<FoodLogEntry[]>('setLogGroup', { ids, group }),
     deleteLogEntries: async (ids) => {

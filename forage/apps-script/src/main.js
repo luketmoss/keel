@@ -165,6 +165,7 @@ function dispatch(action, params, caller) {
     // Groups, usuals logged, meal copy (#878)
     case 'logUsual': return write(function (p) { return logUsual(p, caller); });
     case 'logGroup': return write(function (p) { return logGroup(p, caller); });
+    case 'logMeal': return write(function (p) { return logMeal(p, caller); });
     case 'copyMeal': return write(function (p) { return copyMeal(p, caller); });
     case 'setLogGroup': return write(setLogGroup);
     // Usuals (#877)

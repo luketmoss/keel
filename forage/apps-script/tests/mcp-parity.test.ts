@@ -67,7 +67,7 @@ describe('MCP parity: every action has a tool, or a reason, or an owner', () => 
     expect(workerActions()).toEqual([
       'addStarterFoods', 'addToTrip', 'closeTrip', 'copyMeal', 'deleteFood', 'deleteLogEntry', 'deletePlanEntry', 'deleteRecipe', 'deleteUsual',
       'deleteWalkthrough', 'discardTrip', 'getChangeLog', 'getCombos', 'getConfig', 'getCooks', 'getFood', 'getFoodLog', 'getFoodLogTotals', 'getFoods', 'getPlan',
-      'getRecipe', 'getRecipes', 'getStarterFoods', 'getTrip', 'getTrips', 'getUsual', 'getUsuals', 'hideCombo', 'importRecipe', 'logFood', 'logGroup', 'logUsual',
+      'getRecipe', 'getRecipes', 'getStarterFoods', 'getTrip', 'getTrips', 'getUsual', 'getUsuals', 'hideCombo', 'importRecipe', 'logFood', 'logGroup', 'logMeal', 'logUsual',
       'lookupBarcode', 'movePlanEntry', 'planWeek', 'removeTripItem', 'setFoodWeight', 'setLogGroup', 'setTripItem', 'setWalkthrough', 'startTrip',
       'undoCall', 'unhideCombos', 'updateLogEntry', 'upsertCook', 'upsertFood', 'upsertPlanEntry', 'upsertRecipe', 'upsertUsual',
     ]);

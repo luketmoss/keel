@@ -63,6 +63,7 @@ var CHANGE_LOGGED_ACTIONS = {
   deleteLogEntry: ['FoodLog'],
   logUsual: ['FoodLog', 'UsualLines'],
   logGroup: ['FoodLog'],
+  logMeal: ['FoodLog', 'UsualLines'],
   copyMeal: ['FoodLog'],
   setLogGroup: ['FoodLog'],
   upsertCook: ['Cooks'],
@@ -127,7 +128,7 @@ function isChangeLogged(caller, action, rawPayload) {
   if (!Object.prototype.hasOwnProperty.call(CHANGE_LOGGED_ACTIONS, action)) return false;
   var dryRun = payloadField(rawPayload, 'dry_run');
   if (action === 'importRecipe' || action === 'planWeek') return dryRun === false || dryRun === 'false';
-  if (action === 'startTrip' || action === 'logFood' || action === 'updateLogEntry' || action === 'logUsual' || action === 'logGroup') {
+  if (action === 'startTrip' || action === 'logFood' || action === 'updateLogEntry' || action === 'logUsual' || action === 'logGroup' || action === 'logMeal') {
     return dryRun !== true && dryRun !== 'true';
   }
   return true;

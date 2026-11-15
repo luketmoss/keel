@@ -2748,6 +2748,71 @@ Undo with forage_undo, call ${currentCallId()}`)
   )
 
   server.registerTool(
+    'forage_log_meal',
+    {
+      description:
+        "Log a whole meal to Forage's food log in one write (#930): 1 to 30 items, each a food_id or a recipe_id with " +
+        "qty and unit (a food's serving name or g; a recipe's is serving), in order. Items that share a group.key are " +
+        'logged under one new group with that name (foods only); an item may name the usual and usual line it came ' +
+        "from. Ids sent are kept, so sending the same call again writes nothing new. A dry run by default: it shows " +
+        'the entries and their calories, and logs nothing. Call again with dry_run: false to log them. Any refused ' +
+        'item writes nothing and is named by position. Only log what the user said they ate. On the write ' +
+        'connector; undo with forage_undo.',
+      inputSchema: {
+        slot: z.enum(SLOTS).describe(SLOT_DESCRIPTION),
+        date: z.string().optional().describe("YYYY-MM-DD, 'today' or '-1d'. Default today"),
+        items: z
+          .array(
+            z.object({
+              id: z.string().optional().describe('An id to keep (lg_...), so a repeat of the call writes nothing new'),
+              food_id: z.string().optional().describe('The food (fd_...). Send this or recipe_id'),
+              recipe_id: z.string().optional().describe('The recipe (rc_...), logged in servings; never in a group'),
+              qty: AMOUNT_INPUT.qty,
+              unit: AMOUNT_INPUT.unit.optional(),
+              group: z
+                .object({
+                  key: z.string().describe('Items with the same key share one new group'),
+                  name: z.string().describe('The heading, at most 120 characters'),
+                  usual_id: z.string().optional().describe('The usual (us_...) the group came from'),
+                  usual_line_id: z.string().optional().describe('The line of that usual this item filled (L1...)'),
+                })
+                .optional(),
+            }),
+          )
+          .min(1)
+          .max(30)
+          .describe('The foods and recipes, in order'),
+        dry_run: z.boolean().optional().describe('Default true: preview only. false logs them'),
+      },
+      annotations: WRITE,
+    },
+    guarded(async (args: any): Promise<ToolResult> => {
+      const date = args.date === undefined ? homeToday() : planDate(args.date)
+      if (!date) return failed(`Nothing logged. Could not read "${args.date}" as a date — ${DATE_HINT}.`)
+      const payload = { ...sent(args, ['slot', 'items']), date }
+      if (args.dry_run !== false) {
+        const preview = await apiDry(cfg, 'logMeal', { ...payload, dry_run: true })
+        if (!preview.success) return failed(`Nothing logged. ${preview.error}`)
+        const names = await logNames(cfg)
+        return text(
+          ['Preview — nothing logged.', groupText(preview.data.entries, names), '', 'Call again with dry_run: false to log them.'].join('\n'),
+        )
+      }
+      const rows = (args.items as any[]).length
+      let saved: ApiResult
+      try {
+        declareRows(rows)
+        saved = await apiWrite(cfg, 'logMeal', payload, rows)
+      } catch (err) {
+        inTransit(err, 'log entries')
+      }
+      if (!saved.success) return failed(`Nothing logged. ${saved.error}`)
+      const names = await logNames(cfg)
+      return text(`Logged.\n${groupText(saved.data.entries, names)}\nUndo with forage_undo, call ${currentCallId()}`)
+    }),
+  )
+
+  server.registerTool(
     'forage_copy_meal',
     {
       description:

@@ -190,7 +190,7 @@ What the columns mean:
   is no Groups tab, a group is only its entries. `logUsual` (`usual_id`, `date`, `slot`, `picks`, `dry_run`) writes one entry per
   line in position order under a new group named for the usual, a pick-one logging the pick, else `last_pick`, else the first
   option, at that option's own amount, and setting `last_pick`; `logGroup` (`date`, `slot`, `name` up to 120, 1 to 30 `items`)
-  groups foods with no usual; both answer `{ entries, group_id }`. `copyMeal` copies a meal, or one group, after the target meal's
+  groups foods with no usual; both answer `{ entries, group_id }`. `logMeal` (#930: `date`, `slot`, 1 to 30 `items` of a food or recipe, `qty`, `unit` and an optional `id`, `group` `{ key, name, usual_id?, usual_line_id? }`; `dry_run`) writes a whole meal in one append, in order: items sharing a `group.key` are one new group (foods only), an item from a pick-one line sets its `last_pick` when its food is an option, any refusal names `items[n]` and writes nothing, and an id already logged is not written again and is answered as stored, so a retry leaves one copy; answers `{ entries, group_ids }` (by key). `copyMeal` copies a meal, or one group, after the target meal's
   entries, computing nutrition again from the food or recipe as it is now (#880's rule for a renamed serving), each source group
   becoming a new group with the same name, usual and line; refused for a `to_date` after today or an empty source. `setLogGroup`
   (`ids`, `group`) clears the four fields with `null` (touching nothing else, `updated` included) or puts entries of one meal

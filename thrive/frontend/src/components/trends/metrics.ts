@@ -11,6 +11,8 @@ import { secondsToMinutes } from '../../api/duration';
 import { bodyDayOf, type BodyDay } from '../../api/body-day';
 import { formatSleep, axisSleep } from './sleep-duration';
 import { drinkHistory, waterGoalMl, formatOz, ML_PER_OZ } from '../../state/drinks';
+import { foodHistory, foodEnabled } from '../../state/food';
+import type { FoodDay } from '../../api/forage-food';
 import { today as todaySignal } from '../../day/today';
 import type { DrinkKind } from '../../api/drinks';
 import { datesBetween } from './series';
@@ -28,7 +30,7 @@ export interface TrendPoint {
 }
 
 /** The health tab a metric's `points()` reads; Trends waits on, and reports errors from, exactly these. */
-export type TrendSource = 'dailyHealth' | 'bodyMeasurements' | 'dailySummary' | 'drinks' | 'ftpHistory';
+export type TrendSource = 'dailyHealth' | 'bodyMeasurements' | 'dailySummary' | 'drinks' | 'ftpHistory' | 'food';
 
 export interface TrendMetric {
   id: string;
@@ -54,6 +56,15 @@ export interface TrendMetric {
   note?: string;
   /** Each day is a bar from zero, not a dot (#521): a total, where the others are readings. */
   bars?: boolean;
+  /** The bar colour's token name, `--metric-<token>`, when it is not the metric's id (#890: the food metrics are all `food`). */
+  token?: string;
+  /**
+   * The words for a date with no point (#890: "nothing logged", or why today is not counted), printed
+   * beside the blank in the readout, the table and the announcement. Absent: a bare blank.
+   */
+  gapNote?(date: string, today: string): string;
+  /** The metric Forage's Trends is opened at from this card (#890); absent: no link. */
+  exploreForage?: 'kcal' | 'protein' | 'carbs' | 'fat';
   /** A dashed reference line (the water goal), in the metric's own unit, with its label; null draws none. */
   reference?(): { value: number; label: string } | null;
   /** What the card says when the metric has no value on any date; the default is "Nothing recorded yet." */
@@ -607,6 +618,71 @@ export const UNWIND: TrendMetric = {
 
 const INTAKE_METRICS: TrendMetric[] = [WATER, COFFEE, ALCOHOL, UNWIND];
 
+// ── Food (#890) ──────────────────────────────────────────────────────
+// Calories and macros, read from Forage's `getFoodLogTotals` (the Day card's call, #714), one read of the
+// whole log. A day nobody logged is unknown, not 0: `points()` holds only days Forage reported with a
+// figure, and every consumer already treats an absent day as a gap. A reply that does hold a 0 draws a
+// zero-height bar like any real zero. Nothing is added up here: every value is Forage's, as sent.
+
+export const FOOD_LOW_WORDS = 'low: some items have no nutrition';
+
+type FoodField = 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g';
+
+/** One FoodDay figure as points: a day with it `null` is omitted; `partial` marks a low day. Empty until loaded. */
+export function foodPoints(field: FoodField): TrendPoint[] {
+  const s = foodHistory.value;
+  if (s.state !== 'loaded') return [];
+  const out: TrendPoint[] = [];
+  for (const d of s.rows as FoodDay[]) {
+    const v = d[field];
+    if (v === null || v === undefined) continue;
+    const p: TrendPoint = { date: d.date, value: v };
+    if (d.partial) {
+      p.partial = FOOD_LOW_WORDS;
+      p.partialShort = '(low)';
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+const foodGapNote = (date: string, today: string): string =>
+  date === today ? "today isn't counted until it's over" : 'nothing logged';
+
+const foodMetric = (
+  id: string,
+  label: string,
+  unit: string,
+  field: FoodField,
+  exploreForage: 'kcal' | 'protein' | 'carbs' | 'fat',
+): TrendMetric => ({
+  id,
+  source: 'food',
+  label,
+  unit,
+  note: 'Eaten, from Forage',
+  points: () => foodPoints(field),
+  format: formatWhole,
+  axisFormat: (v) => formatWhole(v),
+  band: false,
+  zeroBased: true,
+  excludesToday: true,
+  bars: true,
+  token: 'food',
+  gapNote: foodGapNote,
+  exploreForage,
+  emptyText: 'Nothing logged in Forage yet.',
+});
+
+export const CALORIES = foodMetric('calories', 'Calories', 'kcal', 'kcal', 'kcal');
+export const PROTEIN = foodMetric('protein', 'Protein', 'g', 'protein_g', 'protein');
+export const CARBS = foodMetric('carbs', 'Carbs', 'g', 'carbs_g', 'carbs');
+export const FAT = foodMetric('fat', 'Fat', 'g', 'fat_g', 'fat');
+
+const FOOD_METRICS: TrendMetric[] = [CALORIES, PROTEIN, CARBS, FAT];
+export const FOOD_GROUP_ID = 'food';
+const FOOD_IDS = new Set(FOOD_METRICS.map((m) => m.id));
+
 // ── The custom set (#246) ────────────────────────────────────────────
 
 /** The most metrics a custom set holds. */
@@ -626,8 +702,14 @@ export const CUSTOM_SECTIONS: { label: string; metrics: TrendMetric[] }[] = [
   { label: 'Blood Pressure', metrics: BLOOD_PRESSURE_METRICS },
   { label: 'Activity', metrics: [...ACTIVITY_SUMMARY_METRICS, STEPS] },
   { label: 'Intake', metrics: INTAKE_METRICS },
+  { label: 'Food', metrics: FOOD_METRICS },
 ];
 export const CUSTOM_PICKABLE: TrendMetric[] = CUSTOM_SECTIONS.flatMap((s) => s.metrics);
+
+/** The sections the picker shows: Food only in a build that can read Forage, or in demo mode (#890). */
+export function availableSections(): { label: string; metrics: TrendMetric[] }[] {
+  return foodEnabled() ? CUSTOM_SECTIONS : CUSTOM_SECTIONS.filter((s) => s.metrics !== FOOD_METRICS);
+}
 
 /**
  * Whatever was stored, as a valid selection: ids that are not registered
@@ -637,7 +719,9 @@ export const CUSTOM_PICKABLE: TrendMetric[] = CUSTOM_SECTIONS.flatMap((s) => s.m
 export function normaliseCustom(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const wanted = new Set(raw.filter((x): x is string => typeof x === 'string'));
-  return CUSTOM_PICKABLE.filter((m) => wanted.has(m.id))
+  // Without Forage's API (#890) a stored food id is unknown, as any unregistered id is.
+  const food = foodEnabled();
+  return CUSTOM_PICKABLE.filter((m) => wanted.has(m.id) && (food || !FOOD_IDS.has(m.id)))
     .slice(0, CUSTOM_MAX)
     .map((m) => m.id);
 }
@@ -660,6 +744,12 @@ export const TREND_GROUPS: TrendGroup[] = [
   { id: 'blood_pressure', label: 'Blood Pressure', metrics: BLOOD_PRESSURE_METRICS },
   { id: 'activity', label: 'Activity', metrics: ACTIVITY_METRICS },
   { id: 'intake', label: 'Intake', metrics: INTAKE_METRICS },
+  { id: FOOD_GROUP_ID, label: 'Food', metrics: FOOD_METRICS },
   // A placeholder: its metrics come from the stored selection (customGroup).
   { id: CUSTOM_GROUP_ID, label: 'Custom', metrics: [] },
 ];
+
+/** The groups the build shows (#890): Food only where Forage can be read. A stored Food choice falls back like an unknown id. */
+export function trendGroups(): TrendGroup[] {
+  return foodEnabled() ? TREND_GROUPS : TREND_GROUPS.filter((g) => g.id !== FOOD_GROUP_ID);
+}

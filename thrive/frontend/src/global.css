@@ -6011,6 +6011,12 @@ input, select, textarea {
   color: var(--color-text-secondary);
 }
 
+/* #890 - a food card's last row: the Explore in Forage link, a .food-link (at least --touch-target tall), left-aligned. */
+.trend-explore {
+  margin: 0;
+  margin-inline-start: calc(-1 * var(--space-sm));
+}
+
 .trend-note,
 .trend-summary {
   font-size: var(--text-sm);

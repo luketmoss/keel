@@ -174,7 +174,7 @@ export function TrendTable({ group, series: built, range, avgDays, today }: Prop
                 </a>
               </th>
               {columns.map(({ metric, series, byDate }) => {
-                const c = dayCells(metric, series, byDate, date, avgDays);
+                const c = dayCells(metric, series, byDate, date, avgDays, today);
                 return [
                   <td key={metric.id}>
                     {c.value}

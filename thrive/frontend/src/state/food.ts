@@ -10,6 +10,7 @@ import { signal } from '@preact/signals';
 import { isDemo } from '../api/demo-data';
 import { forageApiUrl, getFoodLogTotals, type FoodDay, type FoodLabel } from '../api/forage-food';
 import { addDays, todayInDenver } from '../day/dates';
+import type { HealthTabState } from './store';
 
 export const FOOD_WEEK_DAYS = 7;
 
@@ -183,4 +184,70 @@ export function resetFood(): void {
   foodWindows.value = {};
   inFlight.clear();
   lastStart.clear();
+}
+
+// ── Trends (#890) ────────────────────────────────────────────────────
+
+/**
+ * Forage's whole log as Trends reads it: one `getFoodLogTotals` with no window, held as Forage sent it.
+ * Trends reads it on entering a group that shows food; every control then redraws from these rows.
+ */
+export const foodHistory = signal<HealthTabState<FoodDay>>({ state: 'idle' });
+
+export const FOOD_DEMO_DAYS = 400;
+
+/**
+ * Built-in history for demo mode: the last 400 days, today excluded, with a gap about one day in
+ * seven, a low day about every three weeks, and day-to-day variation in the macros too.
+ */
+export function demoFoodHistory(today: string = todayInDenver()): FoodDay[] {
+  const days: FoodDay[] = [];
+  for (let back = FOOD_DEMO_DAYS; back >= 1; back--) {
+    if (back % 7 === 3) continue;
+    const low = back % 21 === 5;
+    const wave = ((back * 37) % 23) - 11;
+    const kcal = low ? 1180 + wave * 8 : 2050 + wave * 38;
+    days.push({
+      date: addDays(today, -back),
+      entries: low ? 3 : 5,
+      unknown_entries: low ? 1 : 0,
+      kcal,
+      protein_g: Math.round(kcal * 0.075 + wave),
+      carbs_g: Math.round(kcal * 0.11 + wave * 2),
+      fat_g: Math.round(kcal * 0.035 + wave / 2),
+      partial: low,
+    });
+  }
+  return days;
+}
+
+let historyInFlight: Promise<void> | null = null;
+
+/**
+ * Read the whole log. One read at a time: a call while one runs joins it. Rows already held stay up
+ * while it reads and through a failed re-read; with none held, a failure is the error state. Demo mode
+ * makes no call.
+ */
+export function loadFoodHistory(token: string): Promise<void> {
+  if (isDemo()) {
+    foodHistory.value = { state: 'loaded', rows: demoFoodHistory() };
+    return Promise.resolve();
+  }
+  if (historyInFlight) return historyInFlight;
+  if (foodHistory.value.state !== 'loaded') foodHistory.value = { state: 'loading' };
+  historyInFlight = getFoodLogTotals(token)
+    .then((res) => {
+      if (res.ok) foodHistory.value = { state: 'loaded', rows: res.days };
+      else if (foodHistory.value.state !== 'loaded') foodHistory.value = { state: 'error' };
+    })
+    .finally(() => {
+      historyInFlight = null;
+    });
+  return historyInFlight;
+}
+
+/** Test-only: forget the whole-log read. */
+export function resetFoodHistory(): void {
+  foodHistory.value = { state: 'idle' };
+  historyInFlight = null;
 }

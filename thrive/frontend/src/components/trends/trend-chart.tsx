@@ -25,6 +25,7 @@ import {
 import { BLANK, withUnit } from './readout';
 import { heldRuns, sourceWords } from './held';
 import { TrendReadout } from './trend-readout';
+import { forageTrendsUrl } from '../../api/forage-food';
 
 /** Width drawn before the card has been measured (and in jsdom). */
 export const DEFAULT_CHART_WIDTH = 300;
@@ -148,6 +149,9 @@ export function TrendPlot({
   const y = (v: number) => PAD_TOP + (1 - (v - dom.min) / (dom.max - dom.min || 1)) * plotH;
   const r = Math.min(3.5, Math.max(MIN_DOT_R, slot * 0.35));
   const barW = Math.max(1, slot * 0.7);
+  const barColour = `var(--metric-${metric.token ?? metric.id})`;
+  const hatchId = `trend-hatch-${metric.id}`;
+  const hatchesLow = !!metric.bars && series.points.some((p) => p.partial !== undefined);
   const avgPoints = [...series.average].map(([date, value]) => ({ date, value }));
   const xTicks = dateTicks(series.dates[0], series.dates[n - 1], plotW);
   const selected = selectedDate && index.has(selectedDate) ? selectedDate : null;
@@ -238,17 +242,28 @@ export function TrendPlot({
       </g>
       {metric.bars && (
         <g class="trend-bars">
+          {hatchesLow && (
+            // A low day's fill (#890): stripes and a 25% tint of the bar colour, the Day card's week strip. A pattern, so it reads without colour.
+            <defs>
+              <pattern id={hatchId} width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width={6} height={6} fill={barColour} fill-opacity={0.25} />
+                <rect width={3} height={6} fill={barColour} />
+              </pattern>
+            </defs>
+          )}
           {series.points.map((p) => (
             <rect
               key={p.date}
-              class="trend-bar"
+              class={`trend-bar${p.partial !== undefined ? ' trend-bar-low' : ''}`}
               data-date={p.date}
               x={x(p.date) - barW / 2}
               y={y(p.value)}
               width={barW}
               height={Math.max(0, y(dom.min) - y(p.value))}
               // The Day cards' colours (--metric-water, --metric-coffee, --metric-alcohol, --metric-unwind): a bars metric's id names its token.
-              fill={`var(--metric-${metric.id})`}
+              fill={p.partial !== undefined ? `url(#${hatchId})` : barColour}
+              stroke={p.partial !== undefined ? barColour : undefined}
+              stroke-width={p.partial !== undefined ? 1 : undefined}
             />
           ))}
         </g>
@@ -530,6 +545,18 @@ export function TrendCard({
       </>
     );
   }
+  const explore = metric.exploreForage && recorded && (
+    <p class="trend-explore">
+      <a
+        class="food-link"
+        href={forageTrendsUrl(metric.exploreForage, range)}
+        rel="noopener"
+        aria-label={`Explore ${metric.label} in Forage`}
+      >
+        Explore in Forage <span aria-hidden="true">›</span>
+      </a>
+    </p>
+  );
   return (
     <section class="trend-card" aria-labelledby={headingId} data-metric={metric.id}>
       <h2 class="trend-card-title" id={headingId}>
@@ -542,6 +569,7 @@ export function TrendCard({
         </p>
       )}
       {body}
+      {explore}
     </section>
   );
 }

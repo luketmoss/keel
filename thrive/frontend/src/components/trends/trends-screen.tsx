@@ -10,8 +10,9 @@ import { signal } from '@preact/signals';
 import { useAuth } from '../../auth/auth-context';
 import { loadHealth } from '../../state/actions';
 import { drinkHistory, loadDrinkHistory } from '../../state/drinks';
+import { foodHistory, loadFoodHistory } from '../../state/food';
 import { dailyHealth, bodyMeasurements, dailySummary, ftpHistory } from '../../state/store';
-import { TREND_GROUPS, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
+import { trendGroups, CUSTOM_GROUP_ID, customGroup, type TrendGroup, type TrendMetric } from './metrics';
 import {
   type RangeKey,
   type AverageKey,
@@ -86,11 +87,14 @@ export function captionText(
   bars = false,
   /** Shade ride days is on (#891): whether the range holds a ride. */
   rides?: 'some' | 'none',
+  /** The group has a food card (#890): a blank is a gap, and low days may be hatched. */
+  food?: { low: boolean },
 ): string {
   const clauses = [bars ? 'Bars are each day' : 'Dots are each day'];
   if (avgDays > 0) clauses.push(`line is the ${avgDays}-day average`);
   if (hasBand) clauses.push('shaded band is your range, the mean ± 1 SD of the 30 days before today');
-  const base = `${clauses.join(' · ')}. Blank days stay blank.`;
+  let base = `${clauses.join(' · ')}. ${food ? 'A day with nothing logged is a gap.' : 'Blank days stay blank.'}`;
+  if (food?.low) base += ' Hatched bars are low days: some items have no nutrition.';
   if (rides === undefined) return base;
   return `${base} ${rides === 'some' ? 'Shaded days had a ride.' : 'No rides in this range.'}`;
 }
@@ -188,7 +192,8 @@ export function TrendsScreen() {
       set(v);
     };
 
-  const picked: TrendGroup = TREND_GROUPS.find((g) => g.id === groupId) ?? TREND_GROUPS[0];
+  const groups = trendGroups();
+  const picked: TrendGroup = groups.find((g) => g.id === groupId) ?? groups[0];
   const isCustom = picked.id === CUSTOM_GROUP_ID;
   // One object per custom set, so the series memo below can key on it.
   const group: TrendGroup = useMemo(() => (isCustom ? customGroup(custom) : picked), [picked, isCustom, custom]);
@@ -218,13 +223,18 @@ export function TrendsScreen() {
     ]),
   ];
   const showsDrinks = sources.includes('drinks');
+  const showsFood = sources.includes('food');
   // Drinks are read on every entry to a group that shows them (#521), not once like the health
   // tabs: a drink logged on the Day view is there on the next visit. Rows already held stay up
   // while it reads, so a revisit does not flash "Loading…".
   useEffect(() => {
     if (token && showsDrinks) void loadDrinkHistory(token);
   }, [token, showsDrinks]);
-  const tabs = { dailyHealth, bodyMeasurements, dailySummary, drinks: drinkHistory, ftpHistory };
+  // Food is read the same way (#890): the whole of Forage's log, once on every entry to a group that shows it.
+  useEffect(() => {
+    if (token && showsFood) void loadFoodHistory(token);
+  }, [token, showsFood]);
+  const tabs = { dailyHealth, bodyMeasurements, dailySummary, drinks: drinkHistory, ftpHistory, food: foodHistory };
   const states = sources.map((s) => tabs[s].value.state);
   const avgDays = averageDays(average);
 
@@ -255,6 +265,11 @@ export function TrendsScreen() {
       rides: shading ? rideDaysOf(rowsOf('dailySummary')) : null,
       nothingEver: pointSets.every((p) => p.length === 0),
       hasBand: groupHasBand(group.metrics, series),
+      food: group.metrics.some((m) => m.gapNote)
+        ? {
+            low: group.metrics.some((m, i) => m.gapNote && series[i].points.some((p) => p.partial !== undefined)),
+          }
+        : undefined,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -269,6 +284,7 @@ export function TrendsScreen() {
     rowsOf('dailySummary'),
     rowsOf('drinks'),
     rowsOf('ftpHistory'),
+    rowsOf('food'),
   ]);
 
   // The day the link named (#504), selected once per arrival and only when the charts plot it: a
@@ -286,10 +302,13 @@ export function TrendsScreen() {
 
   let content;
   if (states.includes('error')) {
+    // Food alone failing says so in its own words (#890); any health tab failing keeps the existing text.
+    const failed = sources.filter((_, i) => states[i] === 'error');
+    const foodOnly = failed.length > 0 && failed.every((s) => s === 'food');
     content = (
       <TrendsState>
         <div class="trends-error" role="alert">
-          <p>Couldn't load your health data.</p>
+          <p>{foodOnly ? "Couldn't load your food." : "Couldn't load your health data."}</p>
           <button
             type="button"
             class="btn btn-secondary trends-retry"
@@ -297,8 +316,9 @@ export function TrendsScreen() {
               // Before the button is replaced by "Loading…" (#290).
               (e.currentTarget as HTMLElement).closest<HTMLElement>('.trends-state')?.focus();
               if (token) {
-                if (sources.some((s) => s !== 'drinks')) void loadHealth(token);
+                if (sources.some((s) => s !== 'drinks' && s !== 'food')) void loadHealth(token);
                 if (showsDrinks) void loadDrinkHistory(token);
+                if (showsFood) void loadFoodHistory(token);
               }
             }}
           >
@@ -318,7 +338,7 @@ export function TrendsScreen() {
   } else if (isCustom && group.metrics.length === 0) {
     content = <p class="trends-custom-empty">Pick up to 4 metrics to see them here.</p>;
   } else if (built) {
-    const { to, series, recorded, nothingEver, hasBand, rides } = built;
+    const { to, series, recorded, nothingEver, hasBand, rides, food } = built;
     const dates = series[0]?.dates ?? [];
     // Keyboard moves select and announce; pointer moves only select (AC4).
     const moveTo = (date: string) => {
@@ -361,6 +381,7 @@ export function TrendsScreen() {
             hasBand,
             group.metrics.length > 0 && group.metrics.every((m) => m.bars),
             rides ? (dates.some((d) => rides.has(d)) ? 'some' : 'none') : undefined,
+            food,
           )}
         </p>
         {view === 'Table' && !nothingEver ? (
@@ -436,7 +457,7 @@ export function TrendsScreen() {
         />
       </header>
       <div class="screen-body">
-        <GroupSwitcher groups={TREND_GROUPS} value={group.id} onChange={clearing(setGroupId)} />
+        <GroupSwitcher groups={groups} value={group.id} onChange={clearing(setGroupId)} />
         {isCustom && (
           <div class="trends-custom-head">
             <button type="button" class="btn btn-secondary trends-custom-edit" onClick={() => setPicking(true)}>

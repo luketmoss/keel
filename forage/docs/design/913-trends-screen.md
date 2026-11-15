@@ -18,7 +18,7 @@ Forage's chart follows **Thrive's look and rules** (decided 2026-11-14) and is i
 
 ## Main path
 
-1. On Eaten, tap the **Trends** button in the header. The screen opens on **Energy**, at the range and average last
+1. On Eaten, tap **Trends ›** on the day card. The screen opens on **Energy**, at the range and average last
    used (first time: 1M, 7-day average).
 2. The top card reads `1,980 kcal a day, on average`, and under it `24 of 29 days logged · 3 low`.
 3. The bar chart shows each day. Tap a day: the readout above the chart reads that day, and offers **Open day ›**.
@@ -47,7 +47,7 @@ Forage's chart follows **Thrive's look and rules** (decided 2026-11-14) and is i
 - **The hash follows the screen.** After a range or tab change the hash is rewritten in place (`history.replaceState`, as #825
   does for the day): `#/eaten/trends?tab=energy&range=3M`. A reload reopens the same view, and Back from a day opened off a
   bar returns to the same tab and range. The selected day is not in the hash.
-- **Opening and leaving.** The Trends button is a link and adds a history entry, so Back from Trends is the previous entry
+- **Opening and leaving.** The day card’s Trends link adds a history entry, so Back from Trends is the previous entry
   (Eaten on the day it was on). **Open day ›** and **Log this day ›** add one too. Range and tab changes add none.
 - **The back arrow** goes to `#/eaten` or `#/eaten/<date>`, by #825's rule, for the day Eaten last showed in this page load
   (`eatenDate`), never to the bar's date. Opened cold (a link, a reload), that is today. Trends does not change `eatenDate`
@@ -57,22 +57,27 @@ Forage's chart follows **Thrive's look and rules** (decided 2026-11-14) and is i
 - Signed out: the sign-in screen, then Trends on the hash's route. Demo mode: `?demo=true#/eaten/trends` opens Trends over
   demo data (a few days of totals, so the chart has bars, one low day and gaps).
 
-## The Trends button on Eaten
+## The Trends link on Eaten's day card
 
-Eaten is otherwise unchanged. The header gains one 44px icon button, `aria-label="Trends"`, a rising-line icon, drawn
-outlined like the account button's neighbours, between the next-day arrow's cluster and the account button. It is the only
-change to Eaten. It carries `title="Trends"`.
+**Changed by the owner at Gate 1 (2026-11-14).** Refinement first put a 44px Trends icon button in Eaten's header. Measured
+at 375px (demo mode, `getBoundingClientRect`), that left 143px for the title column. The date line (`Saturday 14 November
+2026` is 176px, the longest 196px) would then wrap on nearly every day, and the header would have to grow by a line.
+The owner chose to keep **Eaten's header exactly as it is** and open Trends from the day card instead, since the day's
+calories are what Trends charts.
 
-**Measured** (demo mode, 375px viewport, `getBoundingClientRect`): the header has a 16px gutter each side and an 8px gap;
-today the day cluster (previous 44, day title, next 44, 4px gaps) is 291px wide and its title column is 195px. Adding a 44px
-button and one 8px gap leaves **143px** for the title column. The day title (`Wednesday` is the widest, 108px) fits; the
-date line does not: `Saturday 14 November 2026` is 176px and the longest, `Wednesday 30 September 2026`, is 196px.
-At 375px the date line therefore wraps to two lines on nearly every day (it already wrapped on the longest, at 195px).
-
-Decided: **the date line may wrap, and the header reserves two lines for it at every width**, so the header is the same
-height on every day and does not jump as the day arrows are used. It grows from 48px to the height of a one-line title and
-a two-line date. Chosen over truncating the year (hides information), dropping the weekday from the date line (changes
-Eaten's copy) and putting Trends in the account menu (hides the entry point the owner asked for).
+- The day card (#712's totals card, `section.day-card`) gets one text link, **Trends ›**, at the right end of its first row
+  (`.day-main`, the kcal figure's row), baseline-aligned with the `kcal` hint. `--text-sm`, weight 600, `--color-primary`.
+  Its target is at least 44px tall (padding, not a bigger font), and its accessible name is `Trends`.
+- It is a link to `#/eaten/trends` (an `<a href>`, so it adds a history entry; §The route). It never carries a date: Trends
+  always ends today.
+- It shows on every day the day card shows, including a day with nothing logged, a day whose items have no nutrition yet,
+  a low day, and today. It is not shown while the day card is a loading skeleton.
+- Its states are #404's text-link family: rest, hover (under `@media (hover: hover)`), pressed, and the global focus ring.
+  No disabled state.
+- If the kcal figure and the link don't fit on one row (a very large figure at 320px), the link wraps under the figure,
+  right-aligned. It is never cut off and never overlaps.
+- **Nothing else on Eaten changes.** That includes the header, its height, the date line, the day arrows, the meal cards,
+  their Add rows, logging to past days, and everything #876 added.
 
 ## Screen layout
 
@@ -224,7 +229,7 @@ the rest), not an API change.
 
 | Where | Text |
 |---|---|
-| Button | `Trends` (accessible name; icon only) |
+| Day card link | `Trends ›` (accessible name `Trends`) |
 | Heading | `Trends` |
 | Back | `Back to Eaten` |
 | Controls | `1W 1M 3M 6M 1Y All`, `Off 7d 14d 30d`; groups named `Range` and `Average` |
@@ -274,4 +279,4 @@ token; the chart's own geometry (padding, plot height) lives in the chart's code
 - Sharing or moving Thrive's chart, and reading Thrive.
 - A Trends tab in the bar (Trends is a screen off Eaten; the epic names a tab as the fallback if cooking and shopping
   trends grow).
-- Changes to Eaten beyond the one button (and the header height it needs).
+- Changes to Eaten beyond the one link on the day card. The header is not touched.

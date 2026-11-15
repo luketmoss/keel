@@ -435,6 +435,8 @@ function applyChangeUndo(changes) {
     var fields = TABS[tabName].fields;
     var sheet = getSheet(tabName);
     var live = readTabRows(tabName);
+    // The rows are about to change under rows.js's memo and the Foods cache (#932).
+    invalidateTab(tabName);
     var toDelete = [];
     var toAppend = [];
     var asRow = function (obj) {
@@ -457,6 +459,7 @@ function applyChangeUndo(changes) {
     if (toAppend.length) {
       sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, fields.length).setValues(toAppend);
     }
+    invalidateTab(tabName);
   });
 }
 

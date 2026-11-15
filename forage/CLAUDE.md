@@ -245,6 +245,8 @@ client ID, an identifier) for the same `TOKEN_ALLOWED_EMAIL`, which may run
 `THRIVE_TOKEN_ACTIONS` in `auth.js`, only `getFoodLogTotals`, and is refused
 every other action. With the property unset there is no such caller.
 
+**Reading tabs** (#932, `apps-script/src/rows.js`). A request reads each tab from the Sheet at most once (`TAB_MEMO`, reset at the start of `handleRequest`, dropped for a tab whenever the request writes it). The Foods rows are also kept in `CacheService`'s script cache between requests, in 30,000-character chunks with a meta key, for 300 seconds, so a hand edit in the Sheet shows within five minutes. Every Foods write through `rows.js`, and an `undoCall` of Foods, clears it. A write finds its row in a fresh Sheet read, never in the cache. Any new code that writes a sheet directly must call `invalidateTab`.
+
 ## MCP tools
 
 Agents reach Forage through two connectors in the Keel MCP Worker (#713):

@@ -568,6 +568,14 @@ export const DEMO_LOG: {
   { days_ago: 0, entry: { slot: 'Snacks', food_id: 'fd_demo_bar', qty: 1, unit: 'bar' } },
   { days_ago: 1, entry: { slot: 'Breakfast', food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup' } },
   { days_ago: 1, entry: { slot: 'Dinner', recipe_id: 'rc_demo_weeknight', qty: 2, unit: 'serving' } },
+  // #913: older days for Trends, with gaps at 2, 5 and 7 days ago and one low day (the partial recipe).
+  { days_ago: 3, entry: { slot: 'Breakfast', food_id: 'fd_demo_yogurt', qty: 1, unit: 'cup' } },
+  { days_ago: 3, entry: { slot: 'Dinner', recipe_id: 'rc_demo_weeknight', qty: 2, unit: 'serving' } },
+  { days_ago: 4, entry: { slot: 'Lunch', recipe_id: 'rc_demo_bread', qty: 1, unit: 'serving' } },
+  { days_ago: 6, entry: { slot: 'Breakfast', food_id: 'fd_demo_granola', qty: 50, unit: 'g' } },
+  { days_ago: 6, entry: { slot: 'Snacks', food_id: 'fd_demo_bar', qty: 1, unit: 'bar' } },
+  { days_ago: 8, entry: { slot: 'Dinner', recipe_id: 'rc_demo_weeknight', qty: 1, unit: 'serving' } },
+  { days_ago: 9, entry: { slot: 'Breakfast', food_id: 'fd_demo_yogurt', qty: 2, unit: 'cup' } },
 ];
 
 // ---- #718: the sample trips

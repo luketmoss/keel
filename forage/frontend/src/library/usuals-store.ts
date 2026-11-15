@@ -3,6 +3,7 @@
 import { signal } from '@preact/signals';
 import { type ForageApi } from '../api/client';
 import type { Food, Slot, Usual, UsualInput, UsualLineInput, UsualOptional, UsualOption } from '../api/types';
+import { dropHeldUsual, holdUsual } from '../eaten/add-store';
 import { dayTitle } from '../eaten/format';
 import type { LoadState } from './recipes-store';
 
@@ -30,13 +31,16 @@ export async function loadUsuals(api: ForageApi, quiet = false): Promise<void> {
   }
 }
 
-/** Put a saved usual into the list, replacing the old copy. */
+/** Put a saved usual into the list, replacing the old copy, and into the Eaten tab's held usuals (#947). */
 export function keepUsual(usual: Usual): void {
   usuals.value = [...usuals.value.filter((u) => u.id !== usual.id), usual];
+  holdUsual(usual);
 }
 
+/** Take a deleted usual out of the list and out of the Eaten tab's held usuals (#947). */
 export function dropUsual(id: string): void {
   usuals.value = usuals.value.filter((u) => u.id !== id);
+  dropHeldUsual(id);
 }
 
 /** Most recently used first, then by name; a usual never used goes after every used one. */

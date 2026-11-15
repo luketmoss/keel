@@ -275,6 +275,11 @@ export function holdUsual(usual: Usual): void {
   patch((h) => ({ ...h, usuals: [...(h.usuals ?? []).filter((u) => u.id !== usual.id), usual] }));
 }
 
+/** A usual deleted (#947). */
+export function dropHeldUsual(id: string): void {
+  patch((h) => (h.usuals ? { ...h, usuals: h.usuals.filter((u) => u.id !== id) } : h));
+}
+
 /** A recipe deleted. */
 export function dropHeldRecipe(id: string): void {
   patch((h) => (h.recipes ? { ...h, recipes: h.recipes.filter((r) => r.id !== id) } : h));

@@ -8,7 +8,16 @@ import { localDate } from '../cook/format';
 import { eatenDate } from '../eaten/eaten-store';
 import { addDays } from '../plan/dates';
 import { applyTrendsRoute } from '../trends/trends-store';
-import { BUILT_TABS, METRIC_TAB, RANGES, TREND_TABS, type RangeId, type TrendTab } from '../trends/trends-types';
+import {
+  BUILT_TABS,
+  FOOD_METRICS,
+  METRIC_TAB,
+  RANGES,
+  TREND_TABS,
+  type FoodMetric,
+  type RangeId,
+  type TrendTab,
+} from '../trends/trends-types';
 
 export const TAB_IDS = ['plan', 'shop', 'eaten', 'library'] as const;
 export type TabId = (typeof TAB_IDS)[number];
@@ -46,10 +55,12 @@ export interface TrendsRoute {
   tab: TrendTab;
   /** #914: the chart a link named (a macro, or a nutrient row to open), when it names a built one. */
   metric: string | null;
+  /** #916: what the Foods tab ranks by, when a link named it on that tab; absent otherwise. */
+  by?: FoodMetric;
 }
 
 /**
- * #913: `#/eaten/trends[?range=&tab=&metric=]`. Its path is exactly `#/eaten/trends`, so `#/eaten/trends/x` is not it
+ * #913: `#/eaten/trends[?range=&tab=&metric=&by=]`. Its path is exactly `#/eaten/trends`, so `#/eaten/trends/x` is not it
  * and falls to #825's rule. An unknown value, and a tab or metric not built yet, is dropped: Energy opens.
  */
 export function parseTrendsHash(hash: string): TrendsRoute | null {
@@ -59,6 +70,7 @@ export function parseTrendsHash(hash: string): TrendsRoute | null {
   const range = query.get('range');
   const tab = query.get('tab');
   const metric = query.get('metric');
+  const by = query.get('by');
   let want: TrendTab | null = null;
   if (tab && (TREND_TABS as readonly string[]).includes(tab)) want = tab as TrendTab;
   if (metric && metric in METRIC_TAB) want = METRIC_TAB[metric];
@@ -67,12 +79,15 @@ export function parseTrendsHash(hash: string): TrendsRoute | null {
     range: range && (RANGES as readonly string[]).includes(range) ? (range as RangeId) : null,
     tab: tabOk ? want! : 'energy',
     metric: tabOk && metric && metric in METRIC_TAB && METRIC_TAB[metric] === want ? metric : null,
+    ...(tabOk && want === 'foods' && by && (FOOD_METRICS as readonly string[]).includes(by)
+      ? { by: by as FoodMetric }
+      : {}),
   };
 }
 
 /** The hash that follows the Trends screen's tab and range. */
-export function trendsHash(tab: TrendTab, range: RangeId, metric?: string | null): string {
-  return `#/eaten/trends?tab=${tab}&range=${range}${metric ? `&metric=${metric}` : ''}`;
+export function trendsHash(tab: TrendTab, range: RangeId, metric?: string | null, by?: FoodMetric | null): string {
+  return `#/eaten/trends?tab=${tab}&range=${range}${metric ? `&metric=${metric}` : ''}${by ? `&by=${by}` : ''}`;
 }
 
 /** The hash that opens a day from Trends: dated before today, plain on it. */

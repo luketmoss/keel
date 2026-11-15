@@ -130,9 +130,9 @@ describe('the route', () => {
       tab: 'macros',
       metric: 'protein',
     });
-    expect(parseTrendsHash('#/eaten/trends?tab=foods&metric=bogus')).toEqual({
+    expect(parseTrendsHash('#/eaten/trends?tab=meals&metric=bogus')).toEqual({
       range: null,
-      tab: 'energy',
+      tab: 'meals',
       metric: null,
     });
     expect(parseTrendsHash('#/eaten/trends?tab=bogus')).toEqual({ range: null, tab: 'energy', metric: null });
@@ -164,7 +164,7 @@ describe('the route', () => {
   it('range, tab and metric in the hash select the view; unknown values open Energy at the stored range', async () => {
     fakeApi();
     localStorage.setItem(RANGE_KEY, '3M');
-    await openAt('/#/eaten/trends?tab=foods&range=nope&metric=bogus');
+    await openAt('/#/eaten/trends?tab=bogus&range=nope&metric=bogus');
     expect(screen.getByRole('radio', { name: '3M' }).getAttribute('aria-checked')).toBe('true');
     expect(window.location.hash).toBe('#/eaten/trends?tab=energy&range=3M');
   });

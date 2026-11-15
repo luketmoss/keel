@@ -3841,3 +3841,91 @@ a.text-btn {
   font-size: var(--text-base);
   font-weight: 600;
 }
+
+/* === Trends: the Foods tab (#916) === */
+
+.foods-skeleton-rows {
+  display: grid;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.foods-skeleton-row {
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  animation: skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.food-rows {
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.food-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-target);
+  padding: var(--space-xs) 0;
+}
+
+.food-rank {
+  flex: none;
+  width: 1.5em;
+  text-align: right;
+}
+
+.food-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.food-name {
+  overflow-wrap: anywhere;
+}
+
+.food-meter {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-light);
+  overflow: hidden;
+}
+
+.food-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--chart-bar);
+}
+
+.food-figures {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.food-share {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.food-amount {
+  font-size: var(--text-xs);
+}
+
+.food-rating {
+  font-size: var(--text-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foods-skeleton-row {
+    animation: none;
+  }
+}

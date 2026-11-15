@@ -148,6 +148,9 @@ function DayCard({ day, date, today }: { day: FoodLogDay | null; date: string; t
         </span>
         <span class="hint">{day && !allUnknown ? label : 'kcal'}</span>
       </div>
+      <a class="day-trends" href="#/eaten/trends" aria-label="Trends" data-testid="day-trends">
+        Trends ›
+      </a>
       <div class="day-macros" data-testid="day-macros">
         <MacroBar protein={macros.protein} carbs={macros.carbs} fat={macros.fat} size="day" />
         <MacroCols protein={macros.protein} carbs={macros.carbs} fat={macros.fat} format={wholeGrams} />

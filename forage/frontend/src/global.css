@@ -18,6 +18,12 @@
   --macro-track: var(--overlay-md);
   --macro-gap: 2px;
   --macro-stripe: 3px;
+
+  /* #913: the chart's colours are aliases of tokens that exist, so both themes follow. */
+  --chart-bar: var(--color-primary);
+  --chart-line: var(--color-text);
+  --chart-grid: var(--color-border-light);
+  --chart-gap: var(--color-text-muted);
 }
 
 [data-theme='light'] {
@@ -3288,4 +3294,310 @@ a.text-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
+}
+
+/* === Trends (#913) === */
+
+/* The link on Eaten's day card: a text link at the right end of the kcal row, wrapping under the figure. */
+.day-trends {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin-left: auto;
+  padding: 0 var(--space-xs);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.day-trends:active {
+  text-decoration: underline;
+}
+
+@media (hover: hover) {
+  .day-trends:hover {
+    text-decoration: underline;
+  }
+}
+
+.trends-nav .icon-btn {
+  text-decoration: none;
+  color: inherit;
+}
+
+.trends-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-xl);
+}
+
+.seg-radio {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin-bottom: var(--space-sm);
+}
+
+.seg-radio .segment[aria-checked='true'] {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow);
+}
+
+.seg-radio .segment:disabled {
+  color: var(--color-text-muted);
+}
+
+.trends-controls {
+  margin-bottom: var(--space-sm);
+}
+
+.trends-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.trends-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.trends-tab[aria-selected='true'] {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.trends-skeleton {
+  height: 96px;
+  background: var(--color-surface-raised);
+  animation: skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.trends-skeleton-tall {
+  height: 240px;
+}
+
+.card-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.hint-inline {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.trends-figure {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.trends-unit {
+  color: var(--color-text-secondary);
+}
+
+.chart-card {
+  padding-bottom: var(--space-md);
+}
+
+/* Two lines are reserved, so choosing a day never moves the card. */
+.readout {
+  min-height: calc(2 * 1.4em);
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.readout-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.chart {
+  width: 100%;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chart-svg {
+  display: block;
+  max-width: 100%;
+}
+
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  fill: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.chart-bar {
+  fill: var(--chart-bar);
+}
+
+.chart-hatch-bg {
+  fill: var(--color-surface);
+}
+
+.chart-hatch-stripe {
+  fill: var(--chart-bar);
+}
+
+.chart-bar-hatched {
+  stroke: var(--chart-bar);
+  stroke-width: 1;
+}
+
+.chart-gap {
+  stroke: var(--chart-gap);
+  stroke-width: 2;
+  stroke-dasharray: 2 2;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-line-dot {
+  fill: var(--chart-line);
+}
+
+.chart-hairline {
+  stroke: var(--color-text-secondary);
+  stroke-width: 1;
+}
+
+.chart-marker {
+  fill: var(--color-surface);
+  stroke: var(--color-text);
+  stroke-width: 2;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.legend-mark {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+}
+
+.legend-day {
+  background: var(--chart-bar);
+}
+
+.legend-line {
+  height: 0;
+  border-top: 2px solid var(--chart-line);
+}
+
+.legend-gap {
+  height: 0;
+  border-top: 2px dashed var(--chart-gap);
+}
+
+.legend-low {
+  border: 1px solid var(--chart-bar);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--chart-bar) 0 var(--macro-stripe),
+    var(--color-surface) var(--macro-stripe) calc(var(--macro-stripe) * 2)
+  );
+}
+
+.weekday-cols {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+}
+
+.weekday-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.weekday-value {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.weekday-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 96px;
+}
+
+.weekday-bar {
+  display: block;
+  width: 70%;
+  max-width: 28px;
+  background: var(--chart-bar);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.weekday-bar-hatched {
+  border: 1px solid var(--chart-bar);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--chart-bar) 0 var(--macro-stripe),
+    var(--color-surface) var(--macro-stripe) calc(var(--macro-stripe) * 2)
+  );
+}
+
+.weekday-initial {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.weekday-days {
+  min-height: 1.2em;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trends-skeleton {
+    animation: none;
+  }
 }

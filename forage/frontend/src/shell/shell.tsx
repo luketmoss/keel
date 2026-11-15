@@ -14,9 +14,10 @@ import { PlanScreen } from '../plan/plan-screen';
 import { planMealRequested } from '../plan/plan-store';
 import { ShopScreen } from '../shop/shop-screen';
 import { addRequested, shopTrip, tripMenuRequested } from '../shop/shop-store';
+import { TrendsHeader, TrendsScreen } from '../trends/trends-screen';
 import { Toast } from '../ui/toast';
 import { AccountMenu } from './account-menu';
-import { cookRoute, currentTab, syncFromHash } from './routes';
+import { cookRoute, currentTab, syncFromHash, trendsRoute } from './routes';
 import { CameraIcon } from './nav-icons';
 import { TabBar } from './tab-bar';
 import { TABS } from './tabs';
@@ -54,7 +55,7 @@ export function Shell() {
   return (
     <div class="shell">
       <header class="tab-header">
-        {tab.id === 'eaten' ? <EatenHeader api={api} /> : <h1>{tab.label}</h1>}
+        {tab.id === 'eaten' ? trendsRoute.value ? <TrendsHeader /> : <EatenHeader api={api} /> : <h1>{tab.label}</h1>}
         <div class="header-actions">
           {tab.id === 'plan' && (
             <button
@@ -134,6 +135,8 @@ export function Shell() {
           <PlanScreen api={api} empty={empty} />
         ) : tab.id === 'shop' ? (
           <ShopScreen api={api} />
+        ) : trendsRoute.value ? (
+          <TrendsScreen api={api} />
         ) : (
           <EatenScreen api={api} />
         )}

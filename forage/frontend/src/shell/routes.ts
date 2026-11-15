@@ -7,6 +7,8 @@ import { signal } from '@preact/signals';
 import { localDate } from '../cook/format';
 import { eatenDate } from '../eaten/eaten-store';
 import { addDays } from '../plan/dates';
+import { applyTrendsRoute } from '../trends/trends-store';
+import { BUILT_TABS, METRIC_TAB, RANGES, TREND_TABS, type RangeId, type TrendTab } from '../trends/trends-types';
 
 export const TAB_IDS = ['plan', 'shop', 'eaten', 'library'] as const;
 export type TabId = (typeof TAB_IDS)[number];
@@ -36,6 +38,42 @@ export function parseEatenHash(hash: string, today = localDate()): { date: strin
   const given = m[1];
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(given) && addDays(given, 0) === given && given < today;
   return valid ? { date: given, rewrite: false } : { date: today, rewrite: true };
+}
+
+export interface TrendsRoute {
+  /** The range a link asked for, for this visit only; null for the stored one. */
+  range: RangeId | null;
+  tab: TrendTab;
+}
+
+/**
+ * #913: `#/eaten/trends[?range=&tab=&metric=]`. Its path is exactly `#/eaten/trends`, so `#/eaten/trends/x` is not it
+ * and falls to #825's rule. An unknown value, and a tab or metric not built yet, is dropped: Energy opens.
+ */
+export function parseTrendsHash(hash: string): TrendsRoute | null {
+  const m = /^#\/eaten\/trends(?:\?(.*))?$/.exec(hash);
+  if (!m) return null;
+  const query = new URLSearchParams(m[1] ?? '');
+  const range = query.get('range');
+  const tab = query.get('tab');
+  const metric = query.get('metric');
+  let want: TrendTab | null = null;
+  if (tab && (TREND_TABS as readonly string[]).includes(tab)) want = tab as TrendTab;
+  if (metric && metric in METRIC_TAB) want = METRIC_TAB[metric];
+  return {
+    range: range && (RANGES as readonly string[]).includes(range) ? (range as RangeId) : null,
+    tab: want && BUILT_TABS.includes(want) ? want : 'energy',
+  };
+}
+
+/** The hash that follows the Trends screen's tab and range. */
+export function trendsHash(tab: TrendTab, range: RangeId): string {
+  return `#/eaten/trends?tab=${tab}&range=${range}`;
+}
+
+/** The hash that opens a day from Trends: dated before today, plain on it. */
+export function dayHash(date: string, today: string): string {
+  return eatenHash(date, today);
 }
 
 /** The hash that follows the day Eaten shows: dated before today, plain on it. */
@@ -74,6 +112,8 @@ export function cookHash(recipeId: string, planId = '', mode: 'walkthrough' | 'l
 
 export const currentTab = signal<TabId>(parseHash(window.location.hash) ?? DEFAULT_TAB);
 export const cookRoute = signal<CookRoute | null>(parseCookHash(window.location.hash));
+/** #913: the Trends screen, open over the Eaten tab; null on every other route. */
+export const trendsRoute = signal<TrendsRoute | null>(null);
 
 /**
  * While log mode is open it may hold the browser's Back: the guard answers
@@ -107,6 +147,15 @@ export function syncFromHash(): void {
     return;
   }
   cookRoute.value = null;
+  const trends = parseTrendsHash(hash);
+  if (trends) {
+    // Matched before #825's rule, and it leaves the day Eaten shows alone.
+    if (!trendsRoute.value || trendsRoute.value.range !== trends.range) applyTrendsRoute(trends.range);
+    trendsRoute.value = trends;
+    currentTab.value = 'eaten';
+    return;
+  }
+  trendsRoute.value = null;
   const id = parseHash(hash);
   if (id) {
     const eaten = parseEatenHash(hash);

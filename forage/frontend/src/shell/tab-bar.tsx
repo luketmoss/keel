@@ -1,4 +1,4 @@
-import { currentTab, tabHash, type TabId } from './routes';
+import { currentTab, tabHash, trendsRoute, type TabId } from './routes';
 import { TABS } from './tabs';
 
 /**
@@ -7,7 +7,8 @@ import { TABS } from './tabs';
  * scrolls back to the top.
  */
 function onTabClick(e: MouseEvent, id: TabId) {
-  if (id !== currentTab.value) return;
+  // On Trends (#913) the Eaten tab leaves it for the day view, as a tab press leaves any sub-screen.
+  if (id !== currentTab.value || trendsRoute.value) return;
   e.preventDefault();
   window.scrollTo({ top: 0 });
 }

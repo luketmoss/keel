@@ -12,7 +12,9 @@ export interface ChartItem {
   kind: 'bar' | 'hatched' | 'outline' | 'gap';
   value: number | null;
   /** #914: a column of stacked segments from the bottom, in axis units, instead of one bar. */
-  stack?: { h: number; cls: string }[];
+  stack?: { h: number; cls: string; /** #915: a CSS colour; the segment is hatched in it. */ hatch?: string }[];
+  /** #915: a hairline in the surface colour between segments. */
+  hairline?: boolean;
 }
 
 /** A fixed axis, in place of the zero-based one the values would give (the 100% columns). */
@@ -72,6 +74,10 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
   const barW = Math.max(1, Math.min(colW * 0.72, 28));
   const selIndex = selected === null ? -1 : items.findIndex((i) => i.key === selected);
   const hatchId = `${idPrefix}-hatch`;
+  // #915: a hatched stack segment is striped in its own colour, one pattern per colour.
+  const hatchColors = [
+    ...new Set(items.flatMap((i) => (i.stack ?? []).map((s) => s.hatch).filter((c): c is string => !!c))),
+  ];
 
   const indexAt = (clientX: number, svg: Element) => {
     const left = svg.getBoundingClientRect().left;
@@ -173,6 +179,19 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
             <rect width="6" height="6" class="chart-hatch-bg" />
             <rect width="3" height="6" class="chart-hatch-stripe" />
           </pattern>
+          {hatchColors.map((c, k) => (
+            <pattern
+              key={c}
+              id={`${hatchId}-${k}`}
+              width="6"
+              height="6"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect width="6" height="6" class="chart-hatch-bg" />
+              <rect width="3" height="6" style={{ fill: c }} />
+            </pattern>
+          ))}
         </defs>
         {scale.ticks.map((t) => (
           <g key={t}>
@@ -228,8 +247,10 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
                       y={hi}
                       width={barW}
                       height={Math.max(0, lo - hi)}
-                      class={seg.cls}
+                      class={it.hairline ? `${seg.cls} chart-seg-line` : seg.cls}
+                      style={seg.hatch ? { fill: `url(#${hatchId}-${hatchColors.indexOf(seg.hatch)})` } : undefined}
                       data-testid="chart-seg"
+                      data-hatched={seg.hatch ? 'true' : undefined}
                     />
                   );
                 })}

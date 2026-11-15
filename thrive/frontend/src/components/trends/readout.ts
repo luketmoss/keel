@@ -105,7 +105,13 @@ export interface AnnouncePart {
  * The status region's sentence: "Fri, Aug 28. Resting HR 53 bpm, 7-day avg
  * 52 bpm. HRV —." One clause per card, in group order.
  */
-export function announceText(date: string, today: string, parts: readonly AnnouncePart[], avgDays: number): string {
+export function announceText(
+  date: string,
+  today: string,
+  parts: readonly AnnouncePart[],
+  avgDays: number,
+  rideDays?: ReadonlySet<string> | null,
+): string {
   const clauses = parts.map(({ metric, series }) => {
     const c = dayCells(metric, series, pointsByDate(series), date, avgDays);
     const bits = [`${metric.label} ${valueText(metric, c)}${c.partial ? ` ${c.partial}` : ''}`];
@@ -114,5 +120,7 @@ export function announceText(date: string, today: string, parts: readonly Announ
     if (avg) bits.push(avg);
     return `${bits.join(', ')}.`;
   });
-  return [`${readoutDate(date, today)}.`, ...clauses].join(' ');
+  // With Shade ride days on (#891), a ride day says so in words.
+  const head = rideDays?.has(date) ? [`${readoutDate(date, today)}.`, 'Ride day.'] : [`${readoutDate(date, today)}.`];
+  return [...head, ...clauses].join(' ');
 }

@@ -16,6 +16,9 @@ export const RANGE_PREF: Pref<RangeKey> = { key: 'thrive-trends-range', options:
 export const AVERAGE_PREF: Pref<AverageKey> = { key: 'thrive-trends-average', options: AVERAGES, fallback: '7d' };
 export const VIEW_PREF: Pref<ViewKey> = { key: 'thrive-trends-view', options: VIEWS, fallback: 'Chart' };
 
+/** Custom's Shade ride days toggle (#891): Off until chosen, then remembered. */
+export const SHADE_PREF: Pref<'on' | 'off'> = { key: 'thrive-trends-shade', options: ['on', 'off'], fallback: 'off' };
+
 /** The metric-group choice (#243): any registered group id; the first group when missing or unknown. */
 export function groupPref(groups: readonly TrendGroup[]): Pref<string> {
   return { key: 'thrive-trends-group', options: groups.map((g) => g.id), fallback: groups[0]?.id ?? '' };

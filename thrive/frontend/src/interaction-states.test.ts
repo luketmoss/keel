@@ -827,7 +827,7 @@ describe('AC10: selected keeps its non-colour cue and its ARIA state', () => {
     'sub-type-btn': ['aria-pressed'],
     'theme-toggle-btn': ['aria-pressed'],
     'trends-group-btn': ['aria-pressed'],
-    'trends-chip': ['aria-expanded'],
+    'trends-chip': ['aria-expanded', 'aria-pressed'],
     'trends-view-btn': ['aria-pressed'],
     'trends-menu-item': ['aria-checked'],
     'color-swatch': ['aria-checked'],

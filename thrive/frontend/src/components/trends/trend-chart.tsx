@@ -111,6 +111,8 @@ interface PlotProps {
   selectedDate?: string | null;
   /** A pointer chose a day. The screen decides what that means. */
   onSelect?: (date: string) => void;
+  /** Days to shade behind the plot (#891); absent or null draws none. */
+  rideDays?: ReadonlySet<string> | null;
 }
 
 /** The SVG itself. Exported for tests; cards use it through TrendCard. */
@@ -123,6 +125,7 @@ export function TrendPlot({
   avgDays = 1,
   selectedDate,
   onSelect,
+  rideDays,
 }: PlotProps) {
   const values = series.points.map((p) => p.value);
   for (const v of series.average.values()) values.push(v);
@@ -198,6 +201,24 @@ export function TrendPlot({
             />
           );
         })()}
+      {rideDays && (
+        <g class="trend-ride-days" pointer-events="none">
+          {series.dates.map((d) =>
+            rideDays.has(d) ? (
+              <rect
+                key={d}
+                class="trend-ride-day"
+                data-date={d}
+                x={x(d) - slot / 2}
+                y={PAD_TOP}
+                width={slot}
+                height={plotH}
+                fill="var(--trend-ride-shade)"
+              />
+            ) : null,
+          )}
+        </g>
+      )}
       <g class="trend-grid">
         {dom.ticks.map((t, i) => (
           <g key={t}>
@@ -444,10 +465,21 @@ interface CardProps {
   today: string;
   selectedDate?: string | null;
   onSelect?: (date: string) => void;
+  rideDays?: ReadonlySet<string> | null;
 }
 
 /** One metric's card: header, summary line and the plot, or its empty state. */
-export function TrendCard({ metric, series, recorded, range, avgDays, today, selectedDate, onSelect }: CardProps) {
+export function TrendCard({
+  metric,
+  series,
+  recorded,
+  range,
+  avgDays,
+  today,
+  selectedDate,
+  onSelect,
+  rideDays,
+}: CardProps) {
   const [measure, width] = useWidth();
   const headingId = `trend-${metric.id}-heading`;
   const summaryId = `trend-${metric.id}-summary`;
@@ -470,7 +502,14 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
             {summaryText(metric, series, today)}
           </p>
           {selectedDate && series.dates.includes(selectedDate) && (
-            <TrendReadout metric={metric} series={series} date={selectedDate} avgDays={avgDays} today={today} />
+            <TrendReadout
+              metric={metric}
+              series={series}
+              date={selectedDate}
+              avgDays={avgDays}
+              today={today}
+              rideDay={rideDays?.has(selectedDate) ?? false}
+            />
           )}
         </div>
         <div class="trend-plot-wrap" ref={measure}>
@@ -483,6 +522,7 @@ export function TrendCard({ metric, series, recorded, range, avgDays, today, sel
             describedBy={describedBy}
             selectedDate={selectedDate}
             onSelect={onSelect}
+            rideDays={rideDays}
           />
         </div>
         {series.held && <HeldLegend series={series} />}
@@ -517,10 +557,22 @@ interface ChartsProps {
   today: string;
   selectedDate?: string | null;
   onSelect?: (date: string) => void;
+  /** The group's ride days, one set for every card so the bands line up (#891). */
+  rideDays?: ReadonlySet<string> | null;
 }
 
 /** A group as stacked cards, all on the same from..to and so the same x positions. */
-export function TrendCharts({ group, series, recorded, range, avgDays, today, selectedDate, onSelect }: ChartsProps) {
+export function TrendCharts({
+  group,
+  series,
+  recorded,
+  range,
+  avgDays,
+  today,
+  selectedDate,
+  onSelect,
+  rideDays,
+}: ChartsProps) {
   return (
     <div class="trend-cards">
       {group.metrics.map((m, i) => (
@@ -534,6 +586,7 @@ export function TrendCharts({ group, series, recorded, range, avgDays, today, se
           today={today}
           selectedDate={selectedDate}
           onSelect={onSelect}
+          rideDays={rideDays}
         />
       ))}
     </div>

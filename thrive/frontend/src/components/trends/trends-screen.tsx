@@ -29,6 +29,7 @@ import {
   AVERAGE_PREF,
   VIEW_PREF,
   GROUP_PREF,
+  SHADE_PREF,
   readPref,
   writePref,
   readCustom,
@@ -41,6 +42,7 @@ import { TrendsToolbar } from './trends-toolbar';
 import { TrendCharts } from './trend-chart';
 import { TrendTable } from './trend-table';
 import { openDay } from './open-day';
+import { rideDays as rideDaysOf } from './ride-days';
 import { isRestoringFocus, ROUTE_FOCUS_ATTR } from '../../router/route-focus';
 import { useFocusHandoff } from '../focus-handoff';
 import { today as todaySignal, watchToday } from '../../day/today';
@@ -78,11 +80,19 @@ function usePref<T extends string>(pref: Pref<T>, first?: T): [T, (v: T) => void
 }
 
 /** The caption: what the marks are, in words. */
-export function captionText(avgDays: number, hasBand: boolean, bars = false): string {
+export function captionText(
+  avgDays: number,
+  hasBand: boolean,
+  bars = false,
+  /** Shade ride days is on (#891): whether the range holds a ride. */
+  rides?: 'some' | 'none',
+): string {
   const clauses = [bars ? 'Bars are each day' : 'Dots are each day'];
   if (avgDays > 0) clauses.push(`line is the ${avgDays}-day average`);
   if (hasBand) clauses.push('shaded band is your range, the mean ± 1 SD of the 30 days before today');
-  return `${clauses.join(' · ')}. Blank days stay blank.`;
+  const base = `${clauses.join(' · ')}. Blank days stay blank.`;
+  if (rides === undefined) return base;
+  return `${base} ${rides === 'some' ? 'Shaded days had a ride.' : 'No rides in this range.'}`;
 }
 
 /**
@@ -123,6 +133,7 @@ export function TrendsScreen() {
   const [range, setRange] = usePref<RangeKey>(RANGE_PREF);
   const [average, setAverage] = usePref<AverageKey>(AVERAGE_PREF);
   const [view, setView] = usePref<ViewKey>(VIEW_PREF);
+  const [shade, setShade] = usePref<'on' | 'off'>(SHADE_PREF);
   // Opened by a Day card (#504): `#/trends/<group>?date=<day>`. The group is the one shown and
   // becomes the remembered one, as choosing its tab would; the day is selected once the charts exist.
   const link = currentRoute.value.params;
@@ -198,7 +209,14 @@ export function TrendsScreen() {
   // Only the tabs this group reads count: a Body group is neither held up by
   // DailyHealth nor spared by a BodyMeasurements failure. A custom set reads
   // exactly the union of its metrics' tabs, and none when nothing is picked.
-  const sources = [...new Set(group.metrics.flatMap((m) => [m.source ?? 'dailyHealth', ...(m.alsoReads ?? [])]))];
+  // Shade ride days (#891) applies to Custom's Chart view with at least one metric; the stored choice is kept meanwhile.
+  const shading = isCustom && shade === 'on' && view === 'Chart' && group.metrics.length > 0;
+  const sources = [
+    ...new Set([
+      ...group.metrics.flatMap((m) => [m.source ?? 'dailyHealth', ...(m.alsoReads ?? [])]),
+      ...(shading ? (['dailySummary'] as const) : []),
+    ]),
+  ];
   const showsDrinks = sources.includes('drinks');
   // Drinks are read on every entry to a group that shows them (#521), not once like the health
   // tabs: a drink logged on the Day view is there on the next visit. Rows already held stay up
@@ -234,6 +252,7 @@ export function TrendsScreen() {
       to,
       series,
       recorded: pointSets.map((p) => p.length > 0),
+      rides: shading ? rideDaysOf(rowsOf('dailySummary')) : null,
       nothingEver: pointSets.every((p) => p.length === 0),
       hasBand: groupHasBand(group.metrics, series),
     };
@@ -241,6 +260,7 @@ export function TrendsScreen() {
   }, [
     ready,
     group,
+    shading,
     range,
     avgDays,
     today,
@@ -298,7 +318,7 @@ export function TrendsScreen() {
   } else if (isCustom && group.metrics.length === 0) {
     content = <p class="trends-custom-empty">Pick up to 4 metrics to see them here.</p>;
   } else if (built) {
-    const { to, series, recorded, nothingEver, hasBand } = built;
+    const { to, series, recorded, nothingEver, hasBand, rides } = built;
     const dates = series[0]?.dates ?? [];
     // Keyboard moves select and announce; pointer moves only select (AC4).
     const moveTo = (date: string) => {
@@ -308,6 +328,7 @@ export function TrendsScreen() {
         today,
         group.metrics.flatMap((metric, i) => (series[i].points.length ? [{ metric, series: series[i] }] : [])),
         avgDays,
+        rides,
       );
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -335,7 +356,12 @@ export function TrendsScreen() {
     content = (
       <>
         <p class="trends-caption">
-          {captionText(avgDays, hasBand, group.metrics.length > 0 && group.metrics.every((m) => m.bars))}
+          {captionText(
+            avgDays,
+            hasBand,
+            group.metrics.length > 0 && group.metrics.every((m) => m.bars),
+            rides ? (dates.some((d) => rides.has(d)) ? 'some' : 'none') : undefined,
+          )}
         </p>
         {view === 'Table' && !nothingEver ? (
           <TrendTable group={group} series={series} range={range} avgDays={avgDays} today={today} />
@@ -384,6 +410,7 @@ export function TrendsScreen() {
               range={range}
               avgDays={avgDays}
               today={today}
+              rideDays={rides}
               selectedDate={selectedDay.value}
               onSelect={(d) => {
                 selectedDay.value = d;
@@ -415,6 +442,21 @@ export function TrendsScreen() {
             <button type="button" class="btn btn-secondary trends-custom-edit" onClick={() => setPicking(true)}>
               Edit metrics
             </button>
+            {view === 'Chart' && group.metrics.length > 0 && (
+              <button
+                type="button"
+                class={`trends-chip trends-shade${shade === 'on' ? ' on' : ''}`}
+                aria-pressed={shade === 'on'}
+                onClick={() => setShade(shade === 'on' ? 'off' : 'on')}
+              >
+                {shade === 'on' && (
+                  <span class="chip-check" aria-hidden="true">
+                    ✓
+                  </span>
+                )}
+                Shade ride days
+              </button>
+            )}
           </div>
         )}
         {content}

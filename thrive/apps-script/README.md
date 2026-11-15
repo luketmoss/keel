@@ -997,18 +997,30 @@ Owner's steps, in order:
 1. In luketmossbot's Drive, create a folder for the snapshots.
 2. Project Settings → Script Properties: set `SNAPSHOT_FOLDER_ID` to the
    folder's id (the last part of its URL).
-3. `clasp push`. The manifest gained the `drive` scope, so **re-authorize once**
+3. `clasp push`. The manifest gained the full `drive` scope, so **re-authorize once**
    (see Setup): run `installSnapshotTrigger` from the editor and allow the
-   dialog. Running it installs the trigger too, daily at about 03:00
-   America/Denver, outside the sync windows. Running it again leaves exactly one.
+   dialog. If no dialog appears and a later step fails on Drive, the grant is
+   partial: remove the script's access at myaccount.google.com/connections and
+   run it again (Setup, "No dialog, and the call still fails?"). Running it
+   installs the trigger too, daily at about 03:00 America/Denver, outside the
+   sync windows. Running it again leaves exactly one.
 4. Run `takeSnapshot` once by hand and check the file appears.
 
 A trigger runs the **pushed** code, so no redeploy is needed for it. The web app
 is unaffected.
 
-`SNAPSHOT_FOLDER_ID` unset, blank, or not a folder the account can write to makes
-`takeSnapshot` throw `SNAPSHOT_FOLDER_ID is not set or not writable`; it never
-falls back to the Drive root. A throw is how a failure reaches you: Apps Script
+A run that cannot copy throws, says which step failed, and never falls back to
+the Drive root (#919):
+
+- `SNAPSHOT_FOLDER_ID is not set`: the property is unset or blank.
+- `SNAPSHOT_FOLDER_ID does not name a folder this account can open: <Drive's message>`:
+  a wrong id, or a folder luketmossbot cannot see.
+- `Could not copy the sheet into the snapshot folder: <Drive's message>`: Drive
+  refused the copy, for example into a folder the account can only view. Nothing
+  is pruned.
+
+The script never asks Drive for the account's access to the folder: that needs
+the account's identity, a scope the manifest does not pin. The copy is the check. A throw is how a failure reaches you: Apps Script
 mails failed triggers to the trigger's owner, **luketmossbot's inbox**, at most
 once a day. Read it, or a silent failure is a reading problem. A second run the
 same day creates nothing and logs `Snapshot for YYYY-MM-DD already exists`.

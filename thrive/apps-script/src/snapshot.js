@@ -11,26 +11,27 @@ var SNAPSHOT_PREFIX = 'Groundwork snapshot ';
 var SNAPSHOT_NAME_PATTERN = /^Groundwork snapshot (\d{4}-\d{2}-\d{2})$/;
 var SNAPSHOT_KEEP = 60;
 var SNAPSHOT_HANDLER = 'takeSnapshot';
-var SNAPSHOT_FOLDER_ERROR = 'SNAPSHOT_FOLDER_ID is not set or not writable';
+var SNAPSHOT_FOLDER_UNSET = 'SNAPSHOT_FOLDER_ID is not set';
+var SNAPSHOT_FOLDER_UNOPENABLE = 'SNAPSHOT_FOLDER_ID does not name a folder this account can open: ';
+var SNAPSHOT_COPY_FAILED = 'Could not copy the sheet into the snapshot folder: ';
 
 /**
  * The folder named by SNAPSHOT_FOLDER_ID, or a throw. It never falls back to
  * the Drive root: a snapshot of the whole Groundwork sheet must not land anywhere
  * the owner did not choose.
+ *
+ * Write access is not checked here (#919): asking Drive for the account's access
+ * needs the account's identity, a scope the manifest does not pin. Drive refuses
+ * the copy itself into a folder the account cannot write to.
  * @returns {GoogleAppsScript.Drive.Folder}
  */
 function getSnapshotFolder() {
   var id = PropertiesService.getScriptProperties().getProperty('SNAPSHOT_FOLDER_ID');
-  if (!id || !String(id).trim()) throw new Error(SNAPSHOT_FOLDER_ERROR);
+  if (!id || !String(id).trim()) throw new Error(SNAPSHOT_FOLDER_UNSET);
   try {
-    var folder = DriveApp.getFolderById(String(id).trim());
-    var access = folder.getAccess(Session.getEffectiveUser());
-    if (access !== DriveApp.Permission.OWNER && access !== DriveApp.Permission.EDIT) {
-      throw new Error('not writable');
-    }
-    return folder;
+    return DriveApp.getFolderById(String(id).trim());
   } catch (err) {
-    throw new Error(SNAPSHOT_FOLDER_ERROR);
+    throw new Error(SNAPSHOT_FOLDER_UNOPENABLE + (err && err.message ? err.message : String(err)));
   }
 }
 
@@ -45,7 +46,11 @@ function takeSnapshot() {
     return;
   }
 
-  DriveApp.getFileById(getSpreadsheetId()).makeCopy(name, folder);
+  try {
+    DriveApp.getFileById(getSpreadsheetId()).makeCopy(name, folder);
+  } catch (err) {
+    throw new Error(SNAPSHOT_COPY_FAILED + (err && err.message ? err.message : String(err)));
+  }
   Logger.log('Snapshot ' + name + ' created');
   pruneSnapshots(folder);
 }

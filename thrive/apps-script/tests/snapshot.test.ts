@@ -9,6 +9,7 @@ interface FakeFile {
 }
 
 function makeFolder(names: string[], access = 'OWNER') {
+  // `access` is what Drive enforces on a copy into the folder; the script never asks for it (#919).
   const files: FakeFile[] = names.map((name) => ({ name, trashed: false }));
   const handle = (f: FakeFile) => ({
     getName: () => f.name,
@@ -18,7 +19,7 @@ function makeFolder(names: string[], access = 'OWNER') {
   });
   return {
     files,
-    getAccess: () => access,
+    access,
     getFilesByName(name: string) {
       const hits = files.filter((f) => f.name === name && !f.trashed).map(handle);
       return { hasNext: () => hits.length > 0 };
@@ -51,7 +52,8 @@ function load(opts: { folderId?: string; folder?: ReturnType<typeof makeFolder>;
     Utilities: makeUtilities(),
     Date: FakeDate,
     Logger: { log: (m: string) => logs.push(m) },
-    Session: { getEffectiveUser: () => 'me' },
+    // No Session global (#919): the live manifest grants no scope that can read the
+    // account's identity, so any call to it must fail here as it does there.
     DriveApp: {
       Permission: { OWNER: 'OWNER', EDIT: 'EDIT', VIEW: 'VIEW' },
       getFolderById(id: string) {
@@ -61,6 +63,7 @@ function load(opts: { folderId?: string; folder?: ReturnType<typeof makeFolder>;
       getFileById(id: string) {
         return {
           makeCopy(name: string, into: unknown) {
+            if ((into as typeof folder).access === 'VIEW') throw new Error('Access denied: DriveApp.');
             copies.push({ id, name, folder: into });
             (into as typeof folder).files.push({ name, trashed: false });
           },
@@ -139,22 +142,51 @@ describe('#433 AC3: retention keeps the newest 60', () => {
   });
 });
 
-describe('#433 AC4: unconfigured or failed runs fail loudly', () => {
-  const MSG = 'SNAPSHOT_FOLDER_ID is not set or not writable';
+describe('#433 AC4, #919: unconfigured or failed runs fail loudly, saying which', () => {
   it.each([
     ['unset', undefined],
     ['blank', '   '],
-    ['not a folder', 'bogus'],
-  ])('throws when the folder id is %s, and copies nothing', (_l, folderId) => {
+  ])('throws "not set" when the folder id is %s, and copies nothing', (_l, folderId) => {
     const t = load({ folderId });
-    expect(() => t.sandbox.takeSnapshot()).toThrow(MSG);
+    expect(() => t.sandbox.takeSnapshot()).toThrow(/^SNAPSHOT_FOLDER_ID is not set$/);
     expect(t.copies).toHaveLength(0);
   });
 
-  it('throws when the account can only view the folder', () => {
-    const t = load({ folderId: 'folder-id', folder: makeFolder([], 'VIEW') });
-    expect(() => t.sandbox.takeSnapshot()).toThrow(MSG);
+  it("throws with Drive's words when the folder cannot be opened, and copies nothing", () => {
+    const t = load({ folderId: 'bogus' });
+    let message = '';
+    try {
+      t.sandbox.takeSnapshot();
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message.startsWith('SNAPSHOT_FOLDER_ID does not name a folder this account can open: ')).toBe(true);
+    expect(message).toContain('no such folder');
     expect(t.copies).toHaveLength(0);
+  });
+
+  it("throws with Drive's words when the copy is refused (a view-only folder), and prunes nothing", () => {
+    const folder = makeFolder(dates(61).map(snapName), 'VIEW');
+    const t = load({ folderId: 'folder-id', folder });
+    let message = '';
+    try {
+      t.sandbox.takeSnapshot();
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message.startsWith('Could not copy the sheet into the snapshot folder: ')).toBe(true);
+    expect(message).toContain('Access denied');
+    expect(t.copies).toHaveLength(0);
+    expect(folder.files.filter((f) => f.trashed)).toHaveLength(0);
+  });
+});
+
+describe('#919: no identity call', () => {
+  it('takes a snapshot with no Session global in the sandbox', () => {
+    const t = load({ folderId: 'folder-id' });
+    expect('Session' in t.sandbox).toBe(false);
+    t.sandbox.takeSnapshot();
+    expect(t.copies).toHaveLength(1);
   });
 });
 

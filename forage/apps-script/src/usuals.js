@@ -7,6 +7,8 @@
 // `{food_id, qty, unit}` of distinct foods, each with its own amount, because
 // brands and fruits come in different units). `last_pick` is the food id of the
 // option picked last, the default next time; blank means the first option.
+// `optional` (#942) is blank (eaten every time), `in` (usually: logged unless
+// left out) or `out` (sometimes: left out unless brought in), on either kind.
 //
 // `line_id` (L1, L2...) is stable for the life of the usual: a replace keeps
 // the ids sent and numbers new lines after the highest the usual has used.
@@ -66,6 +68,7 @@ function usualShape(usual, lines, foods, use) {
         unit: l.unit,
         options: options,
         last_pick: l.last_pick,
+        optional: l.optional || '',
         swaps: swapsFor(usual.id, l, options, use),
       };
     }),
@@ -134,7 +137,7 @@ function usualsUsing(foodId) {
 /**
  * Create a usual, or replace the one with that `id`, and all its lines.
  * Payload `{ id?, name, slot, lines: [{ line_id?, food_id?, qty?, unit?,
- * options?: [{food_id, qty, unit}], last_pick? }] }`. Zero lines is allowed.
+ * options?: [{food_id, qty, unit}], last_pick?, optional?: ''|'in'|'out' }] }`. Zero lines is allowed.
  * `lines` left out of a replace keeps the stored lines. Every refusal names
  * the field and nothing is written.
  */
@@ -178,8 +181,9 @@ function normalizeUsualLine(line, i, foods) {
   if (lineId && !/^L\d+$/.test(lineId)) throw new Error(at + '.line_id must look like L1, L2...');
   var row = {
     usual_id: '', line_id: lineId, position: i + 1,
-    food_id: '', qty: null, unit: '', options_json: null, last_pick: '',
+    food_id: '', qty: null, unit: '', options_json: null, last_pick: '', optional: '',
   };
+  row.optional = usualOptional(line.optional, at);
   var hasOptions = line.options !== undefined && line.options !== null;
   var always = ['food_id', 'qty', 'unit'].filter(function (f) { return !isBlank(line[f]); });
 
@@ -215,6 +219,13 @@ function normalizeUsualLine(line, i, foods) {
   if (pick && !seen[pick]) throw new Error(at + '.last_pick "' + pick + '" is not one of its options');
   row.last_pick = pick;
   return row;
+}
+
+/** A line's `optional` (#942): blank (every time), `in` (usually) or `out` (sometimes). */
+function usualOptional(value, at) {
+  var v = cell(value).trim();
+  if (v !== '' && v !== 'in' && v !== 'out') throw new Error(at + '.optional must be blank, "in" or "out", not "' + v + '"');
+  return v;
 }
 
 /**

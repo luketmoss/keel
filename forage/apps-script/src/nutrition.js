@@ -304,6 +304,7 @@ function usualPick(line) {
 function usualNutrition(lines, foodsById) {
   var counted = [];
   lines.forEach(function (line) {
+    if (line.optional === 'out') return; // #942: a sometimes line is not in the start
     var pick = Array.isArray(line.options) ? usualPick(line) : line;
     if (!pick) return;
     var food = foodsById[pick.food_id] || null;

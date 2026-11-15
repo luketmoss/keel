@@ -54,7 +54,7 @@ const col = (api: Api, tab: string, field: string) => {
 };
 
 describe('ensureSchema (AC 1)', () => {
-  it('on a Sheet at version 5 appends the four FoodLog columns and sets version 6, leaving rows alone', () => {
+  it('on a Sheet at version 5 appends the four FoodLog columns and sets version 7, leaving rows alone', () => {
     const api = loadApi();
     seed(api);
     api.ok('logFood', { payload: { date: '2026-11-01', slot: 'Lunch', food_id: 'fd_oats', qty: 1, unit: 'cup' } });
@@ -64,7 +64,7 @@ describe('ensureSchema (AC 1)', () => {
     const before = JSON.stringify(log.rows);
     const data = api.ok('ensureSchema');
     expect(data.extended).toEqual([{ tab: 'FoodLog', added: ['group_id', 'group_name', 'usual_id', 'usual_line_id'] }]);
-    expect(data.schema_version).toBe('6');
+    expect(data.schema_version).toBe('7');
     const after = api.ss.getSheetByName('FoodLog')!.rows;
     expect(after[0].slice(24)).toEqual(['group_id', 'group_name', 'usual_id', 'usual_line_id']);
     expect(JSON.stringify(after[1].slice(0, 24))).toBe(JSON.stringify(JSON.parse(before)[1]));

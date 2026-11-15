@@ -113,6 +113,32 @@ describe('the usual tools', () => {
     expect(r.content[0].text).toContain(REMINDER)
   })
 
+  it('forage_list_usuals shows which lines are optional and how often (#942)', async () => {
+    const optional = {
+      ...USUAL,
+      lines: [
+        { ...USUAL.lines[0], optional: 'out' },
+        { ...USUAL.lines[1], optional: 'in' },
+      ],
+    }
+    api({ getUsuals: ok([optional]), getFoods: ok(FOODS) })
+    const out = JSON.parse((await call('forage_list_usuals')).content[0].text)
+    expect(out.usuals[0].lines[0]).toMatchObject({ optional: 'out', how_often: 'sometimes' })
+    expect(out.usuals[0].lines[1]).toMatchObject({ optional: 'in', how_often: 'usually in' })
+    api({ getUsual: ok(USUAL), getFoods: ok(FOODS) })
+    const plain = JSON.parse((await call('forage_get_usual', { id: 'us_1' })).content[0].text)
+    expect(plain.lines[0]).not.toHaveProperty('optional')
+  })
+
+  it('forage_save_usual passes optional through on each line (#942)', async () => {
+    const sent = api({ upsertUsual: ok(USUAL) })
+    const lines = [{ food_id: 'fd_oats', qty: 0.5, unit: 'cup', optional: 'out' }, { options: OPTIONS, optional: 'in' }]
+    await call('forage_save_usual', { name: 'Cereal', slot: 'After dinner', lines })
+    expect(sent[0].payload.lines).toEqual(lines)
+    const bad = await call('forage_save_usual', { name: 'x', slot: 'Snacks', lines: [{ food_id: 'fd_oats', qty: 1, unit: 'g', optional: 'maybe' }] })
+    expect(bad.isError).toBe(true)
+  })
+
   it('forage_save_usual says nothing was saved when the API refuses', async () => {
     api({ upsertUsual: () => ({ success: false, error: 'lines[1].qty must be greater than 0' }) })
     const r = await call('forage_save_usual', { name: 'x', slot: 'Snacks', lines: [{ food_id: 'fd_oats', unit: 'g', qty: 1 }] })

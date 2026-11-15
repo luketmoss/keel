@@ -72,10 +72,10 @@ describe('the Usuals segment', () => {
     mount(createDemoApi());
     await settle();
     const rows = screen.getAllByTestId('usual-row');
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     const order = rows.map((r) => r.querySelector('.recipe-name')!.textContent);
-    // Two were last used yesterday (by name), then the one from three days ago.
-    expect(order).toEqual(['After dinner cereal', 'Oatmeal', 'Yogurt bowl']);
+    // Two were last used yesterday (by name), then two days ago, then three.
+    expect(order).toEqual(['After dinner cereal', 'Oatmeal', 'Side salad', 'Yogurt bowl']);
     const oat = rows[1];
     expect(within(oat).getByTestId('usual-usage').textContent).toBe('Breakfast · used 12 times, last yesterday');
     expect(within(oat).getByTestId('usual-foods').textContent).toContain(' · ');
@@ -97,7 +97,7 @@ describe('the Usuals segment', () => {
     fail = false;
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await settle();
-    expect(screen.getAllByTestId('usual-row')).toHaveLength(3);
+    expect(screen.getAllByTestId('usual-row')).toHaveLength(4);
   });
 
   it('says what an empty list means', async () => {
@@ -290,8 +290,8 @@ describe('the editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await settle();
     expect(toastText.value).toBe('Deleted Oatmeal');
-    expect(screen.getAllByTestId('usual-row')).toHaveLength(2);
-    expect(await api.getUsuals()).toHaveLength(2);
+    expect(screen.getAllByTestId('usual-row')).toHaveLength(3);
+    expect(await api.getUsuals()).toHaveLength(3);
   });
 
   it('a failed delete toasts and stays in the editor', async () => {

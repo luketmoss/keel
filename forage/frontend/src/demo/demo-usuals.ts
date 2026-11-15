@@ -16,6 +16,7 @@ import type {
   Usual,
   UsualInput,
   UsualLine,
+  UsualOptional,
   UsualOption,
 } from '../api/types';
 import { EXTRA_KEYS, SLOTS } from '../api/types';
@@ -42,6 +43,7 @@ interface StoredLine {
   unit: string;
   options: UsualOption[] | null;
   last_pick: string;
+  optional: UsualOptional;
 }
 
 interface StoredUsual {
@@ -104,8 +106,24 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
     base_last_used: dateAgo(d.last_used_days_ago),
     lines: d.lines.map((l, i) =>
       'options' in l
-        ? { line_id: `L${i + 1}`, food_id: '', qty: null, unit: '', options: clone(l.options), last_pick: l.last_pick }
-        : { line_id: `L${i + 1}`, food_id: l.food_id, qty: l.qty, unit: l.unit, options: null, last_pick: '' },
+        ? {
+            line_id: `L${i + 1}`,
+            food_id: '',
+            qty: null,
+            unit: '',
+            options: clone(l.options),
+            last_pick: l.last_pick,
+            optional: l.optional ?? '',
+          }
+        : {
+            line_id: `L${i + 1}`,
+            food_id: l.food_id,
+            qty: l.qty,
+            unit: l.unit,
+            options: null,
+            last_pick: '',
+            optional: l.optional ?? '',
+          },
     ),
   }));
   const hidden = new Set<string>();
@@ -125,10 +143,12 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
 
   /** The usual as it starts: the nutrition of what each line would log now, summed by the API's partial rule. */
   function startOf(u: StoredUsual): Usual['start'] {
-    const snaps = u.lines.map((l) => {
-      const a = chosen(l);
-      return ctx.snapshotOf({ date: today, slot: u.slot, food_id: a.food_id, qty: a.qty, unit: a.unit });
-    });
+    const snaps = u.lines
+      .filter((l) => l.optional !== 'out')
+      .map((l) => {
+        const a = chosen(l);
+        return ctx.snapshotOf({ date: today, slot: u.slot, food_id: a.food_id, qty: a.qty, unit: a.unit });
+      });
     const sum = (k: 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g' | (typeof EXTRA_KEYS)[number]) => {
       const vals = snaps.map((s) => s[k]).filter((v): v is number => typeof v === 'number');
       return vals.length ? round1(vals.reduce((a, b) => a + b, 0)) : null;
@@ -195,6 +215,10 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
     return input.lines.map((l, i) => {
       const where = `lines[${i}]`;
       const line_id = l.line_id || `L${++top}`;
+      const optional = l.optional ?? '';
+      if (optional !== '' && optional !== 'in' && optional !== 'out') {
+        throw new ApiError(`${where}.optional must be blank, "in" or "out", not "${optional}"`);
+      }
       if (l.options) {
         if (l.options.length < 2 || l.options.length > 12) {
           throw new ApiError(`${where}.options: a pick-one has 2 to 12 options`);
@@ -206,10 +230,18 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
         if (l.last_pick && !l.options.some((o) => o.food_id === l.last_pick)) {
           throw new ApiError(`${where}.last_pick: not one of the options`);
         }
-        return { line_id, food_id: '', qty: null, unit: '', options: clone(l.options), last_pick: l.last_pick ?? '' };
+        return {
+          line_id,
+          food_id: '',
+          qty: null,
+          unit: '',
+          options: clone(l.options),
+          last_pick: l.last_pick ?? '',
+          optional,
+        };
       }
       checkAmount(where, l);
-      return { line_id, food_id: l.food_id!, qty: l.qty!, unit: l.unit!, options: null, last_pick: '' };
+      return { line_id, food_id: l.food_id!, qty: l.qty!, unit: l.unit!, options: null, last_pick: '', optional };
     });
   }
 
@@ -276,13 +308,24 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
       const picks = input.picks ?? {};
       for (const [lineId, foodId] of Object.entries(picks)) {
         const line = u.lines.find((l) => l.line_id === lineId);
-        if (!line?.options?.some((o) => o.food_id === foodId)) {
-          throw new ApiError(`picks.${lineId}: "${foodId}" is not one of that line's options`);
+        if (!line) throw new ApiError(`picks.${lineId}: not a line of "${u.name}"`);
+        if (foodId === null) {
+          if (!line.optional) throw new ApiError(`picks.${lineId}: null, but that line is not optional`);
+        } else if (line.options) {
+          if (!line.options.some((o) => o.food_id === foodId)) {
+            throw new ApiError(`picks.${lineId}: "${foodId}" is not one of that line's options`);
+          }
+        } else if (!line.optional || foodId !== line.food_id) {
+          throw new ApiError(`picks.${lineId}: is an Always line: it has nothing to pick`);
         }
       }
       const group_id = nextId('gr');
-      const rows = u.lines.map((line) => {
-        const a = chosen(line, picks[line.line_id]);
+      const left = (line: StoredLine) =>
+        !!line.optional && (line.line_id in picks ? picks[line.line_id] === null : line.optional === 'out');
+      const taken = u.lines.filter((l) => !left(l));
+      if (!taken.length) throw new ApiError(`Every line of "${u.name}" is left out, so nothing would be logged`);
+      const rows = taken.map((line) => {
+        const a = chosen(line, picks[line.line_id] ?? undefined);
         return {
           input: { id: nextId('lg'), date: input.date, slot: input.slot, ...a } as LogEntryInput,
           group: { group_id, group_name: u.name, usual_id: u.id, usual_line_id: line.line_id },
@@ -290,8 +333,8 @@ export function createDemoUsuals(ctx: Context): DemoUsuals {
       });
       const entries = writeAll(rows, dryRun);
       if (!dryRun) {
-        for (const line of u.lines) {
-          if (line.options) line.last_pick = chosen(line, picks[line.line_id]).food_id;
+        for (const line of taken) {
+          if (line.options) line.last_pick = chosen(line, picks[line.line_id] ?? undefined).food_id;
         }
       }
       return clone({ entries, group_id });

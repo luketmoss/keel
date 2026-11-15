@@ -75,7 +75,8 @@ export function groupChanges(entries: FoodLogEntry[], usual: Usual, foods: Map<s
     const e = entries.find((x) => x.usual_line_id === line.line_id && !used.has(x.id));
     const start = startOf(line);
     if (!e) {
-      out.push(`${label(start.food_id)} removed`);
+      // #942: leaving an optional line out is not a change from the usual.
+      if (!line.optional) out.push(`${label(start.food_id)} removed`);
       continue;
     }
     used.add(e.id);
@@ -90,21 +91,59 @@ export function groupChanges(entries: FoodLogEntry[], usual: Usual, foods: Map<s
       out.push(`${label(e.food_id)} ${amountText(e.qty, e.unit)}, was ${amountText(want.qty, want.unit)}`);
     }
   }
-  for (const e of entries) if (!used.has(e.id)) out.push(`${label(e.food_id)} added`);
+  for (const e of entries) {
+    if (!used.has(e.id) && !secondOption(e, usual, used, entries)) out.push(`${label(e.food_id)} added`);
+  }
   return out;
 }
 
 /**
+ * #942: an entry no line took, whose food is an option of a pick-one line that has its own entry: apple and pear in
+ * the oatmeal. It is not an addition, and Update the usual makes no line of it. `used` holds the entries lines took.
+ */
+function secondOption(e: FoodLogEntry, usual: Usual, used: Set<string>, entries: FoodLogEntry[]): boolean {
+  if (!e.food_id) return false;
+  return usual.lines.some(
+    (l) =>
+      !!l.options &&
+      l.options.some((o) => o.food_id === e.food_id) &&
+      entries.some((x) => used.has(x.id) && x.usual_line_id === l.line_id),
+  );
+}
+
+/**
  * What Update the usual saves: the group's entries as the lines. A line keeps its id and, for a pick-one, its other
- * options, with the picked one at the amount the group has and as the last pick. An entry with no line is a new one,
- * and a line with no entry is dropped.
+ * options, with the picked one at the amount the group has and as the last pick. An entry with no line is a new one
+ * (unless it is a second option of a pick-one, #942), and a line with no entry is dropped, unless it is optional.
  */
 export function updatedUsual(entries: FoodLogEntry[], usual: Usual): UsualInput {
   const lines: UsualLineInput[] = [];
   const used = new Set<string>();
   for (const line of usual.lines) {
     const e = entries.find((x) => x.usual_line_id === line.line_id && !used.has(x.id));
-    if (!e) continue;
+    const optional = line.optional ? { optional: line.optional } : {};
+    if (!e) {
+      // #942: an optional line that wasn't logged is kept as it is; any other with no entry is dropped.
+      if (line.optional) {
+        lines.push(
+          line.options
+            ? {
+                line_id: line.line_id,
+                options: line.options.map((o) => ({ ...o })),
+                ...(line.last_pick ? { last_pick: line.last_pick } : {}),
+                ...optional,
+              }
+            : {
+                line_id: line.line_id,
+                food_id: line.food_id,
+                qty: line.qty ?? undefined,
+                unit: line.unit,
+                ...optional,
+              },
+        );
+      }
+      continue;
+    }
     used.add(e.id);
     const now: UsualOption = { food_id: e.food_id, qty: e.qty, unit: e.unit };
     if (line.options && line.options.some((o) => o.food_id === e.food_id)) {
@@ -112,11 +151,14 @@ export function updatedUsual(entries: FoodLogEntry[], usual: Usual): UsualInput 
         line_id: line.line_id,
         options: line.options.map((o) => (o.food_id === e.food_id ? now : { ...o })),
         last_pick: e.food_id,
+        ...optional,
       });
-    } else lines.push({ line_id: line.line_id, ...now });
+    } else lines.push({ line_id: line.line_id, ...now, ...optional });
   }
   for (const e of entries) {
-    if (!used.has(e.id) && e.food_id) lines.push({ food_id: e.food_id, qty: e.qty, unit: e.unit });
+    if (!used.has(e.id) && e.food_id && !secondOption(e, usual, used, entries)) {
+      lines.push({ food_id: e.food_id, qty: e.qty, unit: e.unit });
+    }
   }
   return { id: usual.id, name: usual.name, slot: usual.slot, lines };
 }

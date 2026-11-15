@@ -4089,3 +4089,40 @@ a.text-btn {
     animation: none;
   }
 }
+
+/* #942: optional usual lines. The editor's How often pills, and the tray's on/off chips. */
+.chip[aria-checked='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.usual-how-often {
+  margin-top: var(--space-sm);
+}
+
+.tray-optional {
+  margin: var(--space-xs) 0 var(--space-sm);
+}
+
+.tray-chip {
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.tray-chip.is-on {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.tray-chip.is-off {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.tray-chip[aria-disabled='true'] {
+  opacity: 0.5;
+}

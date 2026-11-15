@@ -194,9 +194,58 @@ export const DEMO_USUAL_FOODS: Food[] = [
     servings_json: [W('tbsp', 16)],
     source: 'usda',
   }),
+  // #942: the Side salad usual's foods.
+  food('fd_demo_romaine', 'Romaine lettuce', {
+    kcal_100g: 17,
+    protein_100g: 1.2,
+    carbs_100g: 3.3,
+    fat_100g: 0.3,
+    servings_json: [W('cup', 47)],
+    source: 'usda',
+  }),
+  food('fd_demo_carrot', 'Carrot', {
+    kcal_100g: 41,
+    protein_100g: 0.9,
+    carbs_100g: 9.6,
+    fat_100g: 0.2,
+    servings_json: [W('medium', 61)],
+    source: 'usda',
+  }),
+  food('fd_demo_feta', 'Feta', {
+    kcal_100g: 264,
+    protein_100g: 14,
+    carbs_100g: 4,
+    fat_100g: 21,
+    servings_json: [W('oz', 28)],
+    source: 'usda',
+  }),
+  food('fd_demo_cucumber', 'Cucumber', {
+    kcal_100g: 15,
+    protein_100g: 0.7,
+    carbs_100g: 3.6,
+    fat_100g: 0.1,
+    servings_json: [W('cup', 104)],
+    source: 'usda',
+  }),
+  food('fd_demo_ranch', 'Ranch dressing', {
+    kcal_100g: 430,
+    protein_100g: 1,
+    carbs_100g: 6,
+    fat_100g: 45,
+    servings_json: [W('tbsp', 15)],
+    source: 'usda',
+  }),
+  food('fd_demo_balsamic', 'Balsamic vinaigrette', {
+    kcal_100g: 320,
+    protein_100g: 0.3,
+    carbs_100g: 12,
+    fat_100g: 30,
+    servings_json: [W('tbsp', 15)],
+    source: 'usda',
+  }),
 ];
 
-type Amount = { food_id: string; qty: number; unit: string };
+type Amount = { food_id: string; qty: number; unit: string; optional?: 'in' | 'out' };
 
 /** A sample usual. `used` and `last_used_days_ago` are its history before the session; the session's own logs add to them. */
 export interface DemoUsual {
@@ -205,7 +254,7 @@ export interface DemoUsual {
   slot: Slot;
   used: number;
   last_used_days_ago: number;
-  lines: (Amount | { options: Amount[]; last_pick: string })[];
+  lines: (Amount | { options: Amount[]; last_pick: string; optional?: 'in' | 'out' })[];
 }
 
 export const DEMO_USUALS: DemoUsual[] = [
@@ -271,6 +320,27 @@ export const DEMO_USUALS: DemoUsual[] = [
         last_pick: 'fd_demo_kpbcreamy',
       },
       { food_id: 'fd_demo_blueberries', qty: 0.5, unit: 'cup' },
+    ],
+  },
+  {
+    id: 'us_demo_sidesalad',
+    name: 'Side salad',
+    slot: 'Lunch',
+    used: 7,
+    last_used_days_ago: 2,
+    lines: [
+      { food_id: 'fd_demo_romaine', qty: 2, unit: 'cup' },
+      { food_id: 'fd_demo_carrot', qty: 0.5, unit: 'medium', optional: 'in' },
+      { food_id: 'fd_demo_feta', qty: 1, unit: 'oz', optional: 'out' },
+      { food_id: 'fd_demo_cucumber', qty: 0.5, unit: 'cup', optional: 'out' },
+      {
+        options: [
+          { food_id: 'fd_demo_ranch', qty: 2, unit: 'tbsp' },
+          { food_id: 'fd_demo_balsamic', qty: 2, unit: 'tbsp' },
+        ],
+        last_pick: 'fd_demo_balsamic',
+        optional: 'in',
+      },
     ],
   },
 ];

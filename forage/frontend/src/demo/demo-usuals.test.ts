@@ -133,6 +133,34 @@ describe('the demo usuals (#881)', () => {
     ).rejects.toThrow();
   });
 
+  it('logMeal writes a food, a recipe and a group in order, once per id', async () => {
+    const api = createDemoApi();
+    const g = { key: 'k', name: 'Snack' };
+    const input = {
+      date: today,
+      slot: 'Snacks' as const,
+      items: [
+        { id: 'lg_m1', food_id: 'fd_demo_apple', qty: 1, unit: 'medium' },
+        { id: 'lg_m2', food_id: 'fd_demo_apple', qty: 1, unit: 'medium', group: g },
+        { id: 'lg_m3', food_id: 'fd_demo_pb', qty: 1, unit: 'tbsp', group: g },
+      ],
+    };
+    const before = (await api.getFoodLog(today, today)).length;
+    const dry = await api.logMeal(input, true);
+    expect(dry.entries).toHaveLength(3);
+    expect((await api.getFoodLog(today, today)).length).toBe(before);
+    const first = await api.logMeal(input);
+    expect(first.entries.map((e) => e.id)).toEqual(['lg_m1', 'lg_m2', 'lg_m3']);
+    expect(first.entries.map((e) => e.group_id || '')).toEqual(['', first.group_ids.k, first.group_ids.k]);
+    const again = await api.logMeal(input);
+    expect(again.entries.map((e) => e.id)).toEqual(['lg_m1', 'lg_m2', 'lg_m3']);
+    expect(again.group_ids).toEqual(first.group_ids);
+    expect((await api.getFoodLog(today, today)).length).toBe(before + 3);
+    await expect(
+      api.logMeal({ ...input, items: [input.items[0], { food_id: 'fd_demo_apple', qty: 1, unit: 'bucket' }] }),
+    ).rejects.toThrow(/items\[2\]/);
+  });
+
   it('logGroup, setLogGroup and deleteLogEntries', async () => {
     const api = createDemoApi();
     const { entries, group_id } = await api.logGroup({

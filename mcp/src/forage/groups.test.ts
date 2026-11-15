@@ -60,7 +60,7 @@ const GROUP = { entries: [entry('lg_1', 'fd_oats'), entry('lg_2', 'fd_pb', { usu
 
 describe('the group tools', () => {
   it('are write tools', () => {
-    for (const t of ['forage_log_usual', 'forage_log_group', 'forage_copy_meal', 'forage_group_log']) {
+    for (const t of ['forage_log_usual', 'forage_log_group', 'forage_log_meal', 'forage_copy_meal', 'forage_group_log']) {
       expect(FORAGE_READ_TOOLS.has(t), t).toBe(false)
     }
   })
@@ -100,6 +100,30 @@ describe('the group tools', () => {
     const r = await call('forage_log_group', { name: 'Toast', slot: 'Snacks', date: '2026-11-01', items, dry_run: false })
     expect(sent.find((s) => s.action === 'logGroup')!.payload).toMatchObject({ name: 'Toast', slot: 'Snacks', date: '2026-11-01', items })
     expect(text(r)).toContain(REMINDER)
+  })
+
+  it('forage_log_meal previews by default and, with dry_run false, writes once and names the undo call', async () => {
+    const sent = api({ logMeal: ok({ entries: GROUP.entries, group_ids: { k: 'gr_1a2b3c4d' } }), getFoods: ok(FOODS), getRecipes: ok([]) })
+    const items = [
+      { food_id: 'fd_oats', qty: 1, unit: 'cup', group: { key: 'k', name: 'Oatmeal' } },
+      { recipe_id: 'rc_1', qty: 1, unit: 'serving' },
+    ]
+    const dry = await call('forage_log_meal', { slot: 'Breakfast', date: '2026-11-01', items })
+    expect(sent.find((s) => s.action === 'logMeal')!.payload).toMatchObject({ slot: 'Breakfast', date: '2026-11-01', items, dry_run: true })
+    expect(text(dry)).toContain('Preview — nothing logged.')
+    expect(text(dry)).not.toContain(REMINDER)
+    const r = await call('forage_log_meal', { slot: 'Breakfast', date: '2026-11-01', items, dry_run: false })
+    const writes = sent.filter((s) => s.action === 'logMeal' && !s.payload.dry_run)
+    expect(writes).toHaveLength(1)
+    expect(text(r)).toContain(`Undo with forage_undo, call ${writes[0].payload.call_id}`)
+    expect(text(r)).toContain(REMINDER)
+  })
+
+  it('forage_log_meal says nothing was logged when the API refuses', async () => {
+    api({ logMeal: () => ({ success: false, error: 'items[2]: food_id "x" is not a food' }) })
+    const r = await call('forage_log_meal', { slot: 'Lunch', date: '2026-11-01', items: [{ food_id: 'x', qty: 1, unit: 'g' }], dry_run: false })
+    expect(r.isError).toBe(true)
+    expect(text(r)).toBe('Nothing logged. items[2]: food_id "x" is not a food')
   })
 
   it('forage_copy_meal sends the meal and answers the copies with the undo call', async () => {

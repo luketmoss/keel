@@ -176,6 +176,22 @@ describe('the usuals, groups, copy and combos client (#881)', () => {
     expect((await run(grouped, (api) => api.logGroup(input, true))).payload).toEqual({ ...input, dry_run: true });
   });
 
+  it('logMeal sends the items with their groups, and dry_run only when asked', async () => {
+    const input = {
+      date: '2026-11-14',
+      slot: 'Lunch' as const,
+      items: [
+        { id: 'lg_1', food_id: 'fd_bread', qty: 2, unit: 'slice', group: { key: 'k', name: 'Sandwich' } },
+        { id: 'lg_2', recipe_id: 'rc_1', qty: 1, unit: 'serving' },
+      ],
+    };
+    const result = { entries: [entry], group_ids: { k: 'gr_1a2b3c4d' } };
+    const r = await run(result, (api) => api.logMeal(input));
+    expect(r).toMatchObject({ action: 'logMeal', payload: input });
+    expect(r.result).toEqual(result);
+    expect((await run(result, (api) => api.logMeal(input, true))).payload).toEqual({ ...input, dry_run: true });
+  });
+
   it('copyMeal sends the source and the target', async () => {
     const input: CopyMealInput = {
       from_date: '2026-11-13',

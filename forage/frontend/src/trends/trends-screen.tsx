@@ -19,6 +19,8 @@ import {
   type DayPoint,
   type WeekPoint,
 } from './energy';
+import { FoodsTab } from './foods-tab';
+import { resetFoods } from './foods-store';
 import { MacrosTab } from './macros-tab';
 import { MealsTab } from './meals-tab';
 import { NutrientsTab } from './nutrients-tab';
@@ -34,12 +36,14 @@ import {
   trendsState,
   trendsToday,
   viewAverage,
+  viewFoodMetric,
   viewMacro,
   viewRange,
 } from './trends-store';
 import {
   AVERAGES,
   BUILT_TABS,
+  FOOD_METRICS,
   MACRO_METRICS,
   NUTRIENT_METRICS,
   RANGES,
@@ -253,20 +257,26 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
   // Trends reads fresh each visit; this runs before the load below.
   useEffect(() => {
     resetTrends();
-    return () => resetTrends();
+    // The Foods tab's own reads start before this runs (a child's effects come first), so only a leave clears them.
+    return () => {
+      resetTrends();
+      resetFoods();
+    };
   }, []);
+  // The Foods tab reads its own entries (#916); every other tab shares the one totals read.
   useEffect(() => {
-    void loadTrends(api, range);
-  }, [api, range]);
+    if (tab !== 'foods') void loadTrends(api, range);
+  }, [api, range, tab]);
   // The hash follows the screen's tab, range and chart, rewritten in place (no history entry).
   const metric = tab === 'macros' ? macro : tab === 'nutrients' ? openNut : null;
+  const by = tab === 'foods' ? viewFoodMetric.value : null;
   useEffect(() => {
-    const want = trendsHash(tab, range, metric);
+    const want = trendsHash(tab, range, metric, by);
     if (window.location.hash !== want) {
       const { pathname, search } = window.location;
       window.history.replaceState(window.history.state, '', `${pathname}${search}${want}`);
     }
-  }, [tab, range, metric]);
+  }, [tab, range, metric, by]);
   // A selection is cleared by a change of range, average or tab; a tab change closes the open nutrient.
   useEffect(() => {
     setSelected(null);
@@ -281,6 +291,8 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
   }, [tab]);
   // A link that names a chart (a macro, or a nutrient row) sets it for this visit; a macro is not stored.
   useEffect(() => {
+    // #916: `by` names what the Foods tab ranks by, for this visit.
+    if (route?.by && (FOOD_METRICS as readonly string[]).includes(route.by)) viewFoodMetric.value = route.by;
     const m = route?.metric;
     if (!m) return;
     if ((MACRO_METRICS as readonly string[]).includes(m)) viewMacro.value = m as MacroMetric;
@@ -353,12 +365,16 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
         options={AVERAGES}
         value={average}
         onChange={chooseAverage}
-        disabled={weekly || tab === 'meals'}
-        describedBy={weekly || tab === 'meals' ? 'weekly-note' : undefined}
+        disabled={weekly || tab === 'meals' || tab === 'foods'}
+        describedBy={weekly || tab === 'meals' || tab === 'foods' ? 'weekly-note' : undefined}
       />
-      {(weekly || tab === 'meals') && (
+      {(weekly || tab === 'meals' || tab === 'foods') && (
         <p class="hint" id="weekly-note" data-testid="weekly-note">
-          {tab === 'meals' ? 'No average line on this chart' : 'Weekly bars have no average line'}
+          {tab === 'foods'
+            ? 'No average on this tab'
+            : tab === 'meals'
+              ? 'No average line on this chart'
+              : 'Weekly bars have no average line'}
         </p>
       )}
     </div>
@@ -401,7 +417,9 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
     ) : null;
 
   let body: preact.ComponentChild;
-  if (state === 'loading') {
+  if (tab === 'foods') {
+    body = <FoodsTab api={api} range={range} />;
+  } else if (state === 'loading') {
     body = <SkeletonCards />;
   } else if (state === 'error') {
     body = (

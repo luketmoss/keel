@@ -185,11 +185,17 @@ describe('the meal-day maths', () => {
 });
 
 describe('the Meals tab', () => {
-  it('adds a fourth tab, opens by ?tab=meals, keeps the range, and makes one by_meal call for all tabs', async () => {
+  it('adds a fourth tab (Foods the fifth), opens by ?tab=meals, keeps the range, and makes one by_meal call for all tabs', async () => {
     const api = fakeApi();
     seed(api);
     await openAt('/#/eaten/trends');
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Energy', 'Macros', 'Nutrients', 'Meals']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Energy',
+      'Macros',
+      'Nutrients',
+      'Meals',
+      'Foods',
+    ]);
     fireEvent.click(screen.getByRole('radio', { name: '3M' }));
     await settle();
     const reads = api.calls('getFoodLogTotals');

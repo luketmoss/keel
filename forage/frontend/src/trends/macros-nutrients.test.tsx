@@ -206,7 +206,13 @@ describe('the tabs', () => {
     const api = fakeApi();
     seedWeeks(api);
     await openAt('/#/eaten/trends');
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Energy', 'Macros', 'Nutrients', 'Meals']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Energy',
+      'Macros',
+      'Nutrients',
+      'Meals',
+      'Foods',
+    ]);
     expect(screen.getByRole('tab', { name: 'Energy' }).getAttribute('aria-selected')).toBe('true');
     fireEvent.click(screen.getByRole('radio', { name: '3M' }));
     await settle();
@@ -372,7 +378,7 @@ describe('Macros', () => {
     await openAt('/#/eaten/trends?tab=macros');
     expect(q('trends-error')).toBeDefined();
     expect(screen.getByRole('radio', { name: '1M' })).toBeDefined();
-    expect(screen.getAllByRole('tab')).toHaveLength(4);
+    expect(screen.getAllByRole('tab')).toHaveLength(5);
   });
 
   it('with nothing logged at all shows the one card on both tabs', async () => {

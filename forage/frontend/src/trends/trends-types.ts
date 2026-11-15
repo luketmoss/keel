@@ -8,10 +8,10 @@ export const AVERAGES = ['Off', '7d', '14d', '30d'] as const;
 export type AverageId = (typeof AVERAGES)[number];
 export const DEFAULT_AVERAGE: AverageId = '7d';
 
-/** The tabs the screen will have (#915, #916 add the rest); only `BUILT_TABS` show. */
+/** The tabs the screen will have; only `BUILT_TABS` show. */
 export const TREND_TABS = ['energy', 'macros', 'nutrients', 'meals', 'foods'] as const;
 export type TrendTab = (typeof TREND_TABS)[number];
-export const BUILT_TABS: readonly TrendTab[] = ['energy', 'macros', 'nutrients', 'meals'];
+export const BUILT_TABS: readonly TrendTab[] = ['energy', 'macros', 'nutrients', 'meals', 'foods'];
 
 /** #914: the macro a Grams per day chart shows, and the seven nutrients, as the hash's `metric` names them. */
 export const MACRO_METRICS = ['protein', 'carbs', 'fat'] as const;
@@ -42,3 +42,8 @@ export const METRIC_TAB: Record<string, TrendTab> = {
   sugars: 'nutrients',
   added_sugars: 'nutrients',
 };
+
+/** #916: what the Foods tab's What drives it ranks by, as the hash's `by` names it. */
+export const FOOD_METRICS = ['kcal', 'protein', 'sodium', 'added_sugars'] as const;
+export type FoodMetric = (typeof FOOD_METRICS)[number];
+export const DEFAULT_FOOD_METRIC: FoodMetric = 'kcal';

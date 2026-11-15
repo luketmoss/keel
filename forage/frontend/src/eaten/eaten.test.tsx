@@ -9,7 +9,8 @@ import type { Food, FoodLogEntry, PlanEntry, RecipeSummary, Slot } from '../api/
 import { _resetDemoApi } from '../api/use-api';
 import { _resetDemoModeCache } from '../demo/is-demo-mode';
 import { _resetFoods } from '../library/foods-store';
-import { _resetRecipes } from '../library/recipes-store';
+import { recipes as libraryRecipes, _resetRecipes } from '../library/recipes-store';
+import { heldRecipes } from './add-store';
 import { _resetPlan } from '../plan/plan-store';
 import { fakeApi } from '../test-api';
 import { readGlobalCss, rule } from '../test-css';
@@ -1055,6 +1056,9 @@ describe('saving a meal as a recipe (#788)', () => {
     expect(kcal()).toBe(before);
     expect(api.log).toHaveLength(6);
     expect(api.calls('logFood')).toHaveLength(0);
+    // #941: one call puts it in the Eaten tab's held recipes, once, and in the Library's list, before any refresh.
+    expect(heldRecipes.value.filter((r) => r.name === 'Side salad')).toHaveLength(1);
+    expect(libraryRecipes.value.map((r) => r.name)).toContain('Side salad');
 
     // It is in the Add sheet's search straight away.
     const add = await addTo('Dinner');

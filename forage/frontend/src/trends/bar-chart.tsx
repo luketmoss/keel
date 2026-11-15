@@ -8,8 +8,18 @@ export interface ChartItem {
   key: string;
   /** The date the item starts on, for the axis. */
   date: string;
-  kind: 'bar' | 'hatched' | 'gap';
+  /** `outline` is a bar whose value is "at least" (#914): drawn unfilled, so it is not colour alone. */
+  kind: 'bar' | 'hatched' | 'outline' | 'gap';
   value: number | null;
+  /** #914: a column of stacked segments from the bottom, in axis units, instead of one bar. */
+  stack?: { h: number; cls: string }[];
+}
+
+/** A fixed axis, in place of the zero-based one the values would give (the 100% columns). */
+export interface ChartAxis {
+  max: number;
+  ticks: number[];
+  format?: (tick: number) => string;
 }
 
 export const CHART_HEIGHT = 200;
@@ -27,9 +37,10 @@ interface Props {
   onSelect: (key: string | null, via: 'pointer' | 'key') => void;
   onOpen: (key: string) => void;
   idPrefix: string;
+  axis?: ChartAxis;
 }
 
-export function BarChart({ items, line, selected, name, describedBy, onSelect, onOpen, idPrefix }: Props) {
+export function BarChart({ items, line, selected, name, describedBy, onSelect, onOpen, idPrefix, axis }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH);
   const press = useRef<{ index: number; wasSelected: boolean; moved: boolean } | null>(null);
@@ -53,7 +64,8 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
   const plotH = CHART_HEIGHT - PAD.top - PAD.bottom;
   const colW = plotW / Math.max(1, n);
   const peak = Math.max(0, ...items.map((i) => i.value ?? 0), ...(line ?? []).map((v) => v ?? 0));
-  const scale = niceScale(peak);
+  const scale = axis ?? niceScale(peak);
+  const tickText = axis?.format ?? ((t: number) => t.toLocaleString('en-US'));
   const y = (v: number) => PAD.top + plotH * (1 - v / scale.max);
   const x = (i: number) => PAD.left + colW * (i + 0.5);
   const base = PAD.top + plotH;
@@ -166,7 +178,7 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
           <g key={t}>
             <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} class="chart-grid" />
             <text x={PAD.left - 6} y={y(t)} class="chart-axis" text-anchor="end" dominant-baseline="middle">
-              {t.toLocaleString('en-US')}
+              {tickText(t)}
             </text>
           </g>
         ))}
@@ -201,6 +213,29 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
               />
             );
           }
+          if (it.stack) {
+            let acc = 0;
+            return (
+              <g key={it.key} data-testid="chart-bar" data-kind="stack" data-key={it.key}>
+                {it.stack.map((seg, k) => {
+                  const lo = y(acc);
+                  acc += seg.h;
+                  const hi = y(acc);
+                  return (
+                    <rect
+                      key={k}
+                      x={x(i) - barW / 2}
+                      y={hi}
+                      width={barW}
+                      height={Math.max(0, lo - hi)}
+                      class={seg.cls}
+                      data-testid="chart-seg"
+                    />
+                  );
+                })}
+              </g>
+            );
+          }
           const top = y(it.value);
           return (
             <rect
@@ -209,7 +244,13 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
               y={top}
               width={barW}
               height={Math.max(1, base - top)}
-              class={it.kind === 'hatched' ? 'chart-bar chart-bar-hatched' : 'chart-bar'}
+              class={
+                it.kind === 'hatched'
+                  ? 'chart-bar chart-bar-hatched'
+                  : it.kind === 'outline'
+                    ? 'chart-bar chart-bar-outline'
+                    : 'chart-bar'
+              }
               style={it.kind === 'hatched' ? { fill: `url(#${hatchId})` } : undefined}
               data-testid="chart-bar"
               data-kind={it.kind}
@@ -239,7 +280,7 @@ export function BarChart({ items, line, selected, name, describedBy, onSelect, o
         {selIndex >= 0 && (
           <g class="chart-selected" data-testid="chart-selected" data-key={items[selIndex].key}>
             <line x1={x(selIndex)} x2={x(selIndex)} y1={PAD.top} y2={base} class="chart-hairline" />
-            {items[selIndex].value !== null && (
+            {items[selIndex].value !== null && !items[selIndex].stack && (
               <circle cx={x(selIndex)} cy={y(items[selIndex].value!)} r="4" class="chart-marker" />
             )}
           </g>

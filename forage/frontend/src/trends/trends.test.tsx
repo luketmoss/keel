@@ -117,11 +117,25 @@ afterEach(() => {
 
 describe('the route', () => {
   it('is matched ahead of #825 and reads range, tab and metric', () => {
-    expect(parseTrendsHash('#/eaten/trends')).toEqual({ range: null, tab: 'energy' });
-    expect(parseTrendsHash('#/eaten/trends?range=3M')).toEqual({ range: '3M', tab: 'energy' });
-    expect(parseTrendsHash('#/eaten/trends?metric=kcal&range=All')).toEqual({ range: 'All', tab: 'energy' });
-    expect(parseTrendsHash('#/eaten/trends?range=3m&tab=meals&metric=protein')).toEqual({ range: null, tab: 'energy' });
-    expect(parseTrendsHash('#/eaten/trends?tab=bogus')).toEqual({ range: null, tab: 'energy' });
+    expect(parseTrendsHash('#/eaten/trends')).toEqual({ range: null, tab: 'energy', metric: null });
+    expect(parseTrendsHash('#/eaten/trends?range=3M')).toEqual({ range: '3M', tab: 'energy', metric: null });
+    expect(parseTrendsHash('#/eaten/trends?metric=kcal&range=All')).toEqual({
+      range: 'All',
+      tab: 'energy',
+      metric: 'kcal',
+    });
+    // The metric wins over the tab and implies its own (#914); a tab not built yet opens Energy.
+    expect(parseTrendsHash('#/eaten/trends?range=3m&tab=meals&metric=protein')).toEqual({
+      range: null,
+      tab: 'macros',
+      metric: 'protein',
+    });
+    expect(parseTrendsHash('#/eaten/trends?tab=meals&metric=bogus')).toEqual({
+      range: null,
+      tab: 'energy',
+      metric: null,
+    });
+    expect(parseTrendsHash('#/eaten/trends?tab=bogus')).toEqual({ range: null, tab: 'energy', metric: null });
     expect(parseTrendsHash('#/eaten/trends/x')).toBeNull();
     expect(parseTrendsHash('#/eaten/2026-10-30')).toBeNull();
     expect(trendsHash('energy', '3M')).toBe('#/eaten/trends?tab=energy&range=3M');
@@ -150,7 +164,7 @@ describe('the route', () => {
   it('range, tab and metric in the hash select the view; unknown values open Energy at the stored range', async () => {
     fakeApi();
     localStorage.setItem(RANGE_KEY, '3M');
-    await openAt('/#/eaten/trends?tab=meals&range=nope&metric=protein');
+    await openAt('/#/eaten/trends?tab=meals&range=nope&metric=bogus');
     expect(screen.getByRole('radio', { name: '3M' }).getAttribute('aria-checked')).toBe('true');
     expect(window.location.hash).toBe('#/eaten/trends?tab=energy&range=3M');
   });

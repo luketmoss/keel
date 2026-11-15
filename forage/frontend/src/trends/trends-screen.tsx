@@ -1,6 +1,6 @@
 // #913: the Trends screen, opened from Eaten's day card, with the Energy tab (forage/docs/design/913-trends-screen.md).
 // Days come from one `getFoodLogTotals` read; the only arithmetic is means over counted days (energy.ts).
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ForageApi } from '../api/client';
 import { eatenDate, eatenToday } from '../eaten/eaten-store';
 import { wholeKcal } from '../eaten/format';
@@ -19,7 +19,11 @@ import {
   type DayPoint,
   type WeekPoint,
 } from './energy';
+import { MacrosTab } from './macros-tab';
+import { NutrientsTab } from './nutrients-tab';
 import { Segmented } from './segmented';
+import { Chip, openDay } from './series-chart';
+import type { TabView } from './series';
 import {
   chooseAverage,
   chooseRange,
@@ -29,9 +33,19 @@ import {
   trendsState,
   trendsToday,
   viewAverage,
+  viewMacro,
   viewRange,
 } from './trends-store';
-import { AVERAGES, BUILT_TABS, RANGES, type TrendTab } from './trends-types';
+import {
+  AVERAGES,
+  BUILT_TABS,
+  MACRO_METRICS,
+  NUTRIENT_METRICS,
+  RANGES,
+  type MacroMetric,
+  type NutrientMetric,
+  type TrendTab,
+} from './trends-types';
 
 const TAB_LABEL: Record<TrendTab, string> = {
   energy: 'Energy',
@@ -58,16 +72,6 @@ export function TrendsHeader() {
   );
 }
 
-/** Open Eaten on a date. A bare `#/eaten` keeps the day last shown, so the day is set first. */
-function openDay(date: string, today: string): void {
-  eatenDate.value = date;
-  window.location.hash = dayHash(date, today);
-}
-
-function Chip({ text }: { text: string }) {
-  return <span class="chip-flag low-chip">{text}</span>;
-}
-
 function SkeletonCards() {
   return (
     <div data-testid="trends-loading" aria-hidden="true">
@@ -83,6 +87,9 @@ interface Readout {
   text: string;
   node: preact.ComponentChild;
 }
+
+const asNutrient = (m: string | null | undefined): NutrientMetric | null =>
+  m && (NUTRIENT_METRICS as readonly string[]).includes(m) ? (m as NutrientMetric) : null;
 
 function dayReadout(p: DayPoint, today: string, avgWord: string | null): Readout {
   const label = p.today ? 'Today' : shortWeekdayDate(p.date);
@@ -236,6 +243,11 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [announce, setAnnounce] = useState('');
+  // #914: the nutrient row whose chart is open, and the one a link named (scrolled into view once).
+  const linked = tab === 'nutrients' ? asNutrient(route?.metric) : null;
+  const [openNut, setOpenNut] = useState<NutrientMetric | null>(linked);
+  const [scrollTo, setScrollTo] = useState<NutrientMetric | null>(linked);
+  const macro = viewMacro.value;
 
   // Trends reads fresh each visit; this runs before the load below.
   useEffect(() => {
@@ -245,19 +257,38 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
   useEffect(() => {
     void loadTrends(api, range);
   }, [api, range]);
-  // The hash follows the screen's tab and range, rewritten in place (no history entry).
+  // The hash follows the screen's tab, range and chart, rewritten in place (no history entry).
+  const metric = tab === 'macros' ? macro : tab === 'nutrients' ? openNut : null;
   useEffect(() => {
-    const want = trendsHash(tab, range);
+    const want = trendsHash(tab, range, metric);
     if (window.location.hash !== want) {
       const { pathname, search } = window.location;
       window.history.replaceState(window.history.state, '', `${pathname}${search}${want}`);
     }
-  }, [tab, range]);
-  // A selection is cleared by a change of range, average or tab.
+  }, [tab, range, metric]);
+  // A selection is cleared by a change of range, average or tab; a tab change closes the open nutrient.
   useEffect(() => {
     setSelected(null);
     setAnnounce('');
   }, [range, average, tab]);
+  const lastTab = useRef(tab);
+  useEffect(() => {
+    if (lastTab.current !== tab) {
+      lastTab.current = tab;
+      setOpenNut(null);
+    }
+  }, [tab]);
+  // A link that names a chart (a macro, or a nutrient row) sets it for this visit; a macro is not stored.
+  useEffect(() => {
+    const m = route?.metric;
+    if (!m) return;
+    if ((MACRO_METRICS as readonly string[]).includes(m)) viewMacro.value = m as MacroMetric;
+    const nut = asNutrient(m);
+    if (nut) {
+      setOpenNut(nut);
+      setScrollTo(nut);
+    }
+  }, [route]);
 
   const first = useMemo(() => {
     const dates = [...byDate.keys()].sort();
@@ -332,15 +363,28 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
     </div>
   );
 
+  const onTabKey = (e: KeyboardEvent) => {
+    const i = BUILT_TABS.indexOf(tab);
+    const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const to = BUILT_TABS[(next + BUILT_TABS.length) % BUILT_TABS.length];
+    window.location.hash = trendsHash(to, range);
+    document.getElementById(`trends-tab-${to}`)?.focus();
+  };
+
   const tabs =
     BUILT_TABS.length > 1 ? (
-      <div class="trends-tabs" role="tablist" aria-label="Trends">
+      <div class="trends-tabs" role="tablist" aria-label="Trends" onKeyDown={onTabKey}>
         {BUILT_TABS.map((t) => (
           <a
             key={t}
             role="tab"
+            id={`trends-tab-${t}`}
             class="trends-tab"
             aria-selected={t === tab}
+            aria-controls="trends-panel"
+            tabIndex={t === tab ? 0 : -1}
             href={trendsHash(t, range)}
             data-testid={`trends-tab-${t}`}
           >
@@ -373,80 +417,94 @@ export function TrendsScreen({ api }: { api: ForageApi }) {
       </section>
     );
   } else {
+    const view: TabView = { byDate, from, today, rangeText, weekly, avgDays };
     const counted = summary.logged > 0;
     const summaryLine = counted
       ? `${summary.logged} of ${summary.total} days logged${summary.low ? ` · ${summary.low} low` : ''}`
       : '';
-    body = (
-      <>
-        <section class="card trends-summary" aria-label="Summary" data-testid="trends-summary">
-          <p class="trends-average">
-            <span class="trends-figure tabular" data-testid="trends-average">
-              {counted ? wholeKcal(summary.average!) : '—'}
-            </span>{' '}
-            {counted && <span class="trends-unit">kcal a day, on average</span>}
-          </p>
-          <p class="hint" id="trends-summary-line" data-testid="trends-summary-line">
-            {counted ? summaryLine : summary.any ? 'No days logged in this range.' : 'Nothing logged in this range.'}
-          </p>
-          {summary.todayIn && (
-            <p class="hint" data-testid="trends-today-note">
-              Not counting today, which is still being logged
+    body =
+      tab === 'macros' ? (
+        <MacrosTab key={`${range}-${average}`} view={view} />
+      ) : tab === 'nutrients' ? (
+        <NutrientsTab
+          key={`${range}-${average}`}
+          view={view}
+          open={openNut}
+          scrollTo={scrollTo}
+          onToggle={(m) => setOpenNut((cur) => (cur === m ? null : m))}
+        />
+      ) : (
+        <>
+          <section class="card trends-summary" aria-label="Summary" data-testid="trends-summary">
+            <p class="trends-average">
+              <span class="trends-figure tabular" data-testid="trends-average">
+                {counted ? wholeKcal(summary.average!) : '—'}
+              </span>{' '}
+              {counted && <span class="trends-unit">kcal a day, on average</span>}
             </p>
-          )}
-        </section>
+            <p class="hint" id="trends-summary-line" data-testid="trends-summary-line">
+              {counted ? summaryLine : summary.any ? 'No days logged in this range.' : 'Nothing logged in this range.'}
+            </p>
+            {summary.todayIn && (
+              <p class="hint" data-testid="trends-today-note">
+                Not counting today, which is still being logged
+              </p>
+            )}
+          </section>
 
-        <section class="card chart-card" aria-labelledby="calories-title" data-testid="chart-card">
-          <h2 class="card-title" id="calories-title">
-            Calories <span class="hint-inline">{rangeText}</span>
-          </h2>
-          <p class="readout" data-testid="readout">
-            {readout ? readout.node : <span class="hint-inline">Tap a day to read it.</span>}
-          </p>
-          <BarChart
-            items={items}
-            line={line}
-            selected={selected}
-            name={`Calories, ${rangeText}`}
-            describedBy="trends-summary-line"
-            onSelect={onSelect}
-            onOpen={onOpen}
-            idPrefix="energy"
-          />
-          <ul class="legend" data-testid="legend">
-            {items.some((i) => i.kind === 'bar') && (
-              <li>
-                <span class="legend-mark legend-day" aria-hidden="true" /> Day
-              </li>
-            )}
-            {lineDrawn && (
-              <li>
-                <span class="legend-mark legend-line" aria-hidden="true" /> {avgWord}
-              </li>
-            )}
-            {items.some((i) => i.kind === 'gap') && (
-              <li>
-                <span class="legend-mark legend-gap" aria-hidden="true" /> Not logged
-              </li>
-            )}
-            {items.some((i) => i.kind === 'hatched') && (
-              <li>
-                <span class="legend-mark legend-low" aria-hidden="true" /> Low
-              </li>
-            )}
-          </ul>
-        </section>
+          <section class="card chart-card" aria-labelledby="calories-title" data-testid="chart-card">
+            <h2 class="card-title" id="calories-title">
+              Calories <span class="hint-inline">{rangeText}</span>
+            </h2>
+            <p class="readout" data-testid="readout">
+              {readout ? readout.node : <span class="hint-inline">Tap a day to read it.</span>}
+            </p>
+            <BarChart
+              items={items}
+              line={line}
+              selected={selected}
+              name={`Calories, ${rangeText}`}
+              describedBy="trends-summary-line"
+              onSelect={onSelect}
+              onOpen={onOpen}
+              idPrefix="energy"
+            />
+            <ul class="legend" data-testid="legend">
+              {items.some((i) => i.kind === 'bar') && (
+                <li>
+                  <span class="legend-mark legend-day" aria-hidden="true" /> Day
+                </li>
+              )}
+              {lineDrawn && (
+                <li>
+                  <span class="legend-mark legend-line" aria-hidden="true" /> {avgWord}
+                </li>
+              )}
+              {items.some((i) => i.kind === 'gap') && (
+                <li>
+                  <span class="legend-mark legend-gap" aria-hidden="true" /> Not logged
+                </li>
+              )}
+              {items.some((i) => i.kind === 'hatched') && (
+                <li>
+                  <span class="legend-mark legend-low" aria-hidden="true" /> Low
+                </li>
+              )}
+            </ul>
+          </section>
 
-        <WeekdayCard days={days} />
-      </>
-    );
+          <WeekdayCard days={days} />
+        </>
+      );
   }
 
   return (
     <div class="trends" data-testid="trends-screen">
       {controls}
       {tabs}
-      {body}
+      <div role="tabpanel" id="trends-panel" aria-labelledby={`trends-tab-${tab}`}>
+        {body}
+      </div>
       <div class="visually-hidden" role="status" data-testid="trends-status">
         {announce}
       </div>

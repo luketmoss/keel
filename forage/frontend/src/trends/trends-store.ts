@@ -6,12 +6,23 @@ import type { FoodLogDay } from '../api/types';
 import { localDate } from '../cook/format';
 import { addDays } from '../plan/dates';
 import { MAX_WINDOW, rangeFrom } from './energy';
-import { AVERAGES, DEFAULT_AVERAGE, DEFAULT_RANGE, RANGES, type AverageId, type RangeId } from './trends-types';
+import {
+  AVERAGES,
+  DEFAULT_AVERAGE,
+  DEFAULT_MACRO,
+  DEFAULT_RANGE,
+  MACRO_METRICS,
+  RANGES,
+  type AverageId,
+  type MacroMetric,
+  type RangeId,
+} from './trends-types';
 
 export type TrendsState = 'loading' | 'ready' | 'error';
 
 export const RANGE_KEY = 'forage-trends-range';
 export const AVERAGE_KEY = 'forage-trends-average';
+export const MACRO_KEY = 'forage-trends-macro';
 /** A `from` before anything can have been logged, for All: the client has no open-ended form. */
 export const ALL_FROM = '2000-01-01';
 
@@ -36,6 +47,8 @@ function write(key: string, value: string): void {
 /** The range on screen: the stored choice, or the one a link asked for on this visit. */
 export const viewRange = signal<RangeId>(read(RANGE_KEY, RANGES, DEFAULT_RANGE));
 export const viewAverage = signal<AverageId>(read(AVERAGE_KEY, AVERAGES, DEFAULT_AVERAGE));
+/** #914: the macro the Grams per day chart shows: the stored choice, or the one a link named on this visit. */
+export const viewMacro = signal<MacroMetric>(read(MACRO_KEY, MACRO_METRICS, DEFAULT_MACRO));
 export const trendsState = signal<TrendsState>('loading');
 /** The days read, by date. A date with nothing logged is absent. */
 export const trendsDays = signal<Map<string, FoodLogDay>>(new Map());
@@ -60,6 +73,11 @@ export function chooseRange(range: RangeId): void {
 export function chooseAverage(avg: AverageId): void {
   viewAverage.value = avg;
   write(AVERAGE_KEY, avg);
+}
+
+export function chooseMacro(m: MacroMetric): void {
+  viewMacro.value = m;
+  write(MACRO_KEY, m);
 }
 
 /** The first date the range needs, with the average's look-back. */
@@ -106,5 +124,6 @@ export function _resetTrends(): void {
   resetTrends();
   viewRange.value = read(RANGE_KEY, RANGES, DEFAULT_RANGE);
   viewAverage.value = read(AVERAGE_KEY, AVERAGES, DEFAULT_AVERAGE);
+  viewMacro.value = read(MACRO_KEY, MACRO_METRICS, DEFAULT_MACRO);
   trendsToday.value = localDate();
 }

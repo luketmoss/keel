@@ -44,6 +44,8 @@ export interface TrendsRoute {
   /** The range a link asked for, for this visit only; null for the stored one. */
   range: RangeId | null;
   tab: TrendTab;
+  /** #914: the chart a link named (a macro, or a nutrient row to open), when it names a built one. */
+  metric: string | null;
 }
 
 /**
@@ -60,15 +62,17 @@ export function parseTrendsHash(hash: string): TrendsRoute | null {
   let want: TrendTab | null = null;
   if (tab && (TREND_TABS as readonly string[]).includes(tab)) want = tab as TrendTab;
   if (metric && metric in METRIC_TAB) want = METRIC_TAB[metric];
+  const tabOk = !!want && BUILT_TABS.includes(want);
   return {
     range: range && (RANGES as readonly string[]).includes(range) ? (range as RangeId) : null,
-    tab: want && BUILT_TABS.includes(want) ? want : 'energy',
+    tab: tabOk ? want! : 'energy',
+    metric: tabOk && metric && metric in METRIC_TAB && METRIC_TAB[metric] === want ? metric : null,
   };
 }
 
 /** The hash that follows the Trends screen's tab and range. */
-export function trendsHash(tab: TrendTab, range: RangeId): string {
-  return `#/eaten/trends?tab=${tab}&range=${range}`;
+export function trendsHash(tab: TrendTab, range: RangeId, metric?: string | null): string {
+  return `#/eaten/trends?tab=${tab}&range=${range}${metric ? `&metric=${metric}` : ''}`;
 }
 
 /** The hash that opens a day from Trends: dated before today, plain on it. */

@@ -6,7 +6,7 @@ import type { Food, Weight } from '../api/types';
 import { keepFood } from '../library/foods-store';
 import { showToast } from '../ui/toast';
 import type { UnitOption } from './amount-edit';
-import { knowFood, switchEditorTo } from './eaten-store';
+import { switchEditorTo } from './eaten-store';
 import { tenth } from './format';
 import {
   fieldNumber,
@@ -65,7 +65,6 @@ export function ServingPanel({
       return;
     }
     keepFood(saved);
-    knowFood(saved);
     const stored = saved.servings_json?.find((s) => s.name.toLowerCase() === added.name.toLowerCase()) ?? added;
     const ok = await switchEditorTo(api, was, { unit: stored.name, grams: stored.g, label: stored.name });
     setSaving(false);

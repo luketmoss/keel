@@ -30,7 +30,7 @@ import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { eatenHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
-import { addLists, beginAddPass, holdFood, holdRecipe } from './add-store';
+import { addLists, beginAddPass, heldFoods, heldRecipes, holdFood, holdRecipe } from './add-store';
 import { AddSheet } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
@@ -65,12 +65,9 @@ import {
   eatenDate,
   eatenToday,
   keepDayUsual,
-  knowFood,
   loadDay,
   loadDayUsuals,
   loadedDate,
-  logFoods,
-  logRecipes,
   moveDay,
   pendingMeals,
   type PendingMeal,
@@ -538,8 +535,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   const state = dayState.value;
   const entries = dayEntries.value;
   const planned = unloggedPlan(dayPlan.value, entries);
-  const foods = logFoods.value;
-  const recipes = logRecipes.value;
+  const foods = heldFoods.value;
+  const recipes = heldRecipes.value;
   const usuals = dayUsuals.value;
   const foodMap = new Map(foods.map((f) => [f.id, f]));
   const pending = pendingMeals.value;
@@ -553,7 +550,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   // catch up quietly behind it (#785).
   function done(status: string, saved: SavedLog) {
     if ('entry' in saved) {
-      if (overlay?.kind === 'amount' && overlay.target.kind === 'food') knowFood(overlay.target.food);
+      if (overlay?.kind === 'amount' && overlay.target.kind === 'food') holdFood(overlay.target.food);
       upsertEntry(saved.entry);
     } else removeEntry(saved.removed);
     void refreshDay(api);
@@ -831,7 +828,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   function savedRecipe(recipe: RecipeDetail) {
     // The reply goes into the Add sheet's and the Library's lists, then the sheet closes and the toast shows together.
     const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = recipe;
-    logRecipes.value = [summary, ...logRecipes.value.filter((r) => r.id !== summary.id)];
     holdRecipe(summary);
     addRecipe(recipe);
     setOverlay(null);
@@ -859,7 +855,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     const amount = swapAmount(entry, food);
     try {
       const saved = await api.updateLogEntry(entry.id, { food_id: food.id, qty: amount.qty, unit: amount.unit });
-      knowFood(food);
+      holdFood(food);
       upsertEntry(saved);
       void refreshDay(api);
       void loadDayUsuals(api);

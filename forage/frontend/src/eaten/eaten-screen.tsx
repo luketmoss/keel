@@ -2,6 +2,8 @@ import { MacroBar } from '../ui/macro-bar';
 import { MacroCols } from '../ui/macro-cols';
 import { MoreNutrition } from '../ui/more-nutrition';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useAuth } from '../auth/auth-context';
+import { isDemoMode } from '../demo/is-demo-mode';
 import type { ForageApi } from '../api/client';
 import {
   SLOTS,
@@ -29,7 +31,8 @@ import { NutritionSheet } from '../library/nutrition-sheet';
 import { StarterSheet } from '../library/starter-sheet';
 import { eatenHash } from '../shell/routes';
 import { showToast } from '../ui/toast';
-import { AddSheet, type AddLists } from './add-sheet';
+import { beginAddPass, holdFood, holdRecipe } from './add-store';
+import { AddSheet } from './add-sheet';
 import { AmountSheet, type LogTarget, type SavedLog } from './amount-sheet';
 import { EntryRow, type RowEditing } from './entry-row';
 import { GroupHeading, GroupMenuSheet, PickOne } from './group-view';
@@ -51,6 +54,7 @@ import {
 import { CopyFromSheet, CopySheet, MealMenuSheet } from './meal-sheets';
 import {
   afterEditor,
+  bindAccount,
   closeEditor,
   editing,
   dayEntries,
@@ -374,8 +378,6 @@ interface Pass {
   slot: Slot;
   /** The entries logged in the pass, in the order logged; one deleted again stays here but leaves the list. */
   ids: string[];
-  /** The Add sheet's lists, loaded at the pass's first open and kept for its returns. */
-  lists: AddLists | null;
   /** The search text, kept while the amount sheet is open. */
   q: string;
   /** The last save's status line, and the entry it touched. */
@@ -417,6 +419,11 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     setSelecting(null);
     setTicked([]);
   }
+
+  // #931: the Add sheet's held lists belong to the signed-in account; the demo user has none on the device.
+  const { user } = useAuth();
+  const account = isDemoMode() ? null : (user?.email ?? null);
+  useEffect(() => bindAccount(account), [account]);
 
   useEffect(() => {
     void loadDay(api);
@@ -511,7 +518,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
   }
 
   function beginPass(slot: Slot) {
-    setPass({ slot, ids: [], lists: null, q: '', status: null, fresh: null });
+    setPass({ slot, ids: [], q: '', status: null, fresh: null });
+    beginAddPass();
     setOverlay({ kind: 'add', slot });
   }
 
@@ -525,13 +533,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     else if (left.length > 1) showToast(`Logged ${left.length} items to ${pass.slot.toLowerCase()}`);
     requestAnimationFrame(() =>
       document.querySelector<HTMLElement>(`[data-testid="add-to-meal"][data-slot="${pass.slot}"]`)?.focus(),
-    );
-  }
-
-  /** A food added or opened inside a pass joins its loaded foods, so a later search finds it. */
-  function passFood(food: Food) {
-    setPass((p) =>
-      p?.lists ? { ...p, lists: { ...p.lists, foods: [...p.lists.foods.filter((f) => f.id !== food.id), food] } } : p,
     );
   }
 
@@ -825,6 +826,7 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     // The reply goes into the Add sheet's and the Library's lists, then the sheet closes and the toast shows together.
     const { lines: _lines, steps: _steps, walkthrough: _walkthrough, walkthrough_check: _check, ...summary } = recipe;
     logRecipes.value = [summary, ...logRecipes.value.filter((r) => r.id !== summary.id)];
+    holdRecipe(summary);
     addRecipe(recipe);
     setOverlay(null);
     leaveSelect();
@@ -835,7 +837,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
     try {
       const food = await api.getFood(id);
       keepFood(food);
-      passFood(food);
       setOverlay(hasNutrition(food) ? { kind: 'amount', slot, target: { kind: 'food', food } } : { kind: 'add', slot });
     } catch {
       setOverlay({ kind: 'add', slot });
@@ -1319,8 +1320,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           slot={overlay.slot}
           today={today}
           initialQuery={overlay.q ?? pass?.q}
-          lists={pass?.lists ?? null}
-          onLoaded={(lists) => setPass((p) => p && { ...p, lists })}
           onQuery={(q) => setPass((p) => (p && p.q !== q ? { ...p, q } : p))}
           added={(pass?.ids ?? []).flatMap((id) => {
             const e = entries.find((x) => x.id === id);
@@ -1375,8 +1374,8 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           api={api}
           onAdded={(result) => {
             const named = [...result.added, ...result.filled];
-            // The pass's foods were loaded before these existed: fetch each, so a search in the pass finds it.
-            for (const n of named) void api.getFood(n.id).then(passFood, () => {});
+            // The held foods were loaded before these existed: fetch each, so a search finds it.
+            for (const n of named) void api.getFood(n.id).then(holdFood, () => {});
             setOverlay({ kind: 'add', slot: overlay.slot, q: named.length === 1 ? named[0].name : '' });
           }}
           onClose={() => setOverlay({ kind: 'add', slot: overlay.slot })}
@@ -1389,7 +1388,6 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           origin={overlay.origin}
           onSaved={(food) => {
             keepFood(food);
-            passFood(food);
             setOverlay(
               hasNutrition(food) && !overlay.fill
                 ? { kind: 'amount', slot: overlay.slot, target: { kind: 'food', food } }
@@ -1405,16 +1403,9 @@ export function EatenScreen({ api }: { api: ForageApi }) {
           recipeId={overlay.recipeId}
           onChanged={(recipe) => {
             if (recipe) {
-              // A recipe given nutrition inside a pass is loggable in the pass's list too.
+              // A recipe given nutrition is loggable in the Add sheet's held list too.
               const { lines: _l, steps: _s, walkthrough: _w, walkthrough_check: _c, ...summary } = recipe;
-              setPass((p) =>
-                p?.lists
-                  ? {
-                      ...p,
-                      lists: { ...p.lists, recipes: p.lists.recipes.map((r) => (r.id === summary.id ? summary : r)) },
-                    }
-                  : p,
-              );
+              holdRecipe(summary);
             }
             void refreshDay(api, true);
           }}

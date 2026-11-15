@@ -6,6 +6,7 @@ import { signal } from '@preact/signals';
 import { ApiError, type ForageApi } from '../api/client';
 import { quietGate } from '../api/quiet-gate';
 import type { Food } from '../api/types';
+import { dropHeldFood, holdFood } from '../eaten/add-store';
 import type { LoadState } from './recipes-store';
 
 export type LibrarySection = 'recipes' | 'foods' | 'usuals';
@@ -67,6 +68,7 @@ export function keepFood(food: Food): void {
   const rest = libraryFoods.value.filter((f) => f.id !== food.id);
   libraryFoods.value = [...rest, food];
   patches++;
+  holdFood(food);
 }
 
 /**
@@ -87,6 +89,7 @@ export async function deleteFood(api: ForageApi, id: string): Promise<string | n
   }
   libraryFoods.value = libraryFoods.value.filter((f) => f.id !== id);
   patches++;
+  dropHeldFood(id);
   return null;
 }
 

@@ -19,6 +19,18 @@ export function sectionKind(section: string): SectionKind {
 }
 
 /**
+ * The five groups last time is matched within (#951): a primary lift, a superset and a burnout are
+ * different efforts, so none stands in for another. `SS1`-`SS3` are one group: the number is only the
+ * superset's position. `sectionKind` keeps the three kinds Lift Mode's working-section flow needs.
+ */
+export type SectionGroup = 'warmup' | 'primary' | 'superset' | 'burnout' | 'cooldown';
+
+export function sectionGroup(section: string): SectionGroup {
+  if (section === 'warmup' || section === 'cooldown' || section === 'primary' || section === 'burnout') return section;
+  return 'superset';
+}
+
+/**
  * Find an exercise's last time, excluding the current workout: one slot (the exercise's rows at one
  * `exercise_order`) of one earlier workout, never a merge of two (#817). `section` is the exercise's
  * section in the workout on screen; every screen that shows a workout passes it.
@@ -30,8 +42,8 @@ export function getLastTimeData(exerciseId: string, currentWorkoutId: string, se
 /**
  * Pure function for testing — accepts data directly instead of reading signals.
  *
- * With a `section`: the most recent earlier workout with the exercise in a section of that kind, and
- * in it the exercise's slot in that section, else its lowest-order slot of that kind. Without one (the
+ * With a `section`: the most recent earlier workout with the exercise in a section of that group (#951),
+ * and in it the exercise's slot in that section, else its lowest-order slot of that group. Without one (the
  * Exercises screen has no section): the most recent working slot, else the most recent warm-up or
  * cool-down slot.
  */
@@ -55,11 +67,11 @@ export function getLastTimeDataFrom(
     (s) => s.exercise_id === exerciseId && s.workout_id !== currentWorkoutId && workoutDateMap.get(s.workout_id),
   );
 
-  // Only rows that can be compared with the section on screen
+  // Only rows that can be compared with the section on screen: the same group (#951)
   let candidates = mine;
   if (section !== undefined) {
-    const kind = sectionKind(section);
-    candidates = mine.filter((s) => sectionKind(s.section) === kind);
+    const group = sectionGroup(section);
+    candidates = mine.filter((s) => sectionGroup(s.section) === group);
   } else {
     const worked = mine.filter((s) => sectionKind(s.section) === 'working');
     if (worked.length > 0) candidates = worked;

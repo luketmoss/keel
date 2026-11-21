@@ -404,12 +404,22 @@ describe('last time is one slot (#817)', () => {
     expect(data!.sets).toHaveLength(4);
   });
 
-  it("matches a working section to another: SS1 last time is today's primary's last time", () => {
+  it("never matches a superset to a primary: SS1 last time is not today's primary's last time (#951)", () => {
     const ss1 = [earlier({ section: 'SS1', exercise_order: 3, set_number: 1, weight: '40', reps: '12' })];
     load(ss1, [workout('w_oct21', '2026-10-21'), workout('w_now', '2026-11-04', 'active')]);
+    expect(lastSession('ex_oh', 'w_now', 'primary')).toBeNull();
+    expect(lastTimeLine(lastTimeFor(today('primary', 5)[0], 'w_now'), 1)).toBe('First time doing this exercise');
+  });
+
+  it('looks past a later superset for a primary (#951)', () => {
+    const lateSS = earlier({ workout_id: 'w_oct28', section: 'SS2', exercise_order: 3, weight: '40', reps: '12' });
+    load(
+      [...OCT21, lateSS],
+      [workout('w_oct21', '2026-10-21'), workout('w_oct28', '2026-10-28'), workout('w_now', '2026-11-04', 'active')],
+    );
     const data = lastSession('ex_oh', 'w_now', 'primary');
-    expect(data!.sets.map((s) => s.section)).toEqual(['SS1']);
-    expect(lastTimeLine(lastTimeFor(today('primary', 5)[0], 'w_now'), 1)).toBe('Last time: 40 × 12');
+    expect(data!.workoutDate).toBe('2026-10-21');
+    expect(data!.sets.every((s) => s.section === 'primary')).toBe(true);
   });
 
   it('never takes last time from a planned workout (#674)', () => {

@@ -320,6 +320,14 @@ describe('getLastTimeDataFrom: same group only (#951)', () => {
     expect(at('burnout')!.sets[0].weight).toBe('30');
   });
 
+  it('gives a burnout the older burnout, skipping a newer primary', () => {
+    const later = [...allSets, row('w_late', 'primary', 1, '75', '5')];
+    const workoutsLater = [...allWorkouts, makeWorkout({ id: 'w_late', date: '2026-10-29' })];
+    const result = getLastTimeDataFrom('ex_db', 'w_now', later, workoutsLater, 'burnout');
+    expect(result!.workoutDate).toBe('2026-10-15');
+    expect(result!.sets[0].section).toBe('burnout');
+  });
+
   it('has no last time for a group the exercise was never in', () => {
     expect(at('cooldown')).toBeNull();
     expect(getLastTimeDataFrom('ex_db', 'w_now', allSets.slice(1), allWorkouts, 'primary')).toBeNull();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLastTimeDataFrom, formatLastTimeDate, sectionKind } from './last-time-data';
+import { getLastTimeDataFrom, formatLastTimeDate, sectionKind, sectionGroup } from './last-time-data';
 import type { SetWithRow, WorkoutWithRow } from '../../api/types';
 import { toLocalDateStr } from '../activities/activities-helpers';
 
@@ -273,6 +273,65 @@ describe('sectionKind (#817)', () => {
   });
 });
 
+describe('sectionGroup (#951)', () => {
+  it('puts each section in its group, with the three supersets together', () => {
+    expect(sectionGroup('warmup')).toBe('warmup');
+    expect(sectionGroup('primary')).toBe('primary');
+    for (const s of ['SS1', 'SS2', 'SS3']) expect(sectionGroup(s)).toBe('superset');
+    expect(sectionGroup('burnout')).toBe('burnout');
+    expect(sectionGroup('cooldown')).toBe('cooldown');
+  });
+});
+
+// #951 — last time comes only from the same group: a more recent appearance in another group is skipped.
+describe('getLastTimeDataFrom: same group only (#951)', () => {
+  const ex = { exercise_id: 'ex_db', exercise_name: 'DB Bench' };
+  const row = (workout_id: string, section: string, order: number, weight: string, reps: string) =>
+    makeSet({ ...ex, workout_id, section, exercise_order: order, set_number: 1, weight, reps, effort: 'Medium' });
+  const allWorkouts = [
+    makeWorkout({ id: 'w_primary', date: '2026-10-01' }),
+    makeWorkout({ id: 'w_ss', date: '2026-10-08' }),
+    makeWorkout({ id: 'w_burnout', date: '2026-10-15' }),
+    makeWorkout({ id: 'w_warmup', date: '2026-10-22' }),
+    makeWorkout({ id: 'w_now', date: '2026-11-04' }),
+  ];
+  const allSets = [
+    row('w_primary', 'primary', 1, '70', '6'),
+    row('w_ss', 'SS2', 4, '50', '10'),
+    row('w_burnout', 'burnout', 8, '30', '15'),
+    row('w_warmup', 'warmup', 0, '20', '12'),
+  ];
+  const at = (section: string) => getLastTimeDataFrom('ex_db', 'w_now', allSets, allWorkouts, section);
+
+  it('gives a primary the older primary, skipping the newer superset, burnout and warm-up', () => {
+    expect(at('primary')!.workoutDate).toBe('2026-10-01');
+    expect(at('primary')!.sets[0].weight).toBe('70');
+  });
+
+  it('gives any superset the superset, skipping the newer burnout and the older primary', () => {
+    for (const s of ['SS1', 'SS2', 'SS3']) {
+      expect(at(s)!.workoutDate).toBe('2026-10-08');
+      expect(at(s)!.sets[0].section).toBe('SS2');
+    }
+  });
+
+  it('gives a burnout the burnout, skipping the newer warm-up', () => {
+    expect(at('burnout')!.workoutDate).toBe('2026-10-15');
+    expect(at('burnout')!.sets[0].weight).toBe('30');
+  });
+
+  it('has no last time for a group the exercise was never in', () => {
+    expect(at('cooldown')).toBeNull();
+    expect(getLastTimeDataFrom('ex_db', 'w_now', allSets.slice(1), allWorkouts, 'primary')).toBeNull();
+  });
+
+  it('leaves the Exercises screen on the most recent working slot, whatever its group', () => {
+    const result = getLastTimeDataFrom('ex_db', '', allSets, allWorkouts);
+    expect(result!.workoutDate).toBe('2026-10-15');
+    expect(result!.sets[0].section).toBe('burnout');
+  });
+});
+
 // #817 — last time is one slot (an exercise's rows at one exercise_order), never a merge.
 // The Oct 21 case: OH Press BB was a warm-up at order 4 (nothing logged) and the primary at order 5.
 describe('getLastTimeDataFrom: one slot (#817)', () => {
@@ -356,11 +415,9 @@ describe('getLastTimeDataFrom: one slot (#817)', () => {
     expect(getLastTimeDataFrom('ex_oh', 'w_now', primary('w_oct21'), base, 'warmup')).toBeNull();
   });
 
-  it('matches working sections to each other: SS1 last time, primary now', () => {
+  it('has no last time for a primary when the exercise was only ever in a superset (#951)', () => {
     const ss1 = [working('w_oct21', 'SS1', 3, 1, '40', '12', 'Easy'), working('w_oct21', 'SS1', 3, 2, '40', '10', '')];
-    const result = getLastTimeDataFrom('ex_oh', 'w_now', ss1, base, 'primary');
-    expect(result!.workoutDate).toBe('2026-10-21');
-    expect(figures(result)).toEqual(['1:40x12', '2:40x10']);
+    expect(getLastTimeDataFrom('ex_oh', 'w_now', ss1, base, 'primary')).toBeNull();
   });
 
   describe('the exercise in two working sections of the earlier workout', () => {
@@ -380,14 +437,30 @@ describe('getLastTimeDataFrom: one slot (#817)', () => {
       expect(figures(getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'burnout'))).toEqual(['1:30x15', '2:30x12']);
     });
 
-    it("takes the lowest-order working slot when today's section is not among them", () => {
-      const result = getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'SS1');
-      expect(result!.sets.every((s) => s.section === 'primary')).toBe(true);
-      expect(figures(result)).toEqual(['1:90x8', '2:90x8', '3:90x8', '4:90x6']);
+    it('gives a superset neither, since neither is in its group (#951)', () => {
+      expect(getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'SS1')).toBeNull();
+    });
+  });
+
+  describe('the exercise in two supersets of the earlier workout', () => {
+    const twoSS = [
+      working('w_oct21', 'SS1', 2, 1, '50', '10', 'Easy'),
+      working('w_oct21', 'SS1', 2, 2, '50', '10', 'Medium'),
+      working('w_oct21', 'SS3', 7, 1, '35', '12', 'Hard'),
+    ];
+
+    it("takes the slot in today's superset when it is among them", () => {
+      expect(figures(getLastTimeDataFrom('ex_oh', 'w_now', twoSS, base, 'SS3'))).toEqual(['1:35x12']);
+    });
+
+    it("takes the lowest-order superset slot when today's superset is not among them", () => {
+      const result = getLastTimeDataFrom('ex_oh', 'w_now', twoSS, base, 'SS2');
+      expect(result!.sets.every((s) => s.section === 'SS1')).toBe(true);
+      expect(figures(result)).toEqual(['1:50x10', '2:50x10']);
     });
 
     it('never shows two slots together, so no set number repeats', () => {
-      const result = getLastTimeDataFrom('ex_oh', 'w_now', both, base, 'SS2');
+      const result = getLastTimeDataFrom('ex_oh', 'w_now', twoSS, base, 'SS2');
       const numbers = result!.sets.map((s) => s.set_number);
       expect(new Set(numbers).size).toBe(numbers.length);
       expect(new Set(result!.sets.map((s) => s.exercise_order)).size).toBe(1);
